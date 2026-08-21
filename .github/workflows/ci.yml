@@ -2,9 +2,9 @@ name: CI
 
 on:
   pull_request:
-    branches: [master]
+    branches: [master, omnimux]
   push:
-    branches: [master]
+    branches: [master, omnimux]
   workflow_dispatch:
 
 permissions:

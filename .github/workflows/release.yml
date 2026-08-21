@@ -1,0 +1,119 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build'
+        required: true
+        type: choice
+        options: [mac, win, both]
+        default: 'both'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DSH_TELEMETRY_DISABLED: '1'
+
+jobs:
+  build-mac:
+    if: ${{ inputs.platform == 'mac' || inputs.platform == 'both' }}
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.23.2
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Install dependencies
+        run: corepack yarn install
+      - name: Install OmniMux product plugins
+        env:
+          OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}/omni-source
+        run: |
+          mkdir -p omni-source
+          # Adjust to the real product-tree repo before merging this workflow.
+          # For v1 the workflow expects a sibling `omni-source` workspace with
+          # the dsh-plugin/product/omnimux-dsh/plugins/* directories mounted.
+      - uses: actions/checkout@v6
+        with:
+          repository: ANYWHERE-LABS/omni-source
+          path: omni-source
+          persist-credentials: false
+          ssh-key: ${{ secrets.OMNI_SOURCE_DEPLOY_KEY }}
+      - name: Stage preset
+        env:
+          OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}/omni-source/product/omnimux-dsh/plugins
+        run: corepack yarn workspace dsh-plugin-desktop stage:preset
+      - name: Build macOS release
+        env:
+          OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}/omni-source/product/omnimux-dsh/plugins
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: corepack yarn workspace dsh-plugin-desktop dist:mac-smoke
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OmniMux-mac
+          path: |
+            dsh-plugin-desktop/dist/**/*.dmg
+            dsh-plugin-desktop/dist/**/*.zip
+          if-no-files-found: error
+          retention-days: 14
+
+  build-win:
+    if: ${{ inputs.platform == 'win' || inputs.platform == 'both' }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.23.2
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Install dependencies
+        run: corepack yarn install
+      - name: Install OmniMux product plugins
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path omni-source -Force | Out-Null
+      - uses: actions/checkout@v6
+        with:
+          repository: ANYWHERE-LABS/omni-source
+          path: omni-source
+          persist-credentials: false
+          ssh-key: ${{ secrets.OMNI_SOURCE_DEPLOY_KEY }}
+      - name: Stage preset
+        env:
+          OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}\omni-source\product\omnimux-dsh\plugins
+        run: corepack yarn workspace dsh-plugin-desktop stage:preset
+      - name: Build Windows installer
+        env:
+          OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}\omni-source\product\omnimux-dsh\plugins
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: corepack yarn workspace dsh-plugin-desktop dist:win
+      - name: Verify Windows installer
+        env:
+          OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}\omni-source\product\omnimux-dsh\plugins
+        run: corepack yarn workspace dsh-plugin-desktop check:win-package
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: OmniMux-win
+          path: |
+            dsh-plugin-desktop/dist/OmniMux-*.exe
+            dsh-plugin-desktop/dist/OmniMux-*.zip
+            dsh-plugin-desktop/dist/win-unpacked
+          if-no-files-found: error
+          retention-days: 14

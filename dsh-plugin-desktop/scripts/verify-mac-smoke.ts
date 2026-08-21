@@ -52,9 +52,9 @@ function defaultOptions(): MacSmokeVerificationOptions {
     distDir: process.argv[2] === undefined
       ? join(packageRoot, 'dist', 'mac-smoke')
       : resolve(process.argv[2]),
-    productName: 'DSH Desktop',
+    productName: 'OmniMux',
     listDmgs,
-    makeMountPoint: () => mkdtempSync(join(tmpdir(), 'dsh-desktop-dmg-smoke-')),
+    makeMountPoint: () => mkdtempSync(join(tmpdir(), 'omnimux-dmg-smoke-')),
     run,
     removeMountPoint: mountPoint => rmdirSync(mountPoint),
     exists: existsSync,

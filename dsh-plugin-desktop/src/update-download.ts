@@ -11,8 +11,8 @@ export type DesktopDownloadPlatform = 'darwin' | 'win32'
 
 /** Fixed download endpoints that record one user-confirmed installer download. */
 export const DESKTOP_DOWNLOAD_URLS: Readonly<Record<DesktopDownloadPlatform, string>> = {
-  darwin: 'https://www.dshdesktop.cn/api/downloads/mac',
-  win32: 'https://www.dshdesktop.cn/api/downloads/windows',
+  darwin: 'https://updates.omnimux.local/api/downloads/mac',
+  win32: 'https://updates.omnimux.local/api/downloads/windows',
 }
 
 /** Maximum accepted installer size, in bytes. */
@@ -161,7 +161,7 @@ export function desktopUpdateFilename(platform: DesktopDownloadPlatform, version
   validatedVersion(version)
   const extension = platform === 'darwin' ? 'dmg' : 'exe'
   const platformName = platform === 'darwin' ? 'mac' : 'windows'
-  return `DSH-Desktop-${version}-${platformName}.${extension}`
+  return `OmniMux-${version}-${platformName}.${extension}`
 }
 
 /** Remember a downloaded installer until an upgraded application resolves its retention. */

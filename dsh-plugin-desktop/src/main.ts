@@ -89,7 +89,7 @@ import type { RendererBootReport } from './renderer-boot-contract.ts'
 import { desktopLocaleFromLanguageTag } from './tray-locale.ts'
 
 const BIN_NAME = 'dsh-plugin-desktop'
-const PRODUCT_NAME = 'DSH Desktop'
+const PRODUCT_NAME = 'OmniMux'
 
 class RendererStartupFailure extends Error {
   constructor(
@@ -370,7 +370,7 @@ async function start(): Promise<void> {
     await app.whenReady()
     startupStage = 'shell-environment'
     lifecycleRecorder.transitionStartupStage(startupStage)
-    if (process.platform === 'win32') app.setAppUserModelId('ai.deepseek.dsh.desktop')
+    if (process.platform === 'win32') app.setAppUserModelId('ai.omnimux.desktop')
     if (app.isPackaged && process.cwd() === '/') process.chdir(app.getPath('home'))
     const shellEnvironmentResolution = await resolveDesktopShellEnvironment({
       environment: process.env,

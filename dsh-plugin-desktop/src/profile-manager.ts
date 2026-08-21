@@ -23,7 +23,7 @@ import {
 } from '@deepseek-ai/dsh-app-boot'
 
 const BIN_NAME = 'dsh-plugin-desktop'
-const DEFAULT_PROFILE_NAME = 'desktop'
+const DEFAULT_PROFILE_NAME = 'omnimux'
 const WEB_PROFILE_NAME = 'web'
 const BASE_BUNDLE_NAME = '@deepseek-ai/dsh-base'
 const WEB_BUNDLE_NAME = '@deepseek-ai/dsh-web-app'

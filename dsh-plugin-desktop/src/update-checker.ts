@@ -1,7 +1,7 @@
 /** Headless version checks against the public DSH Desktop release service. */
 
 /** Public endpoint returning the latest stable DSH Desktop version. */
-export const DESKTOP_VERSION_ENDPOINT = 'https://www.dshdesktop.cn/api/desktop/version'
+export const DESKTOP_VERSION_ENDPOINT = 'https://updates.omnimux.local/api/desktop/version'
 
 /** Maximum response body bytes accepted from the version service. */
 export const MAX_VERSION_RESPONSE_BYTES = 4 * 1024

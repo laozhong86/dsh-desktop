@@ -30,6 +30,7 @@ export default defineConfig([
       'windows-pwsh-sandbox': 'src/windows-pwsh-sandbox.ts',
       'windows-acl-runner': 'src/windows-acl-runner.ts',
       main: 'src/main.ts',
+      'preset-profile': 'src/preset-profile.ts',
     },
     outDir: 'lib',
     format: 'esm',

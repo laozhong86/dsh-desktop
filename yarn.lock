@@ -7269,8 +7269,7 @@ __metadata:
   peerDependencies:
     electron: 43.4.0
   bin:
-    dsh-desktop: lib/bin.js
-    dsh-plugin-desktop: lib/bin.js
+    omnimux: lib/bin.js
   languageName: unknown
   linkType: soft
 

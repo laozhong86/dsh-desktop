@@ -74,6 +74,7 @@ import {
   type SkippedOptionalEntry,
 } from './profile.ts'
 import type { DesktopPnpmBootstrap } from './pnpm.ts'
+import { seedOmnimuxProfile } from './preset-profile.ts'
 import {
   createDesktopExitCoordinator,
   createDesktopShutdown,
@@ -417,6 +418,9 @@ async function start(): Promise<void> {
     const pluginManagementStatePath = join(app.getPath('userData'), 'plugin-management', 'state.json')
     startupStage = 'profile-selection'
     lifecycleRecorder.transitionStartupStage(startupStage)
+    const presetDir = fileURLToPath(new URL('../preset', import.meta.url))
+    const seed = seedOmnimuxProfile({ home: homeDir, presetDir })
+    electronLogger.error(`${BIN_NAME}: omnimux profile seed (created=${String(seed.created)}, refreshedPlugins=${String(seed.refreshedPlugins)}): ${seed.profileDir}`)
     profileStartup = beginDesktopProfileStartup(selectionStatePath, homeDir)
     const activeProfileName = profileStartup.profileName
     const activeProfileDir = resolveProfileDir(activeProfileName, homeDir)

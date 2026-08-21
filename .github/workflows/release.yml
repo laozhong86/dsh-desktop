@@ -51,6 +51,7 @@ jobs:
           OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}/omni-source/plugins
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: |
+          corepack yarn workspace dsh-plugin-desktop build
           cd dsh-plugin-desktop
           node node_modules/electron-builder/cli.js --mac dmg --arm64 --publish never \
             --config.mac.notarize=false --config.npmRebuild=false \

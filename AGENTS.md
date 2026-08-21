@@ -27,3 +27,11 @@ This repository owns the desktop product around an unmodified DeepSeek Harness c
 - Keep graphical application launch explicit. Builds, typechecks, unit tests, and Loader smokes must remain headless-safe.
 - Commit before major changes of direction and keep the submodule pin update separate from desktop behavior changes.
 - Keep the repository topology and package-manager split consistent with the [owning Agent Note](.agents/notes/implemented/process/2026-08-15-pinned-upstream-and-isolated-yarn-workspace.md).
+
+## Repository ecosystem
+
+This desktop product is one layer of a wider OmniMux project ecosystem: it forks an unmodified official DeepSeek Harness checkout, ships preset OmniMux plugins from the sibling `dsh-plugin` development workspace, and talks to the OmniMux Go gateway over `OMNIMUX_BASE_URL`. Sibling repositories live under `~/Desktop/Project/` (`dsh-plugin`, `OmniMux`, `Github/deepseek-harness`). Read the [ecosystem Agent Note](.agents/notes/implemented/architecture/2026-08-21-omnimux-ecosystem-map.md) before touching plugin sync, upstream pins, or gateway-facing behavior.
+
+## Upstream sync contract
+
+This fork syncs with upstream weekly. Before any merge from `origin/master`, read and follow [docs/contracts/upstream-sync.md](docs/contracts/upstream-sync.md) — it defines the four-tier merge decision ladder (auto-merge / template-resolve / user-confirm / reject), the standard SOP, and the mandatory decision log at [docs/contracts/upstream-sync-log.md](docs/contracts/upstream-sync-log.md). A merge without a log entry is not done.

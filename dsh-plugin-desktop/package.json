@@ -286,9 +286,7 @@
       "cordis.patch.yml",
       "lib/**",
       "package.json",
-      "preset/skeleton/**",
-      "preset/seed-version",
-      "preset/owned-packages.json",
+      "preset/**",
       "!node_modules/node-pty/build/**"
     ],
     "mac": {

@@ -6,6 +6,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -123,6 +124,26 @@ function copyHoistedModules(source: string, destination: string): void {
     const to = join(destination, ...name.split('/'))
     mkdirSync(dirname(to), { recursive: true })
     cpSync(from, to, { recursive: true, dereference: true })
+    // pnpm materializes nested `node_modules/.bin` entries whose relative
+    // targets pointed into the (now deleted) staging tree. electron-builder
+    // stats every packaged file, so a dangling link fails the whole build,
+    // while runtime code never invokes these CLI shims.
+    removeDanglingBinLinks(to)
+  }
+}
+
+function removeDanglingBinLinks(packageDir: string): void {
+  const queue = [join(packageDir, 'node_modules')]
+  while (queue.length > 0) {
+    const dir = queue.pop()!
+    const binDir = join(dir, '.bin')
+    if (existsSync(binDir)) rmSync(binDir, { recursive: true, force: true })
+    if (!existsSync(dir)) continue
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.isDirectory() && entry.name !== '.bin' && !entry.name.startsWith('.')) {
+        queue.push(join(dir, entry.name, 'node_modules'))
+      }
+    }
   }
 }
 

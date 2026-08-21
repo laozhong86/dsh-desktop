@@ -48,6 +48,18 @@
 
 ## 标准 SOP（每次同步必走）
 
+**首选执行方式：脚本**（强制分级 + 自动解 B 级 + 生成日志骨架）：
+
+```sh
+cd /Users/x/Desktop/Project/omnimux-desktop-fork
+bash scripts/sync-upstream.sh          # 退出码 0=完成待收尾 / 2=C 级停等 / 3=验证不绿
+# 收尾：补全日志 → git add 日志 && commit → push → CI 确认
+```
+
+脚本实现了本合同的分级：D 级（LICENSE 变更）直接拒绝退出；B 级（品牌字段）按模板自动解并留痕；C 级（结构性冲突）自动 `merge --abort` 回滚并停等；A 级自动合并。核心解析器有单测（`scripts/sync-upstream.test.mjs`，`node --test scripts/sync-upstream.test.mjs`）。
+
+**手动执行（脚本不可用时的人工等价流程）**：
+
 ```sh
 cd /Users/x/Desktop/Project/omnimux-desktop-fork
 git fetch origin

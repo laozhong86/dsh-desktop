@@ -64,8 +64,7 @@ describe('published package surface', () => {
   it('registers both npm launcher names', () => {
     expect(manifest.name).toBe('dsh-plugin-desktop')
     expect(manifest.bin).toEqual({
-      'dsh-plugin-desktop': 'lib/bin.js',
-      'dsh-desktop': 'lib/bin.js',
+      'omnimux': 'lib/bin.js',
     })
   })
 
@@ -386,13 +385,14 @@ describe('published package surface', () => {
   it('fixes the installed application identity', () => {
     expect(manifest.version).toBe(workspaceManifest.version)
     expect(manifest.build?.productName).toBe('OmniMux')
-    expect(manifest.build?.appId).toBe('ai.deepseek.dsh.desktop')
+    expect(manifest.build?.appId).toBe('ai.omnimux.desktop')
     expect(manifest.build?.asarUnpack).toEqual([
       'package.json',
       'cordis.patch.yml',
       'build/**',
       'lib/**',
       'node_modules/**',
+      'preset/**',
     ])
     expect(manifest.build?.electronFuses).toEqual({ runAsNode: true })
     expect(manifest.build?.toolsets).toEqual({ nsis: '1.2.1' })
@@ -440,8 +440,8 @@ describe('published package surface', () => {
   it('separates unsigned smoke packaging from the signed macOS release', () => {
     const packageDir = readFileSync(new URL('scripts/package-dir.mjs', packageRoot), 'utf8')
 
-    expect(manifest.scripts?.build).toContain('node scripts/generate-mac-app-icon.mjs')
-    expect(manifest.scripts?.['package:dir']).toBe('yarn run build && node scripts/package-dir.mjs')
+    expect(manifest.scripts?.build).toContain('node scripts/generate-mac-app-icon-omnimux.mjs')
+    expect(manifest.scripts?.['package:dir']).toBe('yarn run build && yarn run stage:preset && node scripts/package-dir.mjs')
     expect(packageDir).toContain("CSC_IDENTITY_AUTO_DISCOVERY: 'false'")
     expect(manifest.scripts?.['dist:mac']).toBe('node scripts/release-mac.ts')
     expect(manifest.scripts?.['dist:mac-smoke']).toBe('node scripts/package-mac.ts')
@@ -541,12 +541,12 @@ describe('published package surface', () => {
     }
   })
 
-  it('keeps the iOS Default source icon unmodified', () => {
+  it('keeps the OmniMux brand source icon unmodified', () => {
     const digest = createHash('sha256')
       .update(readFileSync(new URL('build/app-icon.png', packageRoot)))
       .digest('hex')
 
-    expect(digest).toBe('315fbc6e57ff1f34894f21f66fb7f9f26deccf78333c71fad21a6cec64e7de80')
+    expect(digest).toBe('64d9bcc087923a42c1667f85e0007b1aa375ece7e41f1d6e388a723a84a4a835')
   })
 
   it('generates a centered macOS icon with a 100-pixel visual inset', async () => {
@@ -561,9 +561,9 @@ describe('published package surface', () => {
       format: 'png',
       width: 1024,
       height: 1024,
-      space: 'rgb16',
-      depth: 'ushort',
-      bitsPerSample: 16,
+      space: 'srgb',
+      depth: 'uchar',
+      bitsPerSample: 8,
       channels: 4,
       hasAlpha: true,
     }))

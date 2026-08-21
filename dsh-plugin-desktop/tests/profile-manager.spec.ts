@@ -71,7 +71,7 @@ describe('desktop profile discovery', () => {
     const before = readFileSync(join(webDir, 'package.json'), 'utf8')
 
     expect(listDesktopProfiles(home)).toEqual([
-      expect.objectContaining({ name: 'desktop', exists: false, webCapable: true }),
+      expect.objectContaining({ name: 'omnimux', exists: false, webCapable: true }),
       expect.objectContaining({ name: 'web', exists: false, webCapable: true }),
       expect.objectContaining({ name: 'broken', exists: true, webCapable: false, problem: expect.any(String) }),
       expect.objectContaining({
@@ -102,16 +102,16 @@ describe('desktop profile discovery', () => {
 
   it('treats an existing repairable desktop profile as managed but rejects malformed metadata', () => {
     const home = temporaryRoot()
-    writeProfile(home, 'desktop', ['@deepseek-ai/dsh-base'])
+    writeProfile(home, 'omnimux', ['@deepseek-ai/dsh-base'])
     expect(listDesktopProfiles(home)[0]).toEqual(expect.objectContaining({
-      name: 'desktop',
+      name: 'omnimux',
       exists: true,
       webCapable: true,
     }))
 
-    writeProfile(home, 'desktop', 'broken')
+    writeProfile(home, 'omnimux', 'broken')
     expect(listDesktopProfiles(home)[0]).toEqual(expect.objectContaining({
-      name: 'desktop',
+      name: 'omnimux',
       webCapable: false,
       problem: expect.any(String),
     }))
@@ -134,14 +134,14 @@ describe('desktop profile selection state', () => {
 
     expect(readDesktopProfileState(statePath)).toEqual({
       version: 1,
-      active: 'desktop',
-      lastKnownGood: 'desktop',
+      active: 'omnimux',
+      lastKnownGood: 'omnimux',
     })
     expect(selectDesktopProfile(statePath, home, 'work')).toEqual({
       version: 1,
-      active: 'desktop',
+      active: 'omnimux',
       pending: 'work',
-      lastKnownGood: 'desktop',
+      lastKnownGood: 'omnimux',
     })
     expect(() => selectDesktopProfile(statePath, home, 'headless')).toThrow(
       'must directly include @deepseek-ai/dsh-base before @deepseek-ai/dsh-web-app',
@@ -166,12 +166,12 @@ describe('desktop profile selection state', () => {
 
     expect(beginDesktopProfileStartup(statePath, home)).toEqual({
       profileName: 'work',
-      state: { version: 1, active: 'work', lastKnownGood: 'desktop' },
+      state: { version: 1, active: 'work', lastKnownGood: 'omnimux' },
       recoveredState: false,
     })
     expect(beginDesktopProfileStartup(statePath, home)).toEqual({
-      profileName: 'desktop',
-      state: { version: 1, active: 'desktop', lastKnownGood: 'desktop' },
+      profileName: 'omnimux',
+      state: { version: 1, active: 'omnimux', lastKnownGood: 'omnimux' },
       recoveredState: true,
       rolledBackFrom: 'work',
     })
@@ -210,14 +210,14 @@ describe('desktop profile selection state', () => {
     writeFileSync(statePath, '{broken')
 
     expect(beginDesktopProfileStartup(statePath, home)).toEqual({
-      profileName: 'desktop',
-      state: { version: 1, active: 'desktop', lastKnownGood: 'desktop' },
+      profileName: 'omnimux',
+      state: { version: 1, active: 'omnimux', lastKnownGood: 'omnimux' },
       recoveredState: true,
     })
     expect(JSON.parse(readFileSync(statePath, 'utf8'))).toEqual({
       version: 1,
-      active: 'desktop',
-      lastKnownGood: 'desktop',
+      active: 'omnimux',
+      lastKnownGood: 'omnimux',
     })
     expect(lstatSync(statePath).isSymbolicLink()).toBe(false)
     expect(existsSync(join(home, 'profiles'))).toBe(false)
@@ -232,8 +232,8 @@ describe('desktop profile selection state', () => {
     rmSync(profileDir, { recursive: true })
 
     expect(beginDesktopProfileStartup(statePath, home)).toEqual({
-      profileName: 'desktop',
-      state: { version: 1, active: 'desktop', lastKnownGood: 'desktop' },
+      profileName: 'omnimux',
+      state: { version: 1, active: 'omnimux', lastKnownGood: 'omnimux' },
       recoveredState: true,
       rolledBackFrom: 'work',
     })

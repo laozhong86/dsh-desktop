@@ -46,18 +46,21 @@ jobs:
         env:
           OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}/omni-source/plugins
         run: corepack yarn workspace dsh-plugin-desktop stage:preset
-      - name: Build macOS release
+      - name: Build macOS release (arm64 DMG)
         env:
           OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}/omni-source/plugins
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-        run: corepack yarn workspace dsh-plugin-desktop dist:mac-smoke
+        run: |
+          cd dsh-plugin-desktop
+          node node_modules/electron-builder/cli.js --mac dmg --arm64 --publish never \
+            --config.mac.notarize=false --config.npmRebuild=false \
+            --config.directories.output=dist/mac-arm64-release
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
           name: OmniMux-mac
           path: |
-            dsh-plugin-desktop/dist/**/*.dmg
-            dsh-plugin-desktop/dist/**/*.zip
+            dsh-plugin-desktop/dist/mac-arm64-release/**/*.dmg
           if-no-files-found: error
           retention-days: 14
 

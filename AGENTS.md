@@ -1,6 +1,6 @@
 # DSH Desktop repository rules
 
-This repository owns the desktop product around an unmodified DeepSeek Harness checkout.
+This repository owns the desktop product around an unmodified DeepSeek Harness checkout. **It is the shipping OmniMux desktop line**: `/Applications/OmniMux.app` and released builds come from here, not from the sibling `omnimux-desktop` tree.
 
 ## Prerequisites and setup
 
@@ -30,7 +30,7 @@ This repository owns the desktop product around an unmodified DeepSeek Harness c
 
 ## Repository ecosystem
 
-This desktop product is one layer of a wider OmniMux project ecosystem: it forks an unmodified official DeepSeek Harness checkout, ships preset OmniMux plugins from the sibling `dsh-plugin` development workspace, and talks to the OmniMux Go gateway over `OMNIMUX_BASE_URL`. Sibling repositories live under `~/Desktop/Project/` (`dsh-plugin`, `OmniMux`, `Github/deepseek-harness`). Read the [ecosystem Agent Note](.agents/notes/implemented/architecture/2026-08-21-omnimux-ecosystem-map.md) before touching plugin sync, upstream pins, or gateway-facing behavior.
+This desktop product is one layer of a wider OmniMux project ecosystem: it forks an unmodified official DeepSeek Harness checkout, ships preset OmniMux plugins from the sibling `dsh-plugin` development workspace, and talks to the OmniMux Go gateway over `OMNIMUX_BASE_URL`. Sibling repositories live under `~/Desktop/Project/` (`dsh-plugin`, `OmniMux`, `Github/deepseek-harness`, and the parallel slim shell `omnimux-desktop` — an alternative product direction, NOT the shipping line). Read the [ecosystem Agent Note](.agents/notes/implemented/architecture/2026-08-21-omnimux-ecosystem-map.md) before touching plugin sync, upstream pins, or gateway-facing behavior. Cross-repo agent memory: `/Users/x/Desktop/Project/Github/deepseek-harness/.workbuddy/memory/MEMORY.md`.
 
 ## Upstream sync contract
 

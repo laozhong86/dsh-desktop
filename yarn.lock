@@ -1937,6 +1937,24 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@deepseek-ai/dsh-credentials-local@npm:0.1.1-rc.2":
+  version: 0.1.1-rc.2
+  resolution: "@deepseek-ai/dsh-credentials-local@npm:0.1.1-rc.2"
+  dependencies:
+    "@deepseek-ai/schemastery": "npm:^3.18.1"
+    chokidar: "npm:^4.0.3"
+    yaml: "npm:^2.9.0"
+  peerDependencies:
+    "@deepseek-ai/cordis": ^4.0.1
+    "@deepseek-ai/dsh-atomic-write": ^0.1.1-rc.2
+    "@deepseek-ai/dsh-credentials": ^0.1.1-rc.2
+    "@deepseek-ai/dsh-home-paths": ^0.1.1-rc.2
+    "@deepseek-ai/dsh-invariants": ^0.1.1-rc.2
+    "@deepseek-ai/dsh-launch-environment": ^0.1.1-rc.2
+  checksum: 10c0/6149c7d962ed8b83eabc9c9d2b36ad3baee50b1cc2f82f320b66f77fd20a9e9b8cd6a8b6e7c8b1eafa218cb4d8c1cd4746a17919dd628978c9c76872c45a0964
+  languageName: node
+  linkType: hard
+
 "@deepseek-ai/dsh-credentials-local@npm:^0.1.0-rc.8":
   version: 0.1.0-rc.8
   resolution: "@deepseek-ai/dsh-credentials-local@npm:0.1.0-rc.8"
@@ -1963,6 +1981,17 @@ __metadata:
     "@deepseek-ai/dsh-brand": ^0.1.0-rc.8
     "@deepseek-ai/dsh-invariants": ^0.1.0-rc.8
   checksum: 10c0/71b611959a5cbb84e1428414e8fab5debba76c8d3cec416f6d8bde1339d20e3bcd7060fb0bfaf8ff7edfc6c36aa531ab2f5534b622183e5e39848f8e83a85817
+  languageName: node
+  linkType: hard
+
+"@deepseek-ai/dsh-credentials@npm:0.1.1-rc.2":
+  version: 0.1.1-rc.2
+  resolution: "@deepseek-ai/dsh-credentials@npm:0.1.1-rc.2"
+  peerDependencies:
+    "@deepseek-ai/cordis": ^4.0.1
+    "@deepseek-ai/dsh-brand": ^0.1.1-rc.2
+    "@deepseek-ai/dsh-invariants": ^0.1.1-rc.2
+  checksum: 10c0/0aa2b265996053ce5bf6799829c4a0fda8fdbba0b9e10e12eaf23fdcddce7e794352b69be01ddcfce0158c46317070fa1b9ce5a75cb87f8dbb18e02f696a8851
   languageName: node
   linkType: hard
 
@@ -7278,7 +7307,8 @@ __metadata:
     "@deepseek-ai/dsh-compaction": "npm:0.1.0-rc.8"
     "@deepseek-ai/dsh-cordis-client-runner": "npm:0.1.0-rc.8"
     "@deepseek-ai/dsh-cordis-host-runner": "npm:0.1.0-rc.8"
-    "@deepseek-ai/dsh-credentials": "npm:0.1.0-rc.8"
+    "@deepseek-ai/dsh-credentials": "npm:0.1.1-rc.2"
+    "@deepseek-ai/dsh-credentials-local": "npm:0.1.1-rc.2"
     "@deepseek-ai/dsh-file-reference": "npm:0.1.0-rc.8"
     "@deepseek-ai/dsh-fs": "npm:0.1.0-rc.8"
     "@deepseek-ai/dsh-fs-local": "npm:0.1.0-rc.8"

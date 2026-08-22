@@ -89,6 +89,7 @@ const electron = vi.hoisted(() => {
     setTemplateImage: vi.fn(),
   }
   const webContents = {
+    executeJavaScript: vi.fn(async (_code: string, _userGesture?: boolean) => null as string | null),
     getZoomLevel: vi.fn(() => zoomLevel),
     on: vi.fn(),
     off: vi.fn(),
@@ -109,6 +110,7 @@ const electron = vi.hoisted(() => {
 
     readonly isDestroyed = vi.fn(() => false)
     readonly isFocused = vi.fn(() => false)
+    readonly isVisible = vi.fn(() => false)
     readonly isMinimized = vi.fn(() => false)
     readonly flashFrame = vi.fn()
     readonly restore = vi.fn()
@@ -168,6 +170,8 @@ const electron = vi.hoisted(() => {
       }),
       getVersion: vi.fn(() => '43.4.0'),
       isPackaged: false,
+      isHidden: vi.fn(() => false),
+      show: vi.fn(),
       setBadgeCount: vi.fn(),
       on: vi.fn(),
       off: vi.fn(),
@@ -887,6 +891,37 @@ describe('Electron desktop runtime', () => {
     expect(electron.browserWindowOff).toHaveBeenCalledWith('focus', expect.any(Function))
   })
 
+  it('restores a hidden macOS application before revealing its window without stealing focus when already visible', async () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const runtime = new ElectronDesktopRuntime(async () => {})
+    const release = runtime.schedule(spec)
+
+    await runtime.mountScheduled()
+
+    const window = electron.browserWindows[0]
+    const activate = electron.app.on.mock.calls.find(([event]) => event === 'activate')?.[1]
+    const didBecomeActive = electron.app.on.mock.calls.find(([event]) => event === 'did-become-active')?.[1]
+    expect(activate).toEqual(expect.any(Function))
+    expect(didBecomeActive).toEqual(expect.any(Function))
+
+    electron.app.isHidden.mockReturnValue(true)
+    window?.isVisible.mockReturnValue(false)
+    didBecomeActive()
+    expect(electron.app.show).toHaveBeenCalledOnce()
+    expect(electron.app.show.mock.invocationCallOrder[0]).toBeLessThan(window?.show.mock.invocationCallOrder[0] ?? Infinity)
+    expect(window?.focus).toHaveBeenCalledOnce()
+
+    electron.app.isHidden.mockReturnValue(false)
+    window?.isVisible.mockReturnValue(true)
+    const focusCount = window?.focus.mock.calls.length ?? 0
+    activate()
+    expect(window?.focus).toHaveBeenCalledTimes(focusCount)
+
+    await release()
+    expect(electron.app.off).toHaveBeenCalledWith('did-become-active', expect.any(Function))
+  })
+
   it('releases the window and tray when post-load startup wiring fails', async () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
     const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
@@ -1059,6 +1094,14 @@ describe('Electron desktop runtime', () => {
     ])
     profile?.submenu?.[0]?.click?.()
     await vi.waitFor(() => { expect(invoke).toHaveBeenCalledOnce() })
+
+    const application = (electron.applicationMenuTemplates.at(-1) as Array<{
+      label?: string
+      submenu?: Array<{ label?: string, submenu?: unknown }>
+    }>).find(item => item.label === 'DSH Desktop')
+    expect(application?.submenu).toEqual(expect.arrayContaining([
+      expect.objectContaining({ label: 'Profile: desktop' }),
+    ]))
 
     await release()
   })

@@ -47,7 +47,7 @@ fi
 if git log --format='%s' "$RANGE" | grep -qiE "electron (3[0-9]|[4-9][0-9])|bump.*electron|major"; then
   warn "🟠 C 级信号：疑似 Electron/依赖大版本变更 —— 合并后需老板确认"
 fi
-git log --oneline "$RANGE" | head -20
+git log --oneline "$RANGE" | head -20 || true
 say ""
 
 # ---------- 阶段 3：merge ----------

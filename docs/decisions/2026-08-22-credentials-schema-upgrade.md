@@ -27,8 +27,8 @@ Status: Implemented（生产 /Applications/OmniMux.app 2.0.2 已携带）
 1. **出包前必须确认** `dsh-plugin-desktop/package.json` 中两个 credentials 包版本 **≥ 0.1.1-rc.2**。任何把它们降回 0.1.0-rc.x 的操作（依赖回滚、lockfile 重置、package.json reset）都会复活跨 app 互杀。
 2. **禁止安装旧产物**：
    - `dist/release-download/OmniMux-2.0.1-arm64.dmg`（旧版，已标记 DEPRECATED）
-   - `/Applications/OmniMux.app.bak-2.0.1-credentials-rc7`（旧版备份，仅供回滚取证，确认稳定后删除）
-   任何从旧 dmg 重装或从旧备份恢复的操作 = 旧 reader 回归。
+   - ~~`/Applications/OmniMux.app.bak-2.0.1-credentials-rc7`~~（2026-08-22 确认新版稳定后已删除）
+   任何从旧 dmg 重装的操作 = 旧 reader 回归。
 3. **上游 sync 时的检查项**：merge 上游后如果 `yarn.lock` 里 credentials 双包被解析回旧版本（上游 lockfile 覆盖、resolutions 冲突），按 upstream-sync 合同走 user-confirm 层重新升级。
 4. **上游正式版注意**：上游首个 tagged release 将移除平铺迁移逻辑（上游源码注释明示）。届时两边都已是嵌套格式，无影响；但**不要再用任何 0.1.1 之前的工具写这个文件**。
 

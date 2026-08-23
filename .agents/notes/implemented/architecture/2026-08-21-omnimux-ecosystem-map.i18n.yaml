@@ -1,5 +1,5 @@
 # Bilingual-pair consistency record: the git blob hash of each side as of the last
 # confirmed-consistent state. Both languages carry equal authority. Update both files
 # and re-record their hashes with git hash-object after editing either side.
-2026-08-21-omnimux-ecosystem-map.md: b37d8ccead74f4de20b6dd405a10856c1800fbe2
-2026-08-21-omnimux-ecosystem-map.zh.md: 7d309c3b4555a7e70dc55af5cf08b1e1637ac77b
+2026-08-21-omnimux-ecosystem-map.md: 2c35b20938f04a08fb6f79b60155512c05212b8c
+2026-08-21-omnimux-ecosystem-map.zh.md: 580fa8e5f6c582b4935c4f5a7211eff26ea631b4

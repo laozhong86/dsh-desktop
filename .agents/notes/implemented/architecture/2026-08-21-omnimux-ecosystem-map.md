@@ -47,7 +47,8 @@ dsh-plugin/product/omnimux-dsh (plugin monorepo: omnimux hub + dsh-drama vertica
 
 ## Guidance for agents
 
-- To change what ships in the desktop as OmniMux: edit plugins in `dsh-plugin/product/omnimux-dsh`, then sync the matching version into `dsh-plugin-desktop/preset/plugins/`.
+- Day-to-day plugin develop / browser QA / sync-to-app / release ops run from **this repository** via `yarn omnimux:*` (see root `AGENTS.md`). Source edits still land in `dsh-plugin/product/omnimux-dsh`.
+- To push a daily iteration into the installed App: `yarn omnimux:sync <plugin>` then `yarn omnimux:restart` (does **not** re-package). To change what ships inside a new install package: `yarn omnimux:stage` then `package:dir` / `dist:*`.
 - To compare against or adopt newer upstream behavior: consult the clean clone `~/Desktop/Project/Github/deepseek-harness`, then propose a dedicated submodule pin update.
 - To touch gateway-facing behavior (billing, video generation, account flows): the contract lives in the gateway repo and the `dsh-plugin` docs (`docs/contracts/hub.md`, `docs/decisions/2026-08-16-harness-consume-not-fork.md`).
 - This map documents local absolute paths; on a different machine, locate siblings by repository identity rather than by path.

@@ -43,7 +43,7 @@ import { LogFileSink } from './log-files.ts'
 import { maskSecrets } from './mask-secrets.ts'
 import { resolveDesktopShellEnvironment } from './shell-environment.ts'
 import { installProfilePackageResolver } from './module-resolution.ts'
-import { packagedDependencyPath } from './packaged-runtime-path.ts'
+import { packagedDependencyPath, unpackedAsarPath } from './packaged-runtime-path.ts'
 import {
   DesktopInstallRecoveryStore,
   desktopInstallRecoveryStatePath,
@@ -480,7 +480,7 @@ async function start(): Promise<void> {
     startupStage = 'profile-selection'
     lifecycleRecorder.transitionStartupStage(startupStage)
     const presetDir = fileURLToPath(new URL('../preset', import.meta.url))
-    const seed = seedOmnimuxProfile({ home: homeDir, presetDir })
+    const seed = seedOmnimuxProfile({ home: homeDir, presetDir: app.isPackaged ? unpackedAsarPath(presetDir) : presetDir })
     electronLogger.error(`${BIN_NAME}: omnimux profile seed (created=${String(seed.created)}, refreshedPlugins=${String(seed.refreshedPlugins)}): ${seed.profileDir}`)
     profileStartup = beginDesktopProfileStartup(selectionStatePath, homeDir)
     const activeProfileName = profileStartup.profileName

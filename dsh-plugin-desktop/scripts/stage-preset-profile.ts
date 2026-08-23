@@ -31,7 +31,6 @@ const PRODUCT_PLUGINS = [
   'omnimux',
   'omnimux-accounts',
   'omnimux-assets',
-  'omnimux-gallery',
   'omnimux-workflow',
 ] as const
 const REQUIRED_PACKAGES = [...PRODUCT_PLUGINS, 'dsh-better-sidebar']

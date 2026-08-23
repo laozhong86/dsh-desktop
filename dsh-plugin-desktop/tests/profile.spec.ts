@@ -206,7 +206,7 @@ describe('desktop profile composition', {
     expect(inserted).toContainEqual(expect.objectContaining({
       id: 'desktop-webserver',
       name: 'dsh-plugin-desktop/webserver',
-      config: { host: '127.0.0.1', port: 43_120 },
+      config: { host: '127.0.0.1', port: 44_120 },
     }))
     expect(patches).toContainEqual(expect.objectContaining({
       id: 'agent-presets',
@@ -554,7 +554,7 @@ describe('desktop profile composition', {
     })
     expect(desktopStartupSettingsFromSettings({ 'dsh-desktop': { mode: 'advanced' } })).toEqual({
       mode: 'advanced',
-      port: 43_120,
+      port: 44_120,
     })
     expect(desktopShellModeFromSettings({ unrelated: { enabled: true } })).toBe('compatibility')
   })

@@ -32,7 +32,6 @@ export const REQUIRED_BUNDLES = [
   'omnimux',
   'omnimux-accounts',
   'omnimux-assets',
-  'omnimux-gallery',
   'omnimux-workflow',
 ] as const
 

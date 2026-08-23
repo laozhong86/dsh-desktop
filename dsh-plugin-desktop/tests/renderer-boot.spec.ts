@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { describe, expect, it, vi } from 'vitest'
 import { handleRendererBootRequest } from '../src/renderer-boot.ts'
 
-function request(body: string, origin = 'http://127.0.0.1:43120'): IncomingMessage {
+function request(body: string, origin = 'http://127.0.0.1:44120'): IncomingMessage {
   return {
     method: 'POST',
     headers: {
@@ -33,7 +33,7 @@ describe('desktop renderer boot route', () => {
     await handleRendererBootRequest(
       request(JSON.stringify(report)),
       res,
-      'http://127.0.0.1:43120',
+      'http://127.0.0.1:44120',
       notify,
     )
 
@@ -49,7 +49,7 @@ describe('desktop renderer boot route', () => {
     await handleRendererBootRequest(
       request(JSON.stringify({ status: 'healthy' }), 'https://example.com'),
       res,
-      'http://127.0.0.1:43120',
+      'http://127.0.0.1:44120',
       notify,
     )
 

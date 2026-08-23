@@ -35,3 +35,7 @@ This desktop product is one layer of a wider OmniMux project ecosystem: it forks
 ## Upstream sync contract
 
 This fork syncs with upstream weekly. Before any merge from `origin/master`, read and follow [docs/contracts/upstream-sync.md](docs/contracts/upstream-sync.md) — it defines the four-tier merge decision ladder (auto-merge / template-resolve / user-confirm / reject), the standard SOP, and the mandatory decision log at [docs/contracts/upstream-sync-log.md](docs/contracts/upstream-sync-log.md). A merge without a log entry is not done.
+
+## Parallel development & PR contract
+
+Multi-session feature work MUST follow [docs/contracts/parallel-dev-pr.md](docs/contracts/parallel-dev-pr.md): one task → one path lease → one worktree → one branch → one PR to `fork`/`omnimux`; main checkout is read-only for day-to-day coding; only the boss merges. Local board/leases live under `.workbuddy/` (not committed).

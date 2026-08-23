@@ -23,7 +23,8 @@
 | 冲突对象 | 固定解法 |
 |----------|----------|
 | package.json 品牌字段 | `version` 取上游；`description`/`build.appId`/`build.productName`/`win.artifactName`/`nsis.shortcutName` 保 OmniMux 值 |
-| 测试品牌断言 | 品牌类断言保我们的值（appId=`ai.omnimux.desktop`、bin=`omnimux`、productName=`OmniMux`、icon hash、preset/** glob）；结构性断言跟随上游 |
+| 测试品牌断言 | 品牌类断言保我们的值（appId=`ai.omnimux.desktop`、bin=`omnimux`、productName=`OmniMux`、icon hash、preset/** glob、默认 Host 口 `44120`）；结构性断言跟随上游 |
+| `src/desktop-port.ts` | 保 `DESKTOP_DEFAULT_WEB_PORT = 44_120`（避开上游 43120–43152 重试窗） |
 | AGENTS.md | 保双方（我们的段落在尾部追加） |
 | build 脚本链 / tsdown entry | 保我们的（含 `preset-profile` entry 与 `generate-*-omnimux.mjs` 调用） |
 

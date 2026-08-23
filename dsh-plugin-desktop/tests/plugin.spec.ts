@@ -25,7 +25,7 @@ import { RENDERER_BOOT_REPORT_PATH, type RendererBootReport } from '../src/rende
 
 const config: DesktopConfig = {
   mode: 'compatibility',
-  port: 43_120,
+  port: 44_120,
   width: 1280,
   height: 840,
   minWidth: 900,
@@ -118,7 +118,7 @@ function createHarness(platform: DesktopRuntime['platform'] = 'darwin'): PluginH
     desktopRuntime: runtime,
     webServer: {
       host: '127.0.0.1',
-      port: 43120,
+      port: 44120,
       register: vi.fn((route: WebRoute) => {
         routes.set(route.path, route)
         return () => { if (routes.get(route.path) === route) routes.delete(route.path) }
@@ -161,7 +161,7 @@ describe('desktop Host plugin', () => {
   it('defaults to compatibility mode and validates both schemas', () => {
     expect(Config({} as DesktopConfig)).toEqual(config)
     expect(Config({ mode: 'advanced' } as DesktopConfig)).toEqual({ ...config, mode: 'advanced' })
-    expect(DesktopSettingsSchema({} as DesktopSettings)).toEqual({ mode: 'compatibility', port: 43_120, logLevel: 'info' })
+    expect(DesktopSettingsSchema({} as DesktopSettings)).toEqual({ mode: 'compatibility', port: 44_120, logLevel: 'info' })
     expect(() => DesktopSettingsSchema({ port: -1 } as DesktopSettings)).toThrow()
     expect(() => DesktopSettingsSchema({ port: 1.5 } as DesktopSettings)).toThrow()
     expect(() => DesktopSettingsSchema({ port: 65_536 } as DesktopSettings)).toThrow()
@@ -173,7 +173,7 @@ describe('desktop Host plugin', () => {
     const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
     const registerRoute = vi.fn()
     const ctx = {
-      webServer: { host: '127.0.0.1', port: 43120, register: registerRoute },
+      webServer: { host: '127.0.0.1', port: 44120, register: registerRoute },
       settings: {
         register: vi.fn(),
         get: vi.fn(() => undefined),
@@ -195,8 +195,8 @@ describe('desktop Host plugin', () => {
   })
 
   it('builds the loopback root with validated renderer mode and platform markers', () => {
-    const url = new URL(desktopRendererUrl(43120, 'advanced', 'darwin'))
-    expect(url.origin).toBe('http://127.0.0.1:43120')
+    const url = new URL(desktopRendererUrl(44120, 'advanced', 'darwin'))
+    expect(url.origin).toBe('http://127.0.0.1:44120')
     expect(url.pathname).toBe('/')
     expect(Object.fromEntries(url.searchParams)).toEqual({
       'dsh-desktop-mode': 'advanced',
@@ -219,7 +219,7 @@ describe('desktop Host plugin', () => {
     expect(loaderAwait).not.toHaveBeenCalled()
     expect(harness.shell()).toEqual(expect.objectContaining({
       mode: 'compatibility',
-      url: 'http://127.0.0.1:43120/?dsh-desktop-mode=compatibility&dsh-desktop-platform=darwin',
+      url: 'http://127.0.0.1:44120/?dsh-desktop-mode=compatibility&dsh-desktop-platform=darwin',
       productName: 'DSH Desktop',
       windowTitle: 'DeepSeek Harness Desktop',
       readThemeSource: expect.any(Function),
@@ -247,7 +247,7 @@ describe('desktop Host plugin', () => {
     const req = {
       method: 'POST',
       headers: {
-        origin: 'http://127.0.0.1:43120',
+        origin: 'http://127.0.0.1:44120',
         'content-type': 'application/json',
       },
       async * [Symbol.asyncIterator]() { yield Buffer.from(JSON.stringify(report)) },
@@ -271,7 +271,7 @@ describe('desktop Host plugin', () => {
     }))
     const req = {
       method: 'POST',
-      headers: { origin: 'http://127.0.0.1:43120' },
+      headers: { origin: 'http://127.0.0.1:44120' },
     } as unknown as IncomingMessage
     let body = ''
     const res = {
@@ -295,7 +295,7 @@ describe('desktop Host plugin', () => {
     const req = {
       method: 'POST',
       headers: {
-        origin: 'http://127.0.0.1:43120',
+        origin: 'http://127.0.0.1:44120',
         'content-type': 'application/json',
       },
       async * [Symbol.asyncIterator]() { yield Buffer.from(JSON.stringify({ path: 'E:\\repo' })) },

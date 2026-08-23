@@ -237,7 +237,7 @@ const spec: DesktopShellSpec = {
   height: 840,
   minWidth: 900,
   minHeight: 640,
-  url: 'http://127.0.0.1:43120/',
+  url: 'http://127.0.0.1:44120/',
   productName: 'DSH Desktop',
   windowTitle: 'DeepSeek Harness Desktop',
   iconPath: '/tmp/app-icon.png',
@@ -781,7 +781,7 @@ describe('Electron desktop runtime', () => {
     expect(redirect).toEqual(expect.any(Function))
 
     const sameOrigin = { preventDefault: vi.fn() }
-    redirect(sameOrigin, 'http://127.0.0.1:43120/next', false, true)
+    redirect(sameOrigin, 'http://127.0.0.1:44120/next', false, true)
     expect(sameOrigin.preventDefault).not.toHaveBeenCalled()
 
     const external = { preventDefault: vi.fn() }

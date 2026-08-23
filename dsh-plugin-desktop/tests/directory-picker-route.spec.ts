@@ -6,11 +6,11 @@ import {
   handleDesktopDirectoryValidationRequest,
 } from '../src/directory-picker-route.ts'
 
-function request(origin = 'http://127.0.0.1:43120', method = 'POST'): IncomingMessage {
+function request(origin = 'http://127.0.0.1:44120', method = 'POST'): IncomingMessage {
   return { method, headers: { origin } } as IncomingMessage
 }
 
-function jsonRequest(value: unknown, origin = 'http://127.0.0.1:43120'): IncomingMessage {
+function jsonRequest(value: unknown, origin = 'http://127.0.0.1:44120'): IncomingMessage {
   const req = Readable.from([JSON.stringify(value)]) as IncomingMessage
   req.method = 'POST'
   req.headers = { origin, 'content-type': 'application/json' }
@@ -39,7 +39,7 @@ describe('desktop directory picker route', () => {
     await handleDesktopDirectoryPickerRequest(
       request(),
       res,
-      'http://127.0.0.1:43120',
+      'http://127.0.0.1:44120',
       pick,
     )
 
@@ -55,7 +55,7 @@ describe('desktop directory picker route', () => {
     await handleDesktopDirectoryPickerRequest(
       request(),
       res,
-      'http://127.0.0.1:43120',
+      'http://127.0.0.1:44120',
       async () => null,
     )
 
@@ -68,7 +68,7 @@ describe('desktop directory picker route', () => {
 
     for (const req of [request('https://example.com'), request(undefined, 'GET')]) {
       const res = response()
-      await handleDesktopDirectoryPickerRequest(req, res, 'http://127.0.0.1:43120', pick)
+      await handleDesktopDirectoryPickerRequest(req, res, 'http://127.0.0.1:44120', pick)
       expect(res.statusCode).toBe(req.method === 'GET' ? 405 : 403)
     }
     expect(pick).not.toHaveBeenCalled()
@@ -80,7 +80,7 @@ describe('desktop directory picker route', () => {
     await handleDesktopDirectoryPickerRequest(
       request(),
       res,
-      'http://127.0.0.1:43120',
+      'http://127.0.0.1:44120',
       async () => { throw new Error('private native failure') },
     )
 
@@ -97,7 +97,7 @@ describe('desktop directory validation route', () => {
     await handleDesktopDirectoryValidationRequest(
       jsonRequest({ path: 'E:\\repo' }),
       res,
-      'http://127.0.0.1:43120',
+      'http://127.0.0.1:44120',
       validate,
     )
 
@@ -117,7 +117,7 @@ describe('desktop directory validation route', () => {
     await handleDesktopDirectoryValidationRequest(
       jsonRequest(body),
       res,
-      'http://127.0.0.1:43120',
+      'http://127.0.0.1:44120',
       validate,
     )
 
@@ -132,7 +132,7 @@ describe('desktop directory validation route', () => {
     await handleDesktopDirectoryValidationRequest(
       jsonRequest({ path: 'C:\\Work' }, 'https://example.com'),
       res,
-      'http://127.0.0.1:43120',
+      'http://127.0.0.1:44120',
       validate,
     )
 
@@ -146,7 +146,7 @@ describe('desktop directory validation route', () => {
     await handleDesktopDirectoryValidationRequest(
       jsonRequest({ path: 'E:\\repo' }),
       res,
-      'http://127.0.0.1:43120',
+      'http://127.0.0.1:44120',
       async () => { throw new Error('private volume query failure') },
     )
 

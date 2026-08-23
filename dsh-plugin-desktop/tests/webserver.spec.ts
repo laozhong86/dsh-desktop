@@ -28,7 +28,7 @@ describe('Desktop WebServer port policy', () => {
     const context = new Context()
     contexts.push(context)
 
-    await expect(context.plugin(DesktopWebServer, { host: '0.0.0.0', port: 43_120 }))
+    await expect(context.plugin(DesktopWebServer, { host: '0.0.0.0', port: 44_120 }))
       .rejects.toThrow('requires a loopback host')
   })
 

@@ -19,7 +19,7 @@ import {
 } from '../src/desktop-settings-route.ts'
 import type { DesktopProfileSummary } from '../src/profile-manager.ts'
 
-const ORIGIN = 'http://127.0.0.1:43120'
+const ORIGIN = 'http://127.0.0.1:44120'
 
 const DESKTOP: DesktopProfileSummary = {
   name: 'desktop',
@@ -89,7 +89,7 @@ function request(method: string, options: RequestOptions = {}): IncomingMessage 
   const req = Readable.from(options.body === undefined ? [] : [options.body]) as IncomingMessage
   req.method = method
   req.headers = {
-    host: '127.0.0.1:43120',
+    host: '127.0.0.1:44120',
     origin: ORIGIN,
     'sec-fetch-site': 'same-origin',
     ...options.headers,

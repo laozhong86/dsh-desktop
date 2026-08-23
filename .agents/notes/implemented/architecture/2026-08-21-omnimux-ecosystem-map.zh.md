@@ -47,7 +47,8 @@ dsh-plugin/product/omnimux-dsh（插件 monorepo：omnimux 中枢 + dsh-drama �
 
 ## 给 agent 的指引
 
-- 要改桌面随附的 OmniMux 内容：在 `dsh-plugin/product/omnimux-dsh` 改插件，然后把对应版本同步进 `dsh-plugin-desktop/preset/plugins/`。
+- 插件日常开发 / 浏览器验收 / 同步进 App / 发版运维，入口是**本仓库**的 `yarn omnimux:*`（见根目录 `AGENTS.md`）。源码改动仍落在 `dsh-plugin/product/omnimux-dsh`。
+- 要把一次日常迭代推进已安装的 App：`yarn omnimux:sync <plugin>`，再 `yarn omnimux:restart`（**不会**重新打包）。要改新安装包内随附内容：`yarn omnimux:stage`，再 `package:dir` / `dist:*`。
 - 要对标或采纳更新的上游行为：先查干净克隆 `~/Desktop/Project/Github/deepseek-harness`，再提出一个独立的子模块 pin 更新。
 - 要动面向网关的行为（计费、视频生成、账号流程）：契约在网关仓库与 `dsh-plugin` 文档中（`docs/contracts/hub.md`、`docs/decisions/2026-08-16-harness-consume-not-fork.md`）。
 - 本地图记录的是本地绝对路径；换机器时请按仓库身份定位兄弟仓库，而非路径。

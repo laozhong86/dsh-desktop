@@ -1,8 +1,8 @@
 # parallel-dev-pr — 多会话并行开发与 PR 闭环合同
 
-> 目的：让多个 WorkBuddy 会话能同时改本仓，且每条改动走完整 PR，直到老板合入。  
-> 本合同是**仓库内的持久制度**，不依赖会话记忆。任何 agent 在本仓开特性分支 / 开 PR 前 MUST 读本合同。  
-> 对照：GitHub PR Manager skill（跟 PR 层）+ `docs/contracts/upstream-sync.md`（上游同步层）。  
+> 目的：让多个 WorkBuddy 会话能同时改本仓，且每条改动走完整 PR，直到老板合入。
+> 本合同是**仓库内的持久制度**，不依赖会话记忆。任何 agent 在本仓开特性分支 / 开 PR 前 MUST 读本合同。
+> 对照：GitHub PR Manager skill（跟 PR 层）+ `docs/contracts/upstream-sync.md`（上游同步层）。
 > 拍板（2026-08-23）：base=`omnimux`；合入永远由老板点；主仓脏改动先分组整理；P0 先制度，再 skill/巡检。
 
 ## 一句话拓扑

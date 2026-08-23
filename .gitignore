@@ -17,6 +17,3 @@ dsh-community-market/lib/
 # filter-branch leftovers and local build/download artifacts
 .git-rewrite/
 dsh-plugin-desktop/dist/
-
-# Agent parallel worktrees (one branch per checkout)
-.worktrees/

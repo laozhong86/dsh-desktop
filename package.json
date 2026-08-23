@@ -80,6 +80,13 @@
     "dist:win-portable": "yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win-portable",
     "upstream:version": "cd deepseek-harness && corepack pnpm --version",
     "upstream:install": "cd deepseek-harness && corepack pnpm install --frozen-lockfile",
-    "upstream:build": "cd deepseek-harness && corepack pnpm run build"
+    "upstream:build": "cd deepseek-harness && corepack pnpm run build",
+    "omnimux:help": "node scripts/omnimux.mjs --help",
+    "omnimux:sync": "node scripts/omnimux.mjs sync",
+    "omnimux:restart": "node scripts/omnimux.mjs restart",
+    "omnimux:dev": "node scripts/omnimux.mjs dev",
+    "omnimux:doctor": "node scripts/omnimux.mjs doctor",
+    "omnimux:stage": "node scripts/omnimux.mjs stage",
+    "omnimux:path": "node scripts/omnimux.mjs path"
   }
 }

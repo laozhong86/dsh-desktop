@@ -17,6 +17,23 @@ This repository owns the desktop product around an unmodified DeepSeek Harness c
 - Run the complete headless gate with `corepack yarn check`.
 - Run upstream operations through the root scripts, such as `corepack yarn upstream:build`.
 
+
+## OmniMux plugin ops (this repo is the day-to-day entry)
+
+This fork is the **main ops entry** for OmniMux plugin develop / browser QA / sync-to-app / release. Plugin source lives in the sibling `~/Desktop/Project/dsh-plugin/product/omnimux-dsh`. Contracts: that tree's `docs/contracts/dev-pipeline.md` + `docs/contracts/ops-entry.md` (single ops entry; no per-plugin deploy lanes).
+
+| Command | Purpose |
+| --- | --- |
+| `yarn omnimux:dev start <task> <plugin>` | L2: isolated Host + link one in-progress plugin + unified watch (official HMR) |
+| `yarn omnimux:dev watch <task> <plugin>` | Switch which plugin the watch targets (Host stays up) |
+| `yarn omnimux:sync [plugin…]` | Build then materialize into `~/.dsh/profiles/omnimux` (**does not restart App**) |
+| `yarn omnimux:restart` | Manually restart `/Applications/OmniMux.app` after sync |
+| `yarn omnimux:doctor` | Compliance check (prod must not link, etc.) |
+| `yarn omnimux:stage` | Materialize into `preset/plugins/` before packaging |
+| `yarn omnimux:path` | Print resolved product/plugin paths |
+
+MUST NOT hand-`rsync`/`cp` into any profile. Daily iteration uses `omnimux:sync` + `omnimux:restart`; packaging uses `omnimux:stage` then `package:dir` / `dist:*`.
+
 - `deepseek-harness/` is a pinned upstream Git submodule. Never edit files inside it from a desktop feature branch.
 - `dsh-plugin-desktop/` owns the Cordis Host and Client faces, Electron bootstrap, packaging, and release tests.
 - `dsh-community-fabric/` owns the community interoperability RFC. Until schemas and a reviewed reference adapter exist, it remains a private documentation scaffold and must not declare loadable DSH or package entry points.

@@ -2,6 +2,7 @@
 
 import type { BrowserWindowConstructorOptions, NativeImage } from 'electron'
 import type { DesktopPlatform, DesktopShellSpec } from './runtime.ts'
+import type { PersistedWindowState } from './window-state.ts'
 import { WINDOWS_TITLEBAR_HEIGHT } from './window-chrome.ts'
 
 /**
@@ -9,6 +10,8 @@ import { WINDOWS_TITLEBAR_HEIGHT } from './window-chrome.ts'
  * @param spec - shell values resolved from the active Cordis row.
  * @param icon - validated application icon.
  * @param platform - current Electron platform.
+ * @param preload - path to preload script.
+ * @param savedState - optional validated geometry to restore.
  * @returns options with a native frame and no custom materials.
  */
 export function compatibilityWindowOptions(
@@ -16,14 +19,19 @@ export function compatibilityWindowOptions(
   icon: NativeImage,
   platform: DesktopPlatform,
   preload: string,
+  savedState?: PersistedWindowState,
 ): BrowserWindowConstructorOptions {
   if (spec.mode !== 'compatibility') {
     throw new Error(`dsh-plugin-desktop: unsupported compatibility window mode ${spec.mode}`)
   }
+  const width = savedState?.width ?? spec.width
+  const height = savedState?.height ?? spec.height
   const options: BrowserWindowConstructorOptions = {
     title: platform === 'win32' ? spec.windowTitle : '',
-    width: spec.width,
-    height: spec.height,
+    width,
+    height,
+    ...(savedState?.x !== undefined ? { x: savedState.x } : {}),
+    ...(savedState?.y !== undefined ? { y: savedState.y } : {}),
     minWidth: spec.minWidth,
     minHeight: spec.minHeight,
     show: false,
@@ -45,6 +53,8 @@ export function compatibilityWindowOptions(
  * @param spec - shell values resolved from the active Cordis row.
  * @param icon - validated application icon.
  * @param platform - current Electron platform.
+ * @param preload - path to preload script.
+ * @param savedState - optional validated geometry to restore.
  * @returns platform-native glass and window-control options.
  */
 export function advancedWindowOptions(
@@ -52,14 +62,19 @@ export function advancedWindowOptions(
   icon: NativeImage,
   platform: DesktopPlatform,
   preload: string,
+  savedState?: PersistedWindowState,
 ): BrowserWindowConstructorOptions {
   if (spec.mode !== 'advanced') {
     throw new Error(`dsh-plugin-desktop: unsupported advanced window mode ${spec.mode}`)
   }
+  const width = savedState?.width ?? spec.width
+  const height = savedState?.height ?? spec.height
   const options: BrowserWindowConstructorOptions = {
     title: platform === 'win32' ? spec.windowTitle : '',
-    width: spec.width,
-    height: spec.height,
+    width,
+    height,
+    ...(savedState?.x !== undefined ? { x: savedState.x } : {}),
+    ...(savedState?.y !== undefined ? { y: savedState.y } : {}),
     minWidth: spec.minWidth,
     minHeight: spec.minHeight,
     show: false,
@@ -108,6 +123,8 @@ export function advancedWindowOptions(
  * @param spec - active shell generation.
  * @param icon - validated application icon.
  * @param platform - current Electron platform.
+ * @param preload - path to preload script.
+ * @param savedState - optional validated geometry to restore.
  * @returns mode-specific BrowserWindow options.
  */
 export function desktopWindowOptions(
@@ -115,8 +132,9 @@ export function desktopWindowOptions(
   icon: NativeImage,
   platform: DesktopPlatform,
   preload: string,
+  savedState?: PersistedWindowState,
 ): BrowserWindowConstructorOptions {
   return spec.mode === 'compatibility'
-    ? compatibilityWindowOptions(spec, icon, platform, preload)
-    : advancedWindowOptions(spec, icon, platform, preload)
+    ? compatibilityWindowOptions(spec, icon, platform, preload, savedState)
+    : advancedWindowOptions(spec, icon, platform, preload, savedState)
 }

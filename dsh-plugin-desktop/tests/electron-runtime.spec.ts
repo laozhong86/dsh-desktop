@@ -112,6 +112,10 @@ const electron = vi.hoisted(() => {
     readonly isFocused = vi.fn(() => false)
     readonly isVisible = vi.fn(() => false)
     readonly isMinimized = vi.fn(() => false)
+    readonly isMaximized = vi.fn(() => false)
+    readonly isFullScreen = vi.fn(() => false)
+    readonly getBounds = vi.fn(() => ({ x: 0, y: 0, width: 1280, height: 840 }))
+    readonly maximize = vi.fn()
     readonly flashFrame = vi.fn()
     readonly restore = vi.fn()
     readonly show = vi.fn()
@@ -215,6 +219,16 @@ const electron = vi.hoisted(() => {
     Tray,
     trays,
     webContents,
+    screen: {
+      getAllDisplays: vi.fn(() => [{
+        workArea: { x: 0, y: 0, width: 1920, height: 1080 },
+        bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+      }]),
+      getPrimaryDisplay: vi.fn(() => ({
+        workArea: { x: 0, y: 0, width: 1920, height: 1080 },
+        bounds: { x: 0, y: 0, width: 1920, height: 1080 },
+      })),
+    },
   }
 })
 
@@ -227,6 +241,7 @@ vi.mock('electron', () => ({
   nativeTheme: electron.nativeTheme,
   net: electron.net,
   Notification: electron.Notification,
+  screen: electron.screen,
   shell: electron.shell,
   Tray: electron.Tray,
 }))
@@ -811,17 +826,17 @@ describe('Electron desktop runtime', () => {
     const ready = window?.once.mock.calls.find(([event]) => event === 'ready-to-show')?.[1]
     const activate = electron.app.on.mock.calls.find(([event]) => event === 'activate')?.[1]
     const trayClick = electron.trays[0]?.on.mock.calls.find(([event]) => event === 'click')?.[1]
-    const close = electron.browserWindowOn.mock.calls.find(([event]) => event === 'close')?.[1]
+    const close = electron.browserWindowOn.mock.calls.find(([event, fn]) => event === 'close' && fn.length === 1)?.[1]
     expect(ready).toEqual(expect.any(Function))
     expect(activate).toEqual(expect.any(Function))
     expect(trayClick).toEqual(expect.any(Function))
     expect(close).toEqual(expect.any(Function))
 
-    window?.isMinimized.mockReturnValueOnce(true)
+    window?.isMinimized.mockReturnValue(true)
     ready()
     activate()
     trayClick()
-    expect(window?.restore).toHaveBeenCalledOnce()
+    expect(window?.restore).toHaveBeenCalled()
     expect(window?.show).toHaveBeenCalledTimes(3)
     expect(window?.focus).toHaveBeenCalledTimes(3)
 

@@ -6,15 +6,22 @@ import {
   nativeImage,
   nativeTheme,
   Notification,
+  screen,
   shell,
   Tray,
 } from 'electron'
+import { join } from 'node:path'
 import { formatDesktopExitCode } from './desktop-logger.ts'
 import { applicationNeedsReveal, revealApplication } from './electron-reveal.ts'
 import type { ElectronPlatformStrategy } from './electron-platform.ts'
 import type { DesktopNotification, DesktopShellSpec } from './runtime.ts'
 import { prepareTrayIcon } from './tray-icons.ts'
 import { desktopWindowOptions } from './window-options.ts'
+import {
+  attachWindowStateTracker,
+  loadWindowState,
+  type PersistedWindowState,
+} from './window-state.ts'
 
 const MIN_ZOOM_LEVEL = -4
 const MAX_ZOOM_LEVEL = 4
@@ -68,12 +75,25 @@ export class ElectronShellGeneration {
     platform.configureApplication(icon, spec.productName, this.options.buildApplicationMenuItems())
     const origin = new URL(spec.url).origin
     if (spec.mode === 'advanced') nativeTheme.themeSource = spec.readThemeSource()
-    const window = new BrowserWindow(desktopWindowOptions(spec, icon, platform.platform, this.options.preloadPath))
+    const windowStatePath = join(app.getPath('userData'), 'window-state.json')
+    const savedWindowState = loadWindowState(windowStatePath, screen, spec)
+    const window = new BrowserWindow(desktopWindowOptions(spec, icon, platform.platform, this.options.preloadPath, savedWindowState))
     window.accessibleTitle = spec.windowTitle
     platform.configureWindow(window)
     this.window = window
 
-    const show = (): void => { this.show() }
+    const detachTracker = attachWindowStateTracker({
+      window,
+      filePath: windowStatePath,
+      screenApi: screen,
+    })
+
+    const show = (): void => {
+      if (savedWindowState.isMaximized && !window.isMaximized()) {
+        window.maximize()
+      }
+      this.show()
+    }
     const activate = (): void => {
       if (applicationNeedsReveal(window, platform.platform)) this.show()
     }
@@ -166,6 +186,7 @@ export class ElectronShellGeneration {
     window.once('ready-to-show', show)
     let tray: Tray | undefined
     this.cleanupListeners = () => {
+      detachTracker()
       app.off('activate', activate)
       if (platform.platform === 'darwin') app.off('did-become-active', activate)
       window.off('close', close)

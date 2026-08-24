@@ -86,8 +86,9 @@ corepack yarn install --immutable
 | 合同 / 技能 | 关系 |
 |---|---|
 | `upstream-sync.md` | 周同步仍走脚本；同步窗内新特性 PR 应 rebase 到最新 `omnimux`；C/D 级不绕开 |
-| GitHub PR Manager | 只负责「开 PR 之后」的 CI/review/跟进；开写前的隔离与租约由本合同管 |
+| `omnimux-pr-handoff`（罩市场版 github-pr-manager） | 只负责「开 PR 之后」的 CI/review/跟进；开写前的隔离与租约由本合同管；合入请示老板；跟踪写 `.workbuddy/pr-board.md` |
 | `omnimux-plugin-ops` | 插件进 App 仍走 `yarn omnimux:*`；本仓壳层 PR 不代替插件 sync 纪律 |
+| 插件仓 `plugin-git-pr.md` | 插件源码仓（`omnimux-dsh`）的分支/PR 纪律；不要把本仓 `fork`/`omnimux` 套过去 |
 
 ## 明确不做
 

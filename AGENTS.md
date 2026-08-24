@@ -55,4 +55,4 @@ This fork syncs with upstream weekly. Before any merge from `origin/master`, rea
 
 ## Parallel development & PR contract
 
-Multi-session feature work MUST follow [docs/contracts/parallel-dev-pr.md](docs/contracts/parallel-dev-pr.md): one task → one path lease → one worktree → one branch → one PR to `fork`/`omnimux`; main checkout is read-only for day-to-day coding; only the boss merges. Local board/leases live under `.workbuddy/` (not committed).
+Multi-session feature work MUST follow [docs/contracts/parallel-dev-pr.md](docs/contracts/parallel-dev-pr.md): one task → one path lease → one worktree → one branch → one PR to `fork`/`omnimux`; main checkout is read-only for day-to-day coding; only the boss merges. Local board/leases live under `.workbuddy/` (not committed). After a PR is open, follow-up uses skill `omnimux-pr-handoff` (wraps marketplace github-pr-manager): update `.workbuddy/pr-board.md`, never auto-merge. Plugin-tree Git/PR lives in sibling `omnimux-dsh` contract `docs/contracts/plugin-git-pr.md` + skills `omnimux-plugin-pr` / `omnimux-pr-handoff` — do not reuse this fork's `fork`/`omnimux` topology there.

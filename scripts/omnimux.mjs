@@ -68,13 +68,26 @@ function runYarnWorkspace(scriptName, args = []) {
   process.exit(result.status === null ? 1 : result.status)
 }
 
-function restartApp() {
-  spawnSync('pkill', ['-f', 'OmniMux.app'], { stdio: 'ignore' })
+function restartApp(target = 'prod') {
+  if (target === 'prod' && (process.env.DSH_AGENT_SESSION || process.env.AGENT_ROLE || process.env.CI)) {
+    die('Agent / 非交互式进程禁止强杀生产桌面应用 (/Applications/OmniMux.app)！生产应用重启由用户自主掌控。如需测试请使用: yarn omnimux:restart dev')
+  }
+
+  if (target === 'dev') {
+    spawnSync('pkill', ['-f', 'OmniMux Dev.app'], { stdio: 'ignore' })
+    spawnSync('sleep', ['1'], { stdio: 'ignore' })
+    const open = spawnSync('open', ['-a', 'OmniMux Dev'], { stdio: 'inherit' })
+    if (open.status !== 0) die('open -a "OmniMux Dev" 失败（确认已打包或安装开发版）')
+    process.stdout.write('✓ 已请求重启 OmniMux Dev 开发版\n')
+    return
+  }
+
+  spawnSync('pkill', ['-f', '/Applications/OmniMux.app'], { stdio: 'ignore' })
   // give Electron a beat to release locks
   spawnSync('sleep', ['1'], { stdio: 'ignore' })
   const open = spawnSync('open', ['-a', 'OmniMux'], { stdio: 'inherit' })
   if (open.status !== 0) die('open -a OmniMux 失败（确认已安装 /Applications/OmniMux.app）')
-  process.stdout.write('✓ 已请求重启 OmniMux（手动确认窗口是否起来）\n')
+  process.stdout.write('✓ 已请求重启 OmniMux 正式版（手动确认窗口是否起来）\n')
 }
 
 function printHelp() {
@@ -85,7 +98,7 @@ function printHelp() {
 
 命令:
   sync [插件...] [--skip-build]   build + 物化进生产 profile（不自动重启）
-  restart                         手动重启 /Applications/OmniMux.app
+  restart [prod|dev]              手动重启 /Applications/OmniMux.app 或 OmniMux Dev
   dev <start|stop|ls|rm|watch|unwatch> ...
                                   L2 预发布环境（含统一 watch）
   doctor                          三层环境合规自检
@@ -96,6 +109,7 @@ function printHelp() {
   yarn omnimux:sync omnimux-assets
   yarn omnimux:dev start assets-v2 omnimux-assets
   yarn omnimux:restart
+  yarn omnimux:restart dev
   yarn omnimux:stage
 `)
 }
@@ -117,7 +131,7 @@ switch (cmd) {
     runBash('scripts/dev-doctor.sh', rest)
     break
   case 'restart':
-    restartApp()
+    restartApp(rest[0] || 'prod')
     break
   case 'stage':
     if (!process.env.OMNIMUX_PLUGINS_DIR) {

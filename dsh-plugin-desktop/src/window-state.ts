@@ -2,7 +2,7 @@
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
-import type { BrowserWindow, Rectangle, screen as ElectronScreen } from 'electron'
+import type { BrowserWindow, Rectangle } from 'electron'
 import type { DesktopWindowConfig } from './runtime.ts'
 
 export interface PersistedWindowState {
@@ -107,13 +107,13 @@ export function saveWindowState(filePath: string, state: PersistedWindowState): 
 export interface WindowStateTrackerOptions {
   window: BrowserWindow
   filePath: string
-  screenApi: ScreenLike
+  screenApi?: ScreenLike
   debounceMs?: number
 }
 
 /** Attach listeners to track and save BrowserWindow state. */
 export function attachWindowStateTracker(options: WindowStateTrackerOptions): () => void {
-  const { window, filePath, screenApi, debounceMs = 400 } = options
+  const { window, filePath, debounceMs = 400 } = options
   let timer: NodeJS.Timeout | undefined
   let normalBounds: Rectangle = window.getBounds()
 

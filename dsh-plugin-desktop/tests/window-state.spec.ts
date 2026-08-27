@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
+import { describe, expect, it, beforeEach, afterEach } from 'vitest'
 import {
   calculateOverlapArea,
   validateWindowState,
@@ -19,6 +19,8 @@ describe('window-state management', () => {
     height: 840,
     minWidth: 900,
     minHeight: 640,
+    macosMaterial: 'transparent',
+    windowsMaterial: 'acrylic',
   }
 
   const mockScreen: ScreenLike = {
@@ -151,8 +153,8 @@ describe('window-state management', () => {
         isMaximized: () => maximized,
         isMinimized: () => false,
         isFullScreen: () => false,
-        on: (event: string, fn: () => void) => { handlers.set(event, fn) },
-        off: (event: string, fn: () => void) => { handlers.delete(event) },
+        on: (event: string, handler: () => void) => { handlers.set(event, handler) },
+        off: (event: string) => { handlers.delete(event) },
       }
 
       const cleanup = attachWindowStateTracker({

@@ -4,6 +4,37 @@
 
 ---
 
+## 2026-08-25 · 例行大同步（232 提交）
+
+- **上游范围**：`f3eb74bb9f..321cbb6683`（232 提交；Setup Wizard 独立初始化向导 UI 与向导设置流程、Extended/Framed 窗口模式与 macOS/Windows 材质支持、Profile Checkpoint 统一三槽位健康检查点管理替代旧 install-recovery、窗口多显示器几何持久化与记忆校验、进程级 pnpm release-age 策略支持、空工具名死循环防护补丁与模型参数弹窗等）
+- **冲突**：
+  - `package.json`（根目录）：scripts 并集（test/typecheck 两 workspace 并行），resolutions 并集（吸收 dsh-agent-loop、dsh-client-runtime、dsh-subprocess-local、dsh-token-meter、open 补丁，保留 models 与 trajectory 补丁）
+  - `dsh-plugin-desktop/package.json`：version 保持 `2.0.2`；description/bin/build 品牌保 OmniMux（`ai.omnimux.desktop`、`omnimux` 命令、`preset/**` 解包、nsis shortcut/artifactName）；scripts 保留品牌构建脚本；devDeps/dependencies 并集
+  - `dsh-plugin-desktop/src/main.ts`：appId 保持 `ai.omnimux.desktop`，吸收上游完整的 Setup Wizard、Recovery Controller、Profile Checkpoint、Window State Persistence 等逻辑
+  - `dsh-plugin-desktop/src/profile-manager.ts`：`DEFAULT_PROFILE_NAME` 保持 `'omnimux'`，吸收 state v2、staging pattern、checkpoint 清理与原子发布等能力
+  - `dsh-plugin-desktop/src/desktop-port.ts`：保持默认 WebCarrier 端口 `44120`
+  - `dsh-plugin-desktop/src/update-checker.ts`：保持当前 feed URL 设定
+  - `dsh-plugin-desktop/tests/package.spec.ts`：品牌类断言保 OmniMux（appId、productName、bin、nsis shortcutName/artifactName、icon hash、preset 包含），结构性与新增功能断言跟随上游
+  - `dsh-plugin-desktop/tests/profile.spec.ts` & `tests/plugin.spec.ts`：端口断言保 `44120`
+  - `dsh-plugin-desktop/tests/profile-manager.spec.ts`：默认 profile 测试断言保 `'omnimux'`
+  - `yarn.lock`：取上游后由 `corepack yarn install` 重算
+- **解法**：
+  - 🟡 B 级（模板与契约）：
+    - 品牌与薄改点完全按 `docs/contracts/upstream-sync.md` 保留 OmniMux 特有属性。
+    - 上游重构的新增功能模块（Setup Wizard, Material, Framed/Extended Shell, Checkpoint, Window State Tracker 等）全量合并。
+    - 废弃的旧模块与旧测试（如 windows-agent-presets）按上游清理。
+- **分级记录**：A 级 219 项自动合并/跟随；B 级 13 项按模板契约解；C 级 0 项；D 级 0 项
+- **验证**：
+  - `corepack yarn install`：exit 0，依赖图一致
+  - `yarn build`：exit 0，包括 tsdown 构件与 vite native-ui 资源（setup-wizard、recovery、profile-create、dialog）
+  - `yarn typecheck`：exit 0，类型检查零错误
+  - `yarn test`：exit 0，**122 test files / 1,247 passed | 4 skipped 全部通过**
+  - `yarn workspace dsh-plugin-desktop verify:closure`：exit 0（201 nodes 闭合图）
+- **决策人**：agent 自主（遵循 upstream-sync 契约规则）
+- **提交**：`164bb1e003`（merge）+ 后续收尾提交 + 本条日志
+
+---
+
 ## 2026-08-22 · 例行同步（49 提交，含 2 项 C 级老板确认）
 
 - **上游范围**：`d457d79029..6201080cfa`（49 提交；dsh rc.8→0.1.1-rc.2 运行时升级与补丁迁移、native UI 恢复/建 Profile 窗口、desktop settings、市场/通知、打包修复、Windows 终端恢复）

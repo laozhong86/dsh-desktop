@@ -20,8 +20,6 @@ import {
   createDesktopWebProfile,
   deleteDesktopProfile,
   listDesktopProfiles,
-  markDesktopProfileFailed,
-  markDesktopProfileHealthy,
   readDesktopProfileState,
   selectDesktopProfile,
 } from '../src/profile-manager.ts'
@@ -57,6 +55,8 @@ describe('desktop profile discovery', () => {
     expect(() => assertDesktopProfileName('CON.txt')).toThrow('invalid desktop profile name')
     expect(() => assertDesktopProfileName('name.')).toThrow('invalid desktop profile name')
     expect(() => assertDesktopProfileName('name ')).toThrow('invalid desktop profile name')
+    expect(() => assertDesktopProfileName('.web.creating-123-12345678-1234-4123-8123-123456789abc'))
+      .toThrow('invalid desktop profile name')
     expect(() => assertDesktopProfileName('é'.repeat(128))).toThrow('invalid desktop profile name')
   })
 
@@ -93,7 +93,7 @@ describe('desktop profile discovery', () => {
     expect(existsSync(join(blockedHome, 'profiles', 'work'))).toBe(false)
   })
 
-  it('lists lazy defaults and existing profiles without creating or changing manifests', () => {
+  it('lists only profiles with real manifests without creating missing defaults', () => {
     const home = temporaryRoot()
     const webDir = writeProfile(home, 'work', [
       '@deepseek-ai/dsh-base',
@@ -112,8 +112,6 @@ describe('desktop profile discovery', () => {
     const before = readFileSync(join(webDir, 'package.json'), 'utf8')
 
     expect(listDesktopProfiles(home)).toEqual([
-      expect.objectContaining({ name: 'omnimux', exists: false, webCapable: true }),
-      expect.objectContaining({ name: 'web', exists: false, webCapable: true }),
       expect.objectContaining({ name: 'broken', exists: true, webCapable: false, problem: expect.any(String) }),
       expect.objectContaining({
         name: 'embedded-desktop',
@@ -130,6 +128,7 @@ describe('desktop profile discovery', () => {
       }),
       expect.objectContaining({ name: 'wrong-order', exists: true, webCapable: false }),
     ])
+    expect(listDesktopProfiles(temporaryRoot())).toEqual([])
     expect(readFileSync(join(webDir, 'package.json'), 'utf8')).toBe(before)
     expect(readdirSync(join(home, 'profiles')).sort()).toEqual([
       'broken',
@@ -161,9 +160,8 @@ describe('desktop profile discovery', () => {
 
 describe('desktop profile deletion', () => {
   function writeSelection(home: string, statePath: string, state: Record<string, unknown> = {
-    version: 1,
-    active: 'desktop',
-    lastKnownGood: 'desktop',
+    version: 2,
+    active: 'omnimux',
   }): void {
     mkdirSync(join(home, 'profiles'), { recursive: true })
     mkdirSync(join(statePath, '..'), { recursive: true })
@@ -174,7 +172,7 @@ describe('desktop profile deletion', () => {
     const home = temporaryRoot()
     const statePath = join(home, 'state', 'profiles.json')
     writeSelection(home, statePath)
-    writeProfile(home, 'desktop', ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'])
+    writeProfile(home, 'omnimux', ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'])
     writeProfile(home, 'web', ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'])
     writeProfile(home, 'work', ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'])
     const link = join(home, 'profiles', 'link')
@@ -183,9 +181,9 @@ describe('desktop profile deletion', () => {
       symlinkSync(join(home, 'profiles', 'work'), link, 'dir')
       linked = true
     } catch { /* Windows may require an elevated symlink privilege. */ }
-    const options = { home, selectionStatePath: statePath, currentProfileName: 'desktop' }
+    const options = { home, selectionStatePath: statePath, currentProfileName: 'omnimux' }
 
-    expect(canDeleteDesktopProfile(options, 'desktop')).toBe(false)
+    expect(canDeleteDesktopProfile(options, 'omnimux')).toBe(false)
     expect(canDeleteDesktopProfile(options, 'web')).toBe(true)
     expect(canDeleteDesktopProfile(options, 'missing')).toBe(false)
     if (linked) expect(canDeleteDesktopProfile(options, 'link')).toBe(false)
@@ -196,21 +194,20 @@ describe('desktop profile deletion', () => {
     const home = temporaryRoot()
     const statePath = join(home, 'state', 'profiles.json')
     writeSelection(home, statePath, {
-      version: 1,
+      version: 2,
       active: 'work',
-      lastKnownGood: 'work',
     })
-    writeProfile(home, 'desktop', ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'])
+    writeProfile(home, 'omnimux', ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'])
     writeProfile(home, 'web', ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'])
     writeProfile(home, 'work', ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'])
     const options = { home, selectionStatePath: statePath, currentProfileName: 'work' }
 
     expect(canDeleteDesktopProfile(options, 'work')).toBe(false)
-    expect(canDeleteDesktopProfile(options, 'desktop')).toBe(true)
+    expect(canDeleteDesktopProfile(options, 'omnimux')).toBe(true)
     expect(canDeleteDesktopProfile(options, 'web')).toBe(true)
-    await deleteDesktopProfile(options, 'desktop')
+    await deleteDesktopProfile(options, 'omnimux')
     await deleteDesktopProfile(options, 'web')
-    expect(existsSync(join(home, 'profiles', 'desktop'))).toBe(false)
+    expect(existsSync(join(home, 'profiles', 'omnimux'))).toBe(false)
     expect(existsSync(join(home, 'profiles', 'web'))).toBe(false)
   })
 
@@ -225,7 +222,7 @@ describe('desktop profile deletion', () => {
     await deleteDesktopProfile({
       home,
       selectionStatePath: statePath,
-      currentProfileName: 'desktop',
+      currentProfileName: 'omnimux',
       clearDisabledState,
       clearCheckpoint,
     }, 'work')
@@ -236,7 +233,7 @@ describe('desktop profile deletion', () => {
     expect(clearCheckpoint).toHaveBeenCalledOnce()
   })
 
-  it('rejects a recovery transaction and restores the directory after cleanup failure', async () => {
+  it('restores the directory after cleanup failure', async () => {
     const home = temporaryRoot()
     const statePath = join(home, 'state', 'profiles.json')
     writeSelection(home, statePath)
@@ -244,15 +241,7 @@ describe('desktop profile deletion', () => {
     await expect(deleteDesktopProfile({
       home,
       selectionStatePath: statePath,
-      currentProfileName: 'desktop',
-      installRecovery: { read: async () => ({ profileName: 'work' }) },
-    }, 'work')).rejects.toThrow('pending install recovery')
-    expect(existsSync(profileDir)).toBe(true)
-
-    await expect(deleteDesktopProfile({
-      home,
-      selectionStatePath: statePath,
-      currentProfileName: 'desktop',
+      currentProfileName: 'omnimux',
       clearDisabledState: () => { throw new Error('state locked') },
     }, 'work')).rejects.toThrow('state locked')
     expect(existsSync(profileDir)).toBe(true)
@@ -261,6 +250,53 @@ describe('desktop profile deletion', () => {
 })
 
 describe('desktop profile selection state', () => {
+  it('materializes one real desktop profile when no profiles exist', () => {
+    const root = temporaryRoot()
+    const home = join(root, 'harness')
+    const statePath = join(root, 'private', 'state.json')
+
+    expect(listDesktopProfiles(home)).toEqual([])
+    expect(beginDesktopProfileStartup(statePath, home)).toEqual({
+      profileName: 'omnimux',
+      state: { version: 2, active: 'omnimux' },
+      recoveredState: false,
+    })
+    expect(listDesktopProfiles(home)).toEqual([
+      expect.objectContaining({ name: 'omnimux', exists: true, webCapable: true }),
+    ])
+    expect(existsSync(join(home, 'profiles', 'omnimux', 'package.json'))).toBe(true)
+    expect(existsSync(join(home, 'profiles', 'omnimux', 'pnpm-workspace.yaml'))).toBe(true)
+  })
+
+  it('ignores interrupted staging profiles when deciding that no real profile exists', () => {
+    const root = temporaryRoot()
+    const home = join(root, 'harness')
+    const statePath = join(root, 'private', 'state.json')
+    const stagingName = '.web.creating-123-12345678-1234-4123-8123-123456789abc'
+    writeProfile(home, stagingName, ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'])
+
+    expect(listDesktopProfiles(home)).toEqual([])
+    expect(beginDesktopProfileStartup(statePath, home).profileName).toBe('omnimux')
+    expect(listDesktopProfiles(home).map(profile => profile.name)).toEqual(['omnimux'])
+    expect(existsSync(join(home, 'profiles', stagingName, 'package.json'))).toBe(true)
+  })
+
+  it('preserves an incomplete default directory while materializing the real desktop profile', () => {
+    const root = temporaryRoot()
+    const home = join(root, 'harness')
+    const statePath = join(root, 'private', 'state.json')
+    const partial = join(home, 'profiles', 'omnimux')
+    mkdirSync(partial, { recursive: true })
+    writeFileSync(join(partial, 'keep.txt'), 'recoverable\n')
+
+    expect(beginDesktopProfileStartup(statePath, home).profileName).toBe('omnimux')
+    expect(existsSync(join(partial, 'package.json'))).toBe(true)
+    const incomplete = readdirSync(join(home, 'profiles')).find(name => name.startsWith('.omnimux.incomplete-'))
+    expect(incomplete).toBeDefined()
+    expect(readFileSync(join(home, 'profiles', incomplete!, 'keep.txt'), 'utf8')).toBe('recoverable\n')
+    expect(listDesktopProfiles(home).map(profile => profile.name)).toEqual(['omnimux'])
+  })
+
   it('defaults to desktop and queues only a directly Web-capable profile', () => {
     const root = temporaryRoot()
     const home = join(root, 'harness')
@@ -275,15 +311,12 @@ describe('desktop profile selection state', () => {
     ])
 
     expect(readDesktopProfileState(statePath)).toEqual({
-      version: 1,
+      version: 2,
       active: 'omnimux',
-      lastKnownGood: 'omnimux',
     })
     expect(selectDesktopProfile(statePath, home, 'work')).toEqual({
-      version: 1,
-      active: 'omnimux',
-      pending: 'work',
-      lastKnownGood: 'omnimux',
+      version: 2,
+      active: 'work',
     })
     expect(() => selectDesktopProfile(statePath, home, 'headless')).toThrow(
       'must directly include @deepseek-ai/dsh-base before @deepseek-ai/dsh-web-app',
@@ -299,7 +332,7 @@ describe('desktop profile selection state', () => {
     }
   })
 
-  it('consumes a pending profile and rolls back an unconfirmed startup on the next launch', () => {
+  it('keeps the exact selected profile across repeated startup attempts', () => {
     const root = temporaryRoot()
     const home = join(root, 'harness')
     const statePath = join(root, 'private', 'state.json')
@@ -308,42 +341,32 @@ describe('desktop profile selection state', () => {
 
     expect(beginDesktopProfileStartup(statePath, home)).toEqual({
       profileName: 'work',
-      state: { version: 1, active: 'work', lastKnownGood: 'omnimux' },
+      state: { version: 2, active: 'work' },
       recoveredState: false,
     })
     expect(beginDesktopProfileStartup(statePath, home)).toEqual({
-      profileName: 'omnimux',
-      state: { version: 1, active: 'omnimux', lastKnownGood: 'omnimux' },
-      recoveredState: true,
-      rolledBackFrom: 'work',
+      profileName: 'work',
+      state: { version: 2, active: 'work' },
+      recoveredState: false,
     })
   })
 
-  it('promotes a healthy profile and explicitly rolls a later failed profile back', () => {
+  it('does not accept or migrate the removed v1 last-known-good state', () => {
     const root = temporaryRoot()
     const home = join(root, 'harness')
     const statePath = join(root, 'private', 'state.json')
     writeProfile(home, 'work', ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'])
-
-    selectDesktopProfile(statePath, home, 'work')
-    beginDesktopProfileStartup(statePath, home)
-    expect(markDesktopProfileHealthy(statePath, 'work')).toEqual({
-      version: 1,
-      active: 'work',
-      lastKnownGood: 'work',
+    mkdirSync(join(statePath, '..'), { recursive: true })
+    writeFileSync(statePath, JSON.stringify({ version: 1, active: 'work', lastKnownGood: 'work' }))
+    expect(beginDesktopProfileStartup(statePath, home)).toEqual({
+      profileName: 'omnimux',
+      state: { version: 2, active: 'omnimux' },
+      recoveredState: true,
     })
-
-    selectDesktopProfile(statePath, home, 'web')
-    beginDesktopProfileStartup(statePath, home)
-    expect(markDesktopProfileFailed(statePath, 'web')).toEqual({
-      version: 1,
-      active: 'work',
-      lastKnownGood: 'work',
-    })
-    expect(() => markDesktopProfileHealthy(statePath, 'web')).toThrow('cannot confirm inactive profile')
+    expect(existsSync(join(home, 'profiles', 'omnimux', 'pnpm-workspace.yaml'))).toBe(true)
   })
 
-  it('recovers malformed or symlinked private state without touching profile files', () => {
+  it('recovers malformed state by materializing the real default profile', () => {
     const root = temporaryRoot()
     const home = join(root, 'harness')
     const stateDir = join(root, 'private')
@@ -353,19 +376,19 @@ describe('desktop profile selection state', () => {
 
     expect(beginDesktopProfileStartup(statePath, home)).toEqual({
       profileName: 'omnimux',
-      state: { version: 1, active: 'omnimux', lastKnownGood: 'omnimux' },
+      state: { version: 2, active: 'omnimux' },
       recoveredState: true,
     })
     expect(JSON.parse(readFileSync(statePath, 'utf8'))).toEqual({
-      version: 1,
+      version: 2,
       active: 'omnimux',
-      lastKnownGood: 'omnimux',
     })
     expect(lstatSync(statePath).isSymbolicLink()).toBe(false)
-    expect(existsSync(join(home, 'profiles'))).toBe(false)
+    expect(existsSync(join(home, 'profiles', 'omnimux', 'package.json'))).toBe(true)
+    expect(existsSync(join(home, 'profiles', 'omnimux', 'pnpm-workspace.yaml'))).toBe(true)
   })
 
-  it('falls back when a queued profile disappears before restart', () => {
+  it('recovers to a real desktop profile when the last selected profile disappears', () => {
     const root = temporaryRoot()
     const home = join(root, 'harness')
     const statePath = join(root, 'private', 'state.json')
@@ -375,9 +398,41 @@ describe('desktop profile selection state', () => {
 
     expect(beginDesktopProfileStartup(statePath, home)).toEqual({
       profileName: 'omnimux',
-      state: { version: 1, active: 'omnimux', lastKnownGood: 'omnimux' },
+      state: { version: 2, active: 'omnimux' },
       recoveredState: true,
-      rolledBackFrom: 'work',
     })
+    expect(readDesktopProfileState(statePath)).toEqual({ version: 2, active: 'omnimux' })
+  })
+
+  it('does not recreate a missing selected profile while another profile exists', () => {
+    const root = temporaryRoot()
+    const home = join(root, 'harness')
+    const statePath = join(root, 'private', 'state.json')
+    const workDir = writeProfile(home, 'work', ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'])
+    writeProfile(home, 'other', ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app'])
+    selectDesktopProfile(statePath, home, 'work')
+    rmSync(workDir, { recursive: true })
+
+    expect(() => beginDesktopProfileStartup(statePath, home)).toThrow('does not exist')
+    expect(listDesktopProfiles(home).map(profile => profile.name)).toEqual(['other'])
+    expect(readDesktopProfileState(statePath)).toEqual({ version: 2, active: 'work' })
+  })
+
+  it('does not recreate deleted inactive web or desktop profiles', () => {
+    const root = temporaryRoot()
+    const home = join(root, 'harness')
+    const statePath = join(root, 'private', 'state.json')
+    const bundles = ['@deepseek-ai/dsh-base', '@deepseek-ai/dsh-web-app']
+    const desktopDir = writeProfile(home, 'omnimux', bundles)
+    const webDir = writeProfile(home, 'web', bundles)
+    writeProfile(home, 'work', bundles)
+    selectDesktopProfile(statePath, home, 'work')
+    rmSync(desktopDir, { recursive: true })
+    rmSync(webDir, { recursive: true })
+
+    expect(beginDesktopProfileStartup(statePath, home).profileName).toBe('work')
+    expect(listDesktopProfiles(home).map(profile => profile.name)).toEqual(['work'])
+    expect(existsSync(desktopDir)).toBe(false)
+    expect(existsSync(webDir)).toBe(false)
   })
 })

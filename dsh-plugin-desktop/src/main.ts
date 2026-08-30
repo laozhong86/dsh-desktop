@@ -2,7 +2,7 @@
 
 import { app, crashReporter, dialog } from 'electron'
 import { randomUUID } from 'node:crypto'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
   boot,
@@ -88,7 +88,7 @@ import {
 import { clearDesktopProfileCheckpoint, DesktopProfileCheckpoint } from './profile-checkpoint.ts'
 import { materializeProfile, ProfileMaterializationError } from './profile-materializer.ts'
 import type { DesktopPnpmBootstrap } from './pnpm.ts'
-import { seedOmnimuxProfile } from './preset-profile.ts'
+import { seedOmnimuxProfile, resolveDesktopHarnessHome } from './preset-profile.ts'
 import {
   createDesktopExitCoordinator,
   createDesktopShutdown,
@@ -256,6 +256,18 @@ function notifyWindowsVolumeConcerns(
 
 /** Start one Electron process and leave lifetime to the mounted desktop plugin. */
 async function start(): Promise<void> {
+  if (
+    process.env.OMNIMUX_CHANNEL === 'dev'
+    || process.env.NODE_ENV === 'development'
+    || process.execPath.includes('OmniMux Dev')
+    || app.getName().includes('Dev')
+    || process.env.DSH_DESKTOP_DEV === '1'
+  ) {
+    const currentName = app.getName()
+    if (!currentName.includes('Dev')) app.setName(`${currentName} Dev`)
+    const devUserData = join(app.getPath('appData'), 'OmniMux-Dev')
+    app.setPath('userData', devUserData)
+  }
   if (!app.requestSingleInstanceLock()) {
     app.quit()
     return
@@ -440,7 +452,24 @@ async function start(): Promise<void> {
       platform: process.platform,
     })
     for (const [name, value] of Object.entries(shellEnvironmentResolution.updates)) process.env[name] = value
-    const homeDir = resolveDshHome()
+    // OmniMux Dev/Prod must bind their own home even when login-shell env carries DSH_HOME=~/.dsh.
+    const defaultAppHome = resolveDesktopHarnessHome({
+      env: process.env,
+      userDataDir: app.getPath('userData'),
+      appName: app.getName(),
+    })
+    process.env.DSH_HOME = defaultAppHome
+    const homeBase = basename(defaultAppHome)
+    if (homeBase === '.omnimux-dev') {
+      process.env.OMNIMUX_CHANNEL = 'dev'
+      process.env.OMNIMUX_DEV = '1'
+    } else if (homeBase === '.omnimux') {
+      if (!process.env.OMNIMUX_CHANNEL || process.env.OMNIMUX_CHANNEL.trim() === '') {
+        process.env.OMNIMUX_CHANNEL = 'prod'
+      }
+      delete process.env.OMNIMUX_DEV
+    }
+    const homeDir = resolveDshHome(defaultAppHome)
     const windowsVolumeConcerns = diagnoseWindowsVolumes(process.platform, [
       { label: 'application install', path: process.execPath },
       { label: 'desktop user data', path: app.getPath('userData') },

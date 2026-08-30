@@ -54,15 +54,62 @@ export interface SeedOmnimuxProfileResult {
 }
 
 /**
- * Resolve the Harness home the same way official boot does: `$DSH_HOME` when
- * non-empty, otherwise `~/.dsh`. A leading `~/` in `$DSH_HOME` expands.
+ * Resolve the application-scoped Harness home directory.
+ *
+ * Priority (OmniMux desktop identity always wins over ambient `$DSH_HOME`):
+ * 1. OmniMux Dev (name/userData/OMNIMUX_DEV/OMNIMUX_CHANNEL=dev) -> ~/.omnimux-dev
+ * 2. OmniMux Release (name/userData/OMNIMUX_CHANNEL=prod) -> ~/.omnimux
+ * 3. Explicit `$DSH_HOME` for upstream / custom harness overrides
+ * 4. Upstream default fallback -> ~/.dsh
+ *
+ * Why identity wins: macOS Dock/Finder launches inherit login-shell env, which
+ * often carries `DSH_HOME=~/.dsh`. If ambient env were allowed to override Dev/
+ * Prod identity, both apps would collapse onto ~/.dsh and break physical isolation.
+ */
+export function resolveDesktopHarnessHome(options?: {
+  env?: NodeJS.ProcessEnv
+  userDataDir?: string
+  appName?: string
+}): string {
+  const env = options?.env ?? process.env
+  const name = options?.appName ?? ''
+  const userData = options?.userDataDir ?? ''
+  const channel = (env.OMNIMUX_CHANNEL ?? '').trim().toLowerCase()
+
+  // 1. App identity takes precedence for OmniMux variants to guarantee physical profile isolation
+  if (
+    name.includes('Dev')
+    || userData.includes('OmniMux-Dev')
+    || userData.includes('omnimux-dev')
+    || env.OMNIMUX_DEV === '1'
+    || channel === 'dev'
+  ) {
+    return join(homedir(), '.omnimux-dev')
+  }
+  if (
+    name.includes('OmniMux')
+    || userData.includes('OmniMux')
+    || userData.includes('omnimux')
+    || channel === 'prod'
+  ) {
+    return join(homedir(), '.omnimux')
+  }
+
+  // 2. Explicit DSH_HOME for generic / custom harness overrides
+  const fromEnv = env.DSH_HOME
+  if (fromEnv !== undefined && fromEnv.trim() !== '') return resolve(expandHome(fromEnv.trim()))
+
+  // 3. Fallback to standard ~/.dsh
+  return join(homedir(), '.dsh')
+}
+
+/**
+ * Resolve the Harness home with OmniMux desktop identity awareness.
  * @param env - environment mapping; defaults to `process.env`.
  * @returns absolute Harness home.
  */
 export function resolveHarnessHome(env: NodeJS.ProcessEnv = process.env): string {
-  const fromEnv = env.DSH_HOME
-  if (fromEnv !== undefined && fromEnv.trim() !== '') return resolve(expandHome(fromEnv.trim()))
-  return join(homedir(), '.dsh')
+  return resolveDesktopHarnessHome({ env })
 }
 
 /**

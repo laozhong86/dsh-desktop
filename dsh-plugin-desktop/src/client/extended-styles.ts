@@ -111,7 +111,8 @@ body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extende
   -webkit-app-region: drag;
 }
 
-/* Drag strip for macOS sidebar top next to traffic lights */
+/* Drag strip for macOS sidebar top next to traffic lights.
+   Hits empty space above the logo row only — never overlays interactive controls. */
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"])[data-dsh-desktop-platform="darwin"] [class*="sidebarCol"]::before,
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"])[data-dsh-desktop-platform="darwin"] .dshDesktopSidebarSurface::before {
   content: "";
@@ -149,12 +150,13 @@ body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extende
   pointer-events: auto !important;
 }
 
-body[data-dsh-desktop-platform="darwin"] aside,
-body[data-dsh-desktop-platform="darwin"] [data-slot="sidebar"],
-body[data-dsh-desktop-platform="darwin"] .dshDesktopSidebarSurface,
-body[data-dsh-desktop-platform="darwin"] .dshDesktopUpstreamSidebar,
-body[data-dsh-desktop-platform="darwin"] [class*="sidebarCol"] > div,
-body[data-dsh-desktop-platform="darwin"] [data-pane="sidebar"] > div {
+/* macOS: push ONLY the left sidebar brand/logo row below traffic lights.
+   Target the real SidebarRoot (class contains _root), NOT sidebarCol > div —
+   that direct child is often an empty/display:contents slot wrapper, so
+   padding-top there has no visible effect. Right/center content stays at top:0. */
+body[data-dsh-desktop-platform="darwin"] [class*="sidebarCol"] [class*="_root"],
+body[data-dsh-desktop-platform="darwin"] .dshDesktopUpstreamSidebar [class*="_root"],
+body[data-dsh-desktop-platform="darwin"] [data-slot="sidebar"] [class*="_root"] {
   padding-top: 48px !important;
 }
 

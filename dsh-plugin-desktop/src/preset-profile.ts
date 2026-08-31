@@ -114,6 +114,74 @@ export function resolveHarnessHome(env: NodeJS.ProcessEnv = process.env): string
 }
 
 /**
+ * Seed initial settings.yaml and credentials in the isolated OmniMux home if absent.
+ * If fresh and an existing ~/.dsh/settings.yaml exists, bootstrap user credentials and models while enforcing compatibility mode.
+ */
+export function seedOmnimuxSettings(homeDir: string): void {
+  const targetHome = resolve(homeDir)
+  mkdirSync(targetHome, { recursive: true })
+  const settingsFile = join(targetHome, 'settings.yaml')
+  const globalDshHome = join(homedir(), '.dsh')
+
+  // 1. Initial settings.yaml bootstrapping
+  if (!existsSync(settingsFile)) {
+    const globalSettingsFile = join(globalDshHome, 'settings.yaml')
+    if (existsSync(globalSettingsFile) && targetHome !== globalDshHome) {
+      try {
+        const raw = readFileSync(globalSettingsFile, 'utf8')
+        const doc = parseDocument(raw)
+        // Ensure dsh-desktop is configured with compatibility mode
+        const desktop = doc.get('dsh-desktop')
+        if (desktop && typeof (desktop as any).set === 'function') {
+          ;(desktop as any).set('mode', 'compatibility')
+        } else {
+          doc.set('dsh-desktop', {
+            mode: 'compatibility',
+            macosMaterial: 'transparent',
+            windowsMaterial: 'acrylic',
+            openBrowser: false,
+            networkExposure: 'loopback',
+          })
+        }
+        writeFileSync(settingsFile, doc.toString())
+      } catch {
+        writeCleanCompatibilitySettings(settingsFile)
+      }
+    } else {
+      writeCleanCompatibilitySettings(settingsFile)
+    }
+  }
+
+  // 2. Initial .credentials.yaml bootstrapping (API Keys migration)
+  const credsFile = join(targetHome, '.credentials.yaml')
+  const globalCreds = join(globalDshHome, '.credentials.yaml')
+  if (!existsSync(credsFile) && existsSync(globalCreds) && targetHome !== globalDshHome) {
+    try {
+      cpSync(globalCreds, credsFile)
+    } catch {}
+  }
+}
+
+function writeCleanCompatibilitySettings(settingsFile: string): void {
+  const initial = [
+    'ui-onboarding:',
+    '  welcomeNoticeVersion: 2026-08-13.1',
+    'locale:',
+    '  preference: zh',
+    'permission:',
+    '  defaultPreset: danger-full-access',
+    'dsh-desktop:',
+    '  mode: compatibility',
+    '  macosMaterial: transparent',
+    '  windowsMaterial: acrylic',
+    '  openBrowser: false',
+    '  networkExposure: loopback',
+    '',
+  ].join('\n')
+  writeFileSync(settingsFile, initial)
+}
+
+/**
  * Seed or upgrade `$DSH_HOME/profiles/omnimux` from the packaged preset.
  * Existing `cordis.patch.yml` is never overwritten. Missing required bundles
  * are appended. Owned plugin directories refresh when the preset version is

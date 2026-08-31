@@ -120,7 +120,7 @@ body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extende
   top: 0;
   left: ${MACOS_TRAFFIC_LIGHT_SAFE_WIDTH}px;
   right: 0;
-  height: 36px;
+  height: 46px;
   -webkit-app-region: drag;
 }
 
@@ -155,7 +155,7 @@ body[data-dsh-desktop-platform="darwin"] .dshDesktopSidebarSurface,
 body[data-dsh-desktop-platform="darwin"] .dshDesktopUpstreamSidebar,
 body[data-dsh-desktop-platform="darwin"] [class*="sidebarCol"] > div,
 body[data-dsh-desktop-platform="darwin"] [data-pane="sidebar"] > div {
-  padding-top: 38px !important;
+  padding-top: 48px !important;
 }
 
 body[data-dsh-desktop-platform="win32"] header,

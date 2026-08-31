@@ -97,7 +97,8 @@ function printHelp() {
 插件源: ${pluginsRoot}
 
 命令:
-  sync [插件...] [--skip-build]   build + 物化进生产 profile（不自动重启）
+  sync [插件...] [--prod] [--skip-build]
+                                  build + 物化进 profile（默认进 ~/.omnimux-dev 开发版，--prod 进生产）
   restart [prod|dev]              手动重启 /Applications/OmniMux.app 或 OmniMux Dev
   dev <start|stop|ls|rm|watch|unwatch> ...
                                   L2 预发布环境（含统一 watch）
@@ -106,9 +107,9 @@ function printHelp() {
   path                            打印产品树 / 插件路径
 
 示例:
-  yarn omnimux:sync omnimux-assets
+  yarn omnimux:sync omnimux-workflow          # 默认同步至 Dev 开发版
+  yarn omnimux:sync --prod omnimux-workflow   # 人类明确指令下同步至生产正式版
   yarn omnimux:dev start assets-v2 omnimux-assets
-  yarn omnimux:restart
   yarn omnimux:restart dev
   yarn omnimux:stage
 `)

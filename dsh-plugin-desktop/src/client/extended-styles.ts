@@ -24,7 +24,7 @@ body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extende
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) #root {
   box-sizing: border-box;
   position: fixed;
-  top: ${DESKTOP_FRAME_HEIGHT}px;
+  top: 0;
   right: 0;
   bottom: 0;
   left: 0;
@@ -39,14 +39,6 @@ body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extende
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"])
   [data-shell-overlay] {
   overflow: hidden;
-  transform: translateZ(0);
-}
-/* Full-viewport dialogs portalled directly to body still belong to content. */
-body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"])
-  > [role="presentation"]:has(> [aria-modal="true"]),
-body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"])
-  > [aria-modal="true"] {
-  top: var(--dsh-desktop-frame-height) !important;
   transform: translateZ(0);
 }
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"])
@@ -103,6 +95,87 @@ body[data-dsh-desktop-mode="compatibility"]:not([data-dsh-desktop-material="off"
 body[data-dsh-desktop-mode="extended"]:not([data-dsh-desktop-material="off"]) {
   --dsh-desktop-frame-fill: color-mix(in srgb, var(--dsw-alias-bg-base) 18%, transparent);
 }
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"])::before {
+  content: "";
+  position: fixed;
+  z-index: 500;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 32px;
+  background: transparent;
+  user-select: none;
+  -webkit-app-region: drag;
+}
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"])[data-dsh-desktop-platform="darwin"]::before {
+  left: ${MACOS_TRAFFIC_LIGHT_SAFE_WIDTH}px;
+}
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"])[data-dsh-desktop-platform="win32"]::before {
+  right: ${WINDOWS_CAPTION_CONTROLS_WIDTH}px;
+}
+
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) button,
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) input,
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) textarea,
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) select,
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) a,
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [role="button"],
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [role="tab"],
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [role="menuitem"],
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [role="option"],
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [role="dialog"],
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [contenteditable="true"],
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) .dshDesktopNoDrag {
+  -webkit-app-region: no-drag !important;
+  position: relative;
+  z-index: 501;
+}
+
+body[data-dsh-desktop-platform="darwin"] aside,
+body[data-dsh-desktop-platform="darwin"] [data-slot="sidebar"],
+body[data-dsh-desktop-platform="darwin"] .dshDesktopSidebarSurface,
+body[data-dsh-desktop-platform="darwin"] .dshDesktopUpstreamSidebar,
+body[data-dsh-desktop-platform="darwin"] [class*="sidebarCol"] > div,
+body[data-dsh-desktop-platform="darwin"] [data-pane="sidebar"] > div {
+  padding-top: 38px !important;
+}
+
+/* Enable drag on all Stage headers and shell.overlay headers */
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [data-slot="shell.overlay"] header,
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [data-slot="shell.overlay"] [class*="PageHeader"],
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [data-slot="shell.overlay"] [class*="pageHeader"],
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="-stage"] > header,
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="-stage"] > [class*="Header"],
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) .sh-plaza-page > header,
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) .dshUk-PageHeader-pageHeader {
+  -webkit-app-region: drag !important;
+}
+
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [data-slot="shell.overlay"] header button,
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [data-slot="shell.overlay"] header input,
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [data-slot="shell.overlay"] header a,
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [data-slot="shell.overlay"] header select,
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [data-slot="shell.overlay"] header [role="button"],
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [data-slot="shell.overlay"] header [role="tab"],
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [data-slot="shell.overlay"] header [class*="controls"],
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [data-slot="shell.overlay"] header [class*="tabsContainer"],
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) .dshUk-PageHeader-pageHeader button,
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) .dshUk-PageHeader-pageHeader input,
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) .dshUk-PageHeader-pageHeader a,
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) .dshUk-PageHeader-pageHeader [role="button"],
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) .dshUk-PageHeader-pageHeader [role="tab"],
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) .dshUk-PageHeader-pageHeader [class*="controls"],
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) .dshUk-PageHeader-pageHeader [class*="tabsContainer"] {
+  -webkit-app-region: no-drag !important;
+  pointer-events: auto !important;
+}
+
+body[data-dsh-desktop-platform="win32"] header,
+body[data-dsh-desktop-platform="win32"] [data-slot="conversation"] > header,
+body[data-dsh-desktop-platform="win32"] .dshDesktopConversationSurface > header {
+  padding-right: ${WINDOWS_CAPTION_CONTROLS_WIDTH}px;
+}
+
 .dshDesktopFrameTitlebar {
   position: fixed;
   z-index: 2147483647;

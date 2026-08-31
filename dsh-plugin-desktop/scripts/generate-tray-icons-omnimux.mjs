@@ -10,7 +10,7 @@ const buildRoot = join(packageRoot, 'build')
 
 /** Pre-rasterized macOS template source (black/transparent). */
 const templateSource = join(buildRoot, 'tray-icon-source-32.png')
-/** Pre-rasterized brand-color source (lima #C8F135). */
+/** Pre-rasterized brand-color source (chartreuse #C6F14F (octopus IP)). */
 const brandSource = join(buildRoot, 'tray-icon-source-blue-32.png')
 
 const [templateBytes, brandBytes] = await Promise.all([

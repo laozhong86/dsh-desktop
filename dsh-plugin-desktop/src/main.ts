@@ -111,7 +111,7 @@ import {
   removeRecoveryPlugin,
 } from './recovery-plugin-uninstall.ts'
 import type { DesktopPnpmBootstrap } from './pnpm.ts'
-import { seedOmnimuxProfile } from './preset-profile.ts'
+import { seedOmnimuxProfile, resolveDesktopHarnessHome } from './preset-profile.ts'
 import {
   createDesktopExitCoordinator,
   createDesktopShutdown,
@@ -441,7 +441,15 @@ async function start(): Promise<void> {
       platform: process.platform,
     })
     for (const [name, value] of Object.entries(shellEnvironmentResolution.updates)) process.env[name] = value
-    const homeDir = resolveDshHome()
+    const defaultAppHome = resolveDesktopHarnessHome({
+      userDataDir: app.getPath('userData'),
+      appName: app.getName(),
+    })
+    // OmniMux Dev/Prod identity owns the harness home. Always align process.env
+    // after resolving homeDir so ambient shell DSH_HOME (often ~/.dsh) cannot
+    // split child processes / no-arg resolveDshHome() away from homeDir.
+    const homeDir = resolveDshHome(defaultAppHome)
+    process.env.DSH_HOME = homeDir
     const projectionCacheRecovery = recoverOversizedSessionProjectionCache(homeDir)
     if (projectionCacheRecovery.status === 'quarantined') {
       sessionProjectionCacheRecovery = projectionCacheRecovery

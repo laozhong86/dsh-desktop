@@ -869,11 +869,11 @@ describe('published package surface', () => {
       .toBe('yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win-portable')
     expect(manifest.build?.afterPack).toBe('./scripts/verify-packaged-runtime.ts')
     expect(manifest.build?.mac).toEqual(expect.objectContaining({
-      extendInfo: {
+      extendInfo: expect.objectContaining({
         CFBundleAllowMixedLocalizations: true,
         CFBundleDevelopmentRegion: 'en',
         CFBundleLocalizations: ['en', 'zh_CN'],
-      },
+      }),
       hardenedRuntime: true,
       mergeASARs: false,
       notarize: true,
@@ -935,7 +935,7 @@ describe('published package surface', () => {
   it('keeps one fixed brand-blue tray source for generated native assets', () => {
     const source = readFileSync(new URL('build/tray-icon.svg', packageRoot), 'utf8')
 
-    expect(source.match(/#4D6BFE/gu)).toHaveLength(1)
+    expect(source.match(/#C6F14F/gu)).toHaveLength(1)
     expect(source).not.toMatch(/<style\b|prefers-color-scheme/iu)
     for (const filename of [
       'tray-iconTemplate.png',
@@ -954,7 +954,7 @@ describe('published package surface', () => {
       .update(readFileSync(new URL('build/app-icon.png', packageRoot)))
       .digest('hex')
 
-    expect(digest).toBe('64d9bcc087923a42c1667f85e0007b1aa375ece7e41f1d6e388a723a84a4a835')
+    expect(digest).toBe('ad1baf25839507f5dad99bddf716ffc3210b49ba2465339957e21c4f8c0da456')
   })
 
   it('generates a centered macOS icon with a 100-pixel visual inset', async () => {

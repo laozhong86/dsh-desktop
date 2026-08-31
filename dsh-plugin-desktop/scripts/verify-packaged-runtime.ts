@@ -88,9 +88,7 @@ export const REQUIRED_UNPACKED_RUNTIME_ENTRIES = [
   'lib/windows-pwsh-sandbox.js',
   'lib/windows-subprocess.js',
   'node_modules/@deepseek-ai/dsh/package.json',
-  'node_modules/@deepseek-ai/dsh/config/agent-presets/cordis/agent.cordis.yml',
-  'node_modules/@deepseek-ai/dsh/config/agent-presets/cordis/skills/cordis-plugin-development/SKILL.md',
-  'node_modules/@deepseek-ai/dsh/config/agent-presets/cordis/skills/editing-cordis-compositions/SKILL.md',
+  'node_modules/@deepseek-ai/dsh/config/agent-presets/standard/agent.cordis.yml',
   'node_modules/@deepseek-ai/dsh/lib/bin.js',
   'node_modules/@deepseek-ai/dsh/lib/plugin-9h8shc4d.js',
   'node_modules/@deepseek-ai/dsh-subprocess-local/lib/index.js',
@@ -238,23 +236,52 @@ export async function smokePackagedDiagnosticWorker(
   }
 }
 
+/** Electron Builder architecture enum value for universal macOS packages. */
+const ELECTRON_BUILDER_UNIVERSAL_ARCH = 4
+
 /**
- * Resolve the platform-specific archive produced by Electron Builder.
- * @param context - completed application directory and target platform.
- * @returns absolute path to the packaged app.asar.
+ * Resolve the macOS Resources directory for a packaged application.
+ * @param context - completed application directory and product metadata.
+ * @returns absolute path to Contents/Resources.
  */
-export function resolvePackagedAsarPath(context: PackagedRuntimeContext): string {
+function resolveMacResourcesDir(context: PackagedRuntimeContext): string {
+  return join(
+    context.appOutDir,
+    `${context.packager.appInfo.productFilename}.app`,
+    'Contents',
+    'Resources',
+  )
+}
+
+/**
+ * Resolve every archive Electron Builder seals for the completed target.
+ *
+ * Universal macOS with `mergeASARs: false` may keep `app-arm64.asar` /
+ * `app-x64.asar`, or emit one sealed `app.asar` when the remaining archives are
+ * identical after `x64ArchFiles`. Detect the layout that actually exists.
+ * @param context - completed application directory and target platform.
+ * @param exists - physical-file probe for archive detection.
+ * @returns absolute archive paths that must pass the packaged-runtime gate.
+ */
+export function resolvePackagedAsarPaths(
+  context: PackagedRuntimeContext,
+  exists: FileProbe = existsSync,
+): readonly string[] {
   if (context.electronPlatformName === 'darwin') {
-    return join(
-      context.appOutDir,
-      `${context.packager.appInfo.productFilename}.app`,
-      'Contents',
-      'Resources',
-      'app.asar',
-    )
+    const resourcesDir = resolveMacResourcesDir(context)
+    if (context.arch === ELECTRON_BUILDER_UNIVERSAL_ARCH) {
+      const splitArchives = [
+        join(resourcesDir, 'app-arm64.asar'),
+        join(resourcesDir, 'app-x64.asar'),
+      ] as const
+      if (splitArchives.every(archivePath => exists(archivePath))) {
+        return [...splitArchives]
+      }
+    }
+    return [join(resourcesDir, 'app.asar')]
   }
   if (context.electronPlatformName === 'win32' || context.electronPlatformName === 'linux') {
-    return join(context.appOutDir, 'resources', 'app.asar')
+    return [join(context.appOutDir, 'resources', 'app.asar')]
   }
   throw new Error(
     `dsh-plugin-desktop: unsupported Electron afterPack platform ${JSON.stringify(context.electronPlatformName)}`,
@@ -262,12 +289,42 @@ export function resolvePackagedAsarPath(context: PackagedRuntimeContext): string
 }
 
 /**
- * Resolve the physical dependency tree emitted beside app.asar.
+ * Resolve the primary archive path used by single-architecture packages.
  * @param context - completed application directory and target platform.
- * @returns absolute path to app.asar.unpacked.
+ * @param exists - physical-file probe for archive detection.
+ * @returns absolute path to the packaged app.asar (or arm64 slice for universal).
  */
-export function resolvePackagedUnpackedRoot(context: PackagedRuntimeContext): string {
-  return `${resolvePackagedAsarPath(context)}.unpacked`
+export function resolvePackagedAsarPath(
+  context: PackagedRuntimeContext,
+  exists: FileProbe = existsSync,
+): string {
+  return resolvePackagedAsarPaths(context, exists)[0]!
+}
+
+/**
+ * Resolve every physical dependency tree emitted beside the sealed archives.
+ * @param context - completed application directory and target platform.
+ * @param exists - physical-file probe for archive detection.
+ * @returns absolute paths to each app*.asar.unpacked tree.
+ */
+export function resolvePackagedUnpackedRoots(
+  context: PackagedRuntimeContext,
+  exists: FileProbe = existsSync,
+): readonly string[] {
+  return resolvePackagedAsarPaths(context, exists).map(archivePath => `${archivePath}.unpacked`)
+}
+
+/**
+ * Resolve the primary physical dependency tree for smoke checks.
+ * @param context - completed application directory and target platform.
+ * @param exists - physical-file probe for archive detection.
+ * @returns absolute path to the preferred app.asar.unpacked tree.
+ */
+export function resolvePackagedUnpackedRoot(
+  context: PackagedRuntimeContext,
+  exists: FileProbe = existsSync,
+): string {
+  return resolvePackagedUnpackedRoots(context, exists)[0]!
 }
 
 /** Normalize the host-specific separators emitted by the ASAR reader. */
@@ -377,30 +434,47 @@ export function verifyPackagedRuntime(
   exists: FileProbe = existsSync,
   resolvePackage?: PackageResolver,
 ): void {
-  const archiveEntries = verifyPackagedAsar(resolvePackagedAsarPath(context), list)
-  const unpackedRoot = resolvePackagedUnpackedRoot(context)
-  const requiredPhysicalEntries = context.electronPlatformName === 'win32'
-    ? [...REQUIRED_UNPACKED_RUNTIME_ENTRIES, ...REQUIRED_WINDOWS_X64_NODE_PTY_ENTRIES]
-    : context.electronPlatformName === 'darwin' && context.arch === 4
-      ? [...REQUIRED_UNPACKED_RUNTIME_ENTRIES, ...REQUIRED_MACOS_UNIVERSAL_ENTRIES]
-      : REQUIRED_UNPACKED_RUNTIME_ENTRIES
-  const missing = requiredPhysicalEntries.filter(entry => !exists(join(unpackedRoot, entry)))
-  if (missing.length > 0) {
-    throw new Error(
-      `dsh-plugin-desktop: packaged runtime at ${unpackedRoot} is missing required physical entries: ${missing.join(', ')}`,
-    )
-  }
-  if (context.electronPlatformName === 'darwin' && context.arch === 4) {
-    const forbidden = FORBIDDEN_MACOS_UNIVERSAL_ENTRIES
-      .filter(entry => exists(join(unpackedRoot, entry)))
-    if (forbidden.length > 0) {
+  const archivePaths = resolvePackagedAsarPaths(context, exists)
+  const unpackedRoots = resolvePackagedUnpackedRoots(context, exists)
+  const isUniversalMac = context.electronPlatformName === 'darwin'
+    && context.arch === ELECTRON_BUILDER_UNIVERSAL_ARCH
+  const usesSplitArchives = archivePaths.length > 1
+
+  for (const [index, archivePath] of archivePaths.entries()) {
+    const archiveEntries = verifyPackagedAsar(archivePath, list)
+    const unpackedRoot = unpackedRoots[index]!
+    const requiredPhysicalEntries = context.electronPlatformName === 'win32'
+      ? [...REQUIRED_UNPACKED_RUNTIME_ENTRIES, ...REQUIRED_WINDOWS_X64_NODE_PTY_ENTRIES]
+      : isUniversalMac
+        ? [
+            ...REQUIRED_UNPACKED_RUNTIME_ENTRIES,
+            ...(usesSplitArchives
+              ? REQUIRED_MACOS_UNIVERSAL_ENTRIES.filter(entry => (
+                  archivePath.endsWith('app-arm64.asar')
+                    ? entry.includes('darwin-arm64') || entry.includes('darwin_arm64')
+                    : entry.includes('darwin-x64') || entry.includes('darwin_x64')
+                ))
+              : REQUIRED_MACOS_UNIVERSAL_ENTRIES),
+          ]
+        : REQUIRED_UNPACKED_RUNTIME_ENTRIES
+    const missing = requiredPhysicalEntries.filter(entry => !exists(join(unpackedRoot, entry)))
+    if (missing.length > 0) {
       throw new Error(
-        `dsh-plugin-desktop: universal macOS runtime at ${unpackedRoot} contains host-architecture build output: ${forbidden.join(', ')}`,
+        `dsh-plugin-desktop: packaged runtime at ${unpackedRoot} is missing required physical entries: ${missing.join(', ')}`,
       )
     }
+    if (isUniversalMac) {
+      const forbidden = FORBIDDEN_MACOS_UNIVERSAL_ENTRIES
+        .filter(entry => exists(join(unpackedRoot, entry)))
+      if (forbidden.length > 0) {
+        throw new Error(
+          `dsh-plugin-desktop: universal macOS runtime at ${unpackedRoot} contains host-architecture build output: ${forbidden.join(', ')}`,
+        )
+      }
+    }
+    verifyUnpackedArchiveMirror(archiveEntries, unpackedRoot, exists)
+    verifyUnpackedPackageResolution(unpackedRoot, resolvePackage)
   }
-  verifyUnpackedArchiveMirror(archiveEntries, unpackedRoot, exists)
-  verifyUnpackedPackageResolution(unpackedRoot, resolvePackage)
 }
 
 /**

@@ -352,7 +352,7 @@ describe('advanced desktop layout', () => {
 })
 
 describe('independent Desktop frame', () => {
-  it('reserves a command bar for both framed modes and limits the inverted-L surface to extended mode', () => {
+  it('fills the viewport in both framed modes and limits the inverted-L surface to extended mode', () => {
     let css = ''
     const remove = vi.fn()
     const style = {
@@ -369,13 +369,15 @@ describe('independent Desktop frame', () => {
 
     try {
       const dispose = installExtendedStyles()
-      expect(css).toContain(`top: ${DESKTOP_FRAME_HEIGHT}px`)
       expect(DESKTOP_FRAME_HEIGHT).toBe(36)
-      expect(css).toMatch(/#root \{[^}]*position: fixed;[^}]*right: 0;[^}]*bottom: 0;[^}]*left: 0;[^}]*padding-top: 0;[^}]*transform: translateZ\(0\);/)
+      expect(css).toContain('--dsh-desktop-frame-height: 36px')
+      expect(css).toMatch(/#root \{[^}]*position: fixed;[^}]*top: 0;[^}]*right: 0;[^}]*bottom: 0;[^}]*left: 0;[^}]*padding-top: 0;[^}]*transform: translateZ\(0\);/)
+      expect(css).not.toMatch(/#root\s*\{[^}]*top:\s*36px/)
       expect(css).toMatch(/\[data-shell-overlay\] \{[^}]*overflow: hidden;[^}]*transform: translateZ\(0\);/)
       expect(css).toMatch(/\[data-slot="sidebar\.footer\.action"\] \{[^}]*display: flex !important;[^}]*flex-direction: column;[^}]*max-height: min\(40vh, 240px\);[^}]*overflow-y: auto;/)
       expect(css).toMatch(/\[data-slot="sidebar\.footer\.action"\] > \* \{[^}]*flex: none;[^}]*min-width: 0;/)
-      expect(css).toMatch(/\[role="presentation"\]:has\(> \[aria-modal="true"\]\),[\s\S]*> \[aria-modal="true"\] \{[\s\S]*top: var\(--dsh-desktop-frame-height\) !important;/)
+      expect(css).not.toMatch(/\[role="presentation"\]:has\(> \[aria-modal="true"\]\)/)
+      expect(css).not.toContain('top: var(--dsh-desktop-frame-height) !important')
       expect(css).not.toContain('#root > :has(> [data-shell-overlay])')
       expect(css).toMatch(/body\[data-dsh-desktop-mode="extended"\] \.dshDesktopSidebarSurface \{[^}]*--dsw-specific-sidebar-fill: transparent;[^}]*border-right-color: transparent;[^}]*background: transparent !important;/)
       expect(css).toMatch(/body\[data-dsh-desktop-mode="extended"\] \.dshDesktopFrame \{[^}]*background: var\(--dsh-desktop-frame-fill\);/)
@@ -476,18 +478,9 @@ describe('independent Desktop frame', () => {
       })
       expect(rootInject).not.toHaveProperty('mode')
       expect(occupants[0]).toBe(ExtendedFrame)
-      expect(registrations[1]).toMatchObject({
-        name: 'shell.overlay',
-        id: 'desktop-frame-titlebar',
-      })
-      expect(registrations[1]).not.toHaveProperty('children')
-      expect(registrations[1]?.inject).toBeTypeOf('function')
-      expect((registrations[1]?.inject as () => Record<string, unknown>)()).toMatchObject({
-        environment: { mode: 'extended', platform: 'win32', material: 'acrylic' },
-        api: expect.any(Object),
-        setMode: expect.any(Function),
-      })
-      expect(registrations).toHaveLength(2)
+      expect(registrations).toHaveLength(1)
+      expect(JSON.stringify(registrations)).not.toContain('desktop-frame-titlebar')
+      expect(ctx.slots.inject).not.toHaveBeenCalled()
       expect(dataset).toMatchObject({
         dshDesktopMode: 'extended',
         dshDesktopPlatform: 'win32',
@@ -539,16 +532,10 @@ describe('independent Desktop frame', () => {
         material: 'transparent',
         micaSupported: false,
       })
-      expect(injectedSlots).toEqual(['shell.overlay'])
-      expect(registrations).toHaveLength(1)
-      expect(registrations[0]).toMatchObject({
-        name: 'shell.overlay',
-        id: 'desktop-frame-titlebar',
-      })
-      expect(registrations[0]).not.toHaveProperty('children')
-      expect((registrations[0]?.inject as () => Record<string, unknown>)()).toMatchObject({
-        setMode: expect.any(Function),
-      })
+      expect(injectedSlots).toEqual([])
+      expect(registrations).toHaveLength(0)
+      expect(ctx.slots.inject).not.toHaveBeenCalled()
+      expect(JSON.stringify(registrations)).not.toContain('desktop-frame-titlebar')
       expect(JSON.stringify(registrations)).not.toContain('desktop.titlebar.action')
       expect(dataset).toMatchObject({
         dshDesktopMode: 'compatibility',

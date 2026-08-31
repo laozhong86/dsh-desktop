@@ -5,12 +5,13 @@ import AdmZip from 'adm-zip'
 import {
   afterPack,
   REQUIRED_PACKAGED_RUNTIME_ENTRIES,
-  REQUIRED_MACOS_UNIVERSAL_ENTRIES,
   REQUIRED_UNPACKED_PACKAGE_SPECIFIERS,
   REQUIRED_UNPACKED_RUNTIME_ENTRIES,
   REQUIRED_WINDOWS_X64_NODE_PTY_ENTRIES,
   resolvePackagedAsarPath,
+  resolvePackagedAsarPaths,
   resolvePackagedUnpackedRoot,
+  resolvePackagedUnpackedRoots,
   smokePackagedDiagnosticWorker,
   verifyUnpackedArchiveMirror,
   verifyPackagedRuntime,
@@ -132,6 +133,7 @@ describe('packaged desktop runtime verification', () => {
     verifyPackagedRuntime(context('/build', platform), list, exists, resolvePackage)
 
     expect(resolvePackagedAsarPath(context('/build', platform))).toBe(expectedPath)
+    expect(resolvePackagedAsarPaths(context('/build', platform))).toEqual([expectedPath])
     expect(list).toHaveBeenCalledOnce()
     expect(list).toHaveBeenCalledWith(expectedPath, { isPack: false })
     expect(resolvePackagedUnpackedRoot(context('/build', platform))).toBe(unpackedRoot)
@@ -149,32 +151,88 @@ describe('packaged desktop runtime verification', () => {
       .toThrow('unsupported Electron afterPack platform "mas"')
   })
 
-  it('requires both CPU variants from a universal macOS runtime', () => {
+  it('inspects both CPU archives from a universal macOS runtime', () => {
     const runtimeContext = context('/build', 'darwin', 4)
-    const unpackedRoot = resolvePackagedUnpackedRoot(runtimeContext)
+    const resourcesDir = join('/build', 'OmniMux.app', 'Contents', 'Resources')
+    const archivePaths = [
+      join(resourcesDir, 'app-arm64.asar'),
+      join(resourcesDir, 'app-x64.asar'),
+    ] as const
+    const unpackedRoots = archivePaths.map(path => `${path}.unpacked`)
+    const splitExists = (filename: string): boolean => archivePaths.includes(filename as typeof archivePaths[number])
+      || !unpackedRoots.some(root => (
+        FORBIDDEN_MACOS_UNIVERSAL_ENTRIES.some(entry => filename === join(root, entry))
+      ))
+
+    expect(resolvePackagedAsarPaths(runtimeContext, splitExists)).toEqual([...archivePaths])
+    expect(resolvePackagedUnpackedRoots(runtimeContext, splitExists))
+      .toEqual(unpackedRoots)
+
     const missing = 'node_modules/@vscode/ripgrep-darwin-x64/bin/rg'
+    const x64UnpackedRoot = unpackedRoots[1]!
 
     expect(() => verifyPackagedRuntime(
       runtimeContext,
       () => completeArchiveEntries(),
-      filename => filename !== join(unpackedRoot, missing),
+      filename => splitExists(filename) && filename !== join(x64UnpackedRoot, missing),
+      specifier => completePackageResolver(unpackedRoots[0]!)(specifier),
+    )).toThrow(`missing required physical entries: ${missing}`)
+
+    const list = vi.fn<ArchiveLister>(() => completeArchiveEntries())
+    const exists = vi.fn<FileProbe>(splitExists)
+    let resolveCount = 0
+    verifyPackagedRuntime(
+      runtimeContext,
+      list,
+      exists,
+      (specifier) => {
+        const root = resolveCount < REQUIRED_UNPACKED_PACKAGE_SPECIFIERS.length
+          ? unpackedRoots[0]!
+          : unpackedRoots[1]!
+        resolveCount += 1
+        return completePackageResolver(root)(specifier)
+      },
+    )
+    expect(list).toHaveBeenCalledTimes(2)
+    expect(list).toHaveBeenNthCalledWith(1, archivePaths[0], { isPack: false })
+    expect(list).toHaveBeenNthCalledWith(2, archivePaths[1], { isPack: false })
+  })
+
+  it('inspects a single sealed app.asar when universal archives are merged', () => {
+    const runtimeContext = context('/build', 'darwin', 4)
+    const resourcesDir = join('/build', 'OmniMux.app', 'Contents', 'Resources')
+    const archivePath = join(resourcesDir, 'app.asar')
+    const unpackedRoot = `${archivePath}.unpacked`
+    const missing = 'node_modules/@vscode/ripgrep-darwin-x64/bin/rg'
+    const splitArchives = [
+      join(resourcesDir, 'app-arm64.asar'),
+      join(resourcesDir, 'app-x64.asar'),
+    ]
+    const mergedExists = (filename: string): boolean => (
+      !splitArchives.includes(filename)
+      && (
+        filename === archivePath
+        || !FORBIDDEN_MACOS_UNIVERSAL_ENTRIES.some(entry => filename === join(unpackedRoot, entry))
+      )
+    )
+
+    expect(resolvePackagedAsarPaths(runtimeContext, mergedExists)).toEqual([archivePath])
+    expect(() => verifyPackagedRuntime(
+      runtimeContext,
+      () => completeArchiveEntries(),
+      filename => mergedExists(filename) && filename !== join(unpackedRoot, missing),
       completePackageResolver(unpackedRoot),
     )).toThrow(`missing required physical entries: ${missing}`)
 
-    const exists = vi.fn<FileProbe>(filename => !FORBIDDEN_MACOS_UNIVERSAL_ENTRIES
-      .some(entry => filename === join(unpackedRoot, entry)))
+    const list = vi.fn<ArchiveLister>(() => completeArchiveEntries())
     verifyPackagedRuntime(
       runtimeContext,
-      () => completeArchiveEntries(),
-      exists,
+      list,
+      mergedExists,
       completePackageResolver(unpackedRoot),
     )
-    expect(exists).toHaveBeenCalledTimes(
-      REQUIRED_UNPACKED_RUNTIME_ENTRIES.length
-        + REQUIRED_MACOS_UNIVERSAL_ENTRIES.length
-        + FORBIDDEN_MACOS_UNIVERSAL_ENTRIES.length
-        + completeArchiveEntries().length,
-    )
+    expect(list).toHaveBeenCalledOnce()
+    expect(list).toHaveBeenCalledWith(archivePath, { isPack: false })
   })
 
   it('rejects any ASAR-declared unpacked dependency missing from the physical tree', () => {
@@ -190,13 +248,15 @@ describe('packaged desktop runtime verification', () => {
 
   it('rejects a host-architecture node-pty build from a universal app', () => {
     const runtimeContext = context('/build', 'darwin', 4)
-    const unpackedRoot = resolvePackagedUnpackedRoot(runtimeContext)
+    const archivePath = join('/build', 'OmniMux.app', 'Contents', 'Resources', 'app.asar')
+    const unpackedRoot = `${archivePath}.unpacked`
     const forbidden = FORBIDDEN_MACOS_UNIVERSAL_ENTRIES[0]
 
     expect(() => verifyPackagedRuntime(
       runtimeContext,
       () => completeArchiveEntries(),
-      filename => filename === join(unpackedRoot, forbidden)
+      filename => filename === archivePath
+        || filename === join(unpackedRoot, forbidden)
         || !FORBIDDEN_MACOS_UNIVERSAL_ENTRIES
           .some(entry => filename === join(unpackedRoot, entry)),
       completePackageResolver(unpackedRoot),
@@ -248,13 +308,11 @@ describe('packaged desktop runtime verification', () => {
     )).toThrow(`missing required physical entries: ${missing}`)
   })
 
-  it('requires the physical Cordis preset and its bundled skills', () => {
+  it('requires the physical standard preset', () => {
     const runtimeContext = context('/build', 'win32')
     const unpackedRoot = resolvePackagedUnpackedRoot(runtimeContext)
     const requiredPresetEntries = [
-      'node_modules/@deepseek-ai/dsh/config/agent-presets/cordis/agent.cordis.yml',
-      'node_modules/@deepseek-ai/dsh/config/agent-presets/cordis/skills/cordis-plugin-development/SKILL.md',
-      'node_modules/@deepseek-ai/dsh/config/agent-presets/cordis/skills/editing-cordis-compositions/SKILL.md',
+      'node_modules/@deepseek-ai/dsh/config/agent-presets/standard/agent.cordis.yml',
     ]
 
     for (const missing of requiredPresetEntries) {

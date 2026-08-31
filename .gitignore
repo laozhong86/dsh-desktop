@@ -20,6 +20,9 @@ dsh-plugin-desktop/dist/
 
 # 根目录发布/下载产物（.app 备份、本地分发缓存），勿提交
 /dist/
+/index.js
+.workbuddy/
+dsh-plugin-desktop/preset/plugins/
 
 # Agent parallel worktrees (one branch per checkout)
 .worktrees/

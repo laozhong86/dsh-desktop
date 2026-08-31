@@ -66,14 +66,14 @@ afterEach(() => {
 describe('desktop profile composition', {
   timeout: process.platform === 'win32' ? 10_000 : 5_000,
 }, () => {
-  it('ships a PowerShell-backed minimal preset for Windows', () => {
-    const minimalPreset = readFileSync(
-      join(shippedPresetRoot(), 'minimal', 'agent.cordis.yml'),
+  it('ships a PowerShell-backed standard preset for Windows', () => {
+    const standardPreset = readFileSync(
+      join(shippedPresetRoot(), 'standard', 'agent.cordis.yml'),
       'utf8',
     )
 
-    expect(minimalPreset).toContain("name: '@deepseek-ai/dsh-tool-pwsh-persistent'")
-    expect(minimalPreset).toContain("disabled: !!js process.platform !== 'win32'")
+    expect(standardPreset).toContain("name: '@deepseek-ai/dsh-tool-pwsh'")
+    expect(standardPreset).toContain("disabled: !!js process.platform !== 'win32'")
   })
 
   it('reads packaged Cordis skills from the physical unpacked preset root', () => {

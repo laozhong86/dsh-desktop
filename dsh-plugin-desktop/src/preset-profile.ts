@@ -57,14 +57,15 @@ export interface SeedOmnimuxProfileResult {
 /**
  * Resolve the application-scoped Harness home directory.
  *
- * Priority:
- * 1. OmniMux Dev identity (`Dev` name / OmniMux-Dev userData / OMNIMUX_DEV=1) -> ~/.omnimux-dev
- * 2. OmniMux Prod identity (OmniMux name / OmniMux userData) -> ~/.omnimux
- * 3. Explicit `$DSH_HOME` (generic / custom harness overrides)
+ * Priority (OmniMux desktop identity always wins over ambient `$DSH_HOME`):
+ * 1. OmniMux Dev (name/userData/OMNIMUX_DEV/OMNIMUX_CHANNEL=dev) -> ~/.omnimux-dev
+ * 2. OmniMux Release (name/userData/OMNIMUX_CHANNEL=prod) -> ~/.omnimux
+ * 3. Explicit `$DSH_HOME` for upstream / custom harness overrides
  * 4. Upstream default fallback -> ~/.dsh
  *
- * App identity beats ambient `$DSH_HOME` so a shell export of ~/.dsh cannot
- * collapse Dev/Prod isolation.
+ * Why identity wins: macOS Dock/Finder launches inherit login-shell env, which
+ * often carries `DSH_HOME=~/.dsh`. If ambient env were allowed to override Dev/
+ * Prod identity, both apps would collapse onto ~/.dsh and break physical isolation.
  */
 export function resolveDesktopHarnessHome(options?: {
   env?: NodeJS.ProcessEnv
@@ -74,12 +75,24 @@ export function resolveDesktopHarnessHome(options?: {
   const env = options?.env ?? process.env
   const name = options?.appName ?? ''
   const userData = options?.userDataDir ?? ''
+  const channel = (env.OMNIMUX_CHANNEL ?? '').trim().toLowerCase()
 
   // 1. App identity takes precedence for OmniMux variants to guarantee physical profile isolation
-  if (name.includes('Dev') || userData.includes('OmniMux-Dev') || userData.includes('omnimux-dev') || env.OMNIMUX_DEV === '1') {
+  if (
+    name.includes('Dev')
+    || userData.includes('OmniMux-Dev')
+    || userData.includes('omnimux-dev')
+    || env.OMNIMUX_DEV === '1'
+    || channel === 'dev'
+  ) {
     return join(homedir(), '.omnimux-dev')
   }
-  if (name.includes('OmniMux') || userData.includes('OmniMux') || userData.includes('omnimux')) {
+  if (
+    name.includes('OmniMux')
+    || userData.includes('OmniMux')
+    || userData.includes('omnimux')
+    || channel === 'prod'
+  ) {
     return join(homedir(), '.omnimux')
   }
 
@@ -92,81 +105,12 @@ export function resolveDesktopHarnessHome(options?: {
 }
 
 /**
- * Resolve the Harness home the same way official boot does: `$DSH_HOME` when
- * non-empty, otherwise `~/.dsh`. A leading `~/` in `$DSH_HOME` expands.
+ * Resolve the Harness home with OmniMux desktop identity awareness.
  * @param env - environment mapping; defaults to `process.env`.
  * @returns absolute Harness home.
  */
 export function resolveHarnessHome(env: NodeJS.ProcessEnv = process.env): string {
   return resolveDesktopHarnessHome({ env })
-}
-
-/**
- * Seed initial settings.yaml and credentials in the isolated OmniMux home if absent.
- * If fresh and an existing ~/.dsh/settings.yaml exists, bootstrap user credentials and models while enforcing compatibility mode.
- */
-export function seedOmnimuxSettings(homeDir: string): void {
-  const targetHome = resolve(homeDir)
-  mkdirSync(targetHome, { recursive: true })
-  const settingsFile = join(targetHome, 'settings.yaml')
-  const globalDshHome = join(homedir(), '.dsh')
-
-  // 1. Initial settings.yaml bootstrapping
-  if (!existsSync(settingsFile)) {
-    const globalSettingsFile = join(globalDshHome, 'settings.yaml')
-    if (existsSync(globalSettingsFile) && targetHome !== globalDshHome) {
-      try {
-        const raw = readFileSync(globalSettingsFile, 'utf8')
-        const doc = parseDocument(raw)
-        // Ensure dsh-desktop is configured with compatibility mode
-        const desktop = doc.get('dsh-desktop')
-        if (desktop && typeof (desktop as any).set === 'function') {
-          ;(desktop as any).set('mode', 'compatibility')
-        } else {
-          doc.set('dsh-desktop', {
-            mode: 'compatibility',
-            macosMaterial: 'transparent',
-            windowsMaterial: 'acrylic',
-            openBrowser: false,
-            networkExposure: 'loopback',
-          })
-        }
-        writeFileSync(settingsFile, doc.toString())
-      } catch {
-        writeCleanCompatibilitySettings(settingsFile)
-      }
-    } else {
-      writeCleanCompatibilitySettings(settingsFile)
-    }
-  }
-
-  // 2. Initial .credentials.yaml bootstrapping (API Keys migration)
-  const credsFile = join(targetHome, '.credentials.yaml')
-  const globalCreds = join(globalDshHome, '.credentials.yaml')
-  if (!existsSync(credsFile) && existsSync(globalCreds) && targetHome !== globalDshHome) {
-    try {
-      cpSync(globalCreds, credsFile)
-    } catch {}
-  }
-}
-
-function writeCleanCompatibilitySettings(settingsFile: string): void {
-  const initial = [
-    'ui-onboarding:',
-    '  welcomeNoticeVersion: 2026-08-13.1',
-    'locale:',
-    '  preference: zh',
-    'permission:',
-    '  defaultPreset: danger-full-access',
-    'dsh-desktop:',
-    '  mode: compatibility',
-    '  macosMaterial: transparent',
-    '  windowsMaterial: acrylic',
-    '  openBrowser: false',
-    '  networkExposure: loopback',
-    '',
-  ].join('\n')
-  writeFileSync(settingsFile, initial)
 }
 
 /**

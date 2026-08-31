@@ -5,59 +5,65 @@ import { join } from 'node:path'
 import { parseDocument } from 'yaml'
 import {
   resolveDesktopHarnessHome,
+  resolveHarnessHome,
   seedOmnimuxSettings,
 } from '../src/preset-profile.ts'
 
 describe('resolveDesktopHarnessHome', () => {
-  it('respects explicit DSH_HOME environment variable', () => {
-    const custom = '/tmp/custom-dsh-home'
-    expect(resolveDesktopHarnessHome({ env: { DSH_HOME: custom } })).toBe(custom)
+  it('routes OmniMux Dev to ~/.omnimux-dev even when ambient DSH_HOME points at ~/.dsh', () => {
+    expect(
+      resolveDesktopHarnessHome({
+        env: { DSH_HOME: join(homedir(), '.dsh') },
+        appName: 'OmniMux Dev',
+        userDataDir: join(homedir(), 'Library/Application Support/OmniMux-Dev'),
+      }),
+    ).toBe(join(homedir(), '.omnimux-dev'))
   })
 
-  it('routes OmniMux Dev variant to ~/.omnimux-dev even with ambient DSH_HOME', () => {
+  it('routes OmniMux Dev via OMNIMUX_CHANNEL=dev without relying on app name', () => {
     expect(
       resolveDesktopHarnessHome({
-        env: { DSH_HOME: "/Users/test/.dsh" },
-        appName: 'OmniMux Dev',
-        userDataDir: '/Users/test/Library/Application Support/OmniMux-Dev',
-      }),
-    ).toBe(join(homedir(), '.omnimux-dev'))
-
-    expect(
-      resolveDesktopHarnessHome({
-        env: {},
-        appName: 'OmniMux Dev',
-        userDataDir: '/Users/test/Library/Application Support/OmniMux-Dev',
-      }),
-    ).toBe(join(homedir(), '.omnimux-dev'))
-
-    expect(
-      resolveDesktopHarnessHome({
-        env: { OMNIMUX_DEV: '1' },
+        env: { DSH_HOME: join(homedir(), '.dsh'), OMNIMUX_CHANNEL: 'dev' },
         appName: '',
         userDataDir: '',
       }),
     ).toBe(join(homedir(), '.omnimux-dev'))
   })
 
-  it('routes OmniMux Release to ~/.omnimux', () => {
+  it('routes OmniMux Release to ~/.omnimux even when ambient DSH_HOME points at ~/.dsh', () => {
     expect(
       resolveDesktopHarnessHome({
-        env: {},
+        env: { DSH_HOME: join(homedir(), '.dsh') },
         appName: 'OmniMux',
-        userDataDir: '/Users/test/Library/Application Support/OmniMux',
+        userDataDir: join(homedir(), 'Library/Application Support/OmniMux'),
       }),
     ).toBe(join(homedir(), '.omnimux'))
   })
 
-  it('falls back to standard ~/.dsh for upstream DSH Desktop', () => {
+  it('keeps upstream DSH Desktop on explicit DSH_HOME / ~/.dsh', () => {
+    const custom = '/tmp/custom-dsh-home'
+    expect(
+      resolveDesktopHarnessHome({
+        env: { DSH_HOME: custom },
+        appName: 'DSH Desktop',
+        userDataDir: join(homedir(), 'Library/Application Support/DSH Desktop'),
+      }),
+    ).toBe(custom)
+
     expect(
       resolveDesktopHarnessHome({
         env: {},
         appName: 'DSH Desktop',
-        userDataDir: '/Users/test/Library/Application Support/DSH Desktop',
+        userDataDir: join(homedir(), 'Library/Application Support/DSH Desktop'),
       }),
     ).toBe(join(homedir(), '.dsh'))
+  })
+
+  it('resolveHarnessHome remains identity-aware for OmniMux channel env', () => {
+    expect(resolveHarnessHome({ OMNIMUX_CHANNEL: 'dev', DSH_HOME: join(homedir(), '.dsh') }))
+      .toBe(join(homedir(), '.omnimux-dev'))
+    expect(resolveHarnessHome({ OMNIMUX_CHANNEL: 'prod', DSH_HOME: join(homedir(), '.dsh') }))
+      .toBe(join(homedir(), '.omnimux'))
   })
 })
 

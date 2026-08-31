@@ -150,14 +150,28 @@ body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extende
   pointer-events: auto !important;
 }
 
-/* macOS: push ONLY the left sidebar brand/logo row below traffic lights.
-   Target the real SidebarRoot (class contains _root), NOT sidebarCol > div —
-   that direct child is often an empty/display:contents slot wrapper, so
-   padding-top there has no visible effect. Right/center content stays at top:0. */
-body[data-dsh-desktop-platform="darwin"] [class*="sidebarCol"] [class*="_root"],
-body[data-dsh-desktop-platform="darwin"] .dshDesktopUpstreamSidebar [class*="_root"],
-body[data-dsh-desktop-platform="darwin"] [data-slot="sidebar"] [class*="_root"] {
-  padding-top: 48px !important;
+/* macOS: unified 38px top toolbar alignment across all three columns.
+   - Left expanded sidebar: logoRow sits in the 38px band with padding-left: 72px to clear traffic lights.
+   - Left collapsed sidebar: rail icons start below traffic lights (padding-top: 42px).
+   - Center & right columns: remain at top:0 with 38px headers/tabs, perfectly aligned. */
+body[data-dsh-desktop-platform="darwin"] [class*="sidebarCol"] [class*="_root"]:not([class*="collapsed"]) {
+  padding-top: 4px !important;
+}
+body[data-dsh-desktop-platform="darwin"] [class*="sidebarCol"] [class*="_root"]:not([class*="collapsed"]) [class*="logoRow"] {
+  height: 38px !important;
+  padding-left: 72px !important;
+  margin-bottom: 6px !important;
+}
+body[data-dsh-desktop-platform="darwin"] [class*="sidebarCol"] [class*="_root"][class*="collapsed"] {
+  padding-top: 42px !important;
+}
+
+/* Sidebar workspace & session rows: reveal full title on hover to prevent version/suffix ambiguity (e.g. (2)/(3)) */
+[class*="projectRow"]:hover [class*="title"],
+[class*="sessionRow"]:hover [class*="title"] {
+  overflow: visible !important;
+  white-space: normal !important;
+  word-break: break-word !important;
 }
 
 body[data-dsh-desktop-platform="win32"] header,

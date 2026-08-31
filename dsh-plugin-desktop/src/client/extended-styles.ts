@@ -153,6 +153,7 @@ body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extende
 /* macOS: unified 38px top toolbar alignment across all three columns.
    - Left expanded sidebar: logoRow sits in the 38px band with padding-left: 72px to clear traffic lights.
    - Left collapsed sidebar: rail icons start below traffic lights (padding-top: 42px).
+   - Right panel & toggle cluster: stay flush at top:0 / top:3px (no Windows title bar gap on macOS).
    - Center & right columns: remain at top:0 with 38px headers/tabs, perfectly aligned. */
 body[data-dsh-desktop-platform="darwin"] [class*="sidebarCol"] [class*="_root"]:not([class*="collapsed"]) {
   padding-top: 4px !important;
@@ -164,6 +165,14 @@ body[data-dsh-desktop-platform="darwin"] [class*="sidebarCol"] [class*="_root"]:
 }
 body[data-dsh-desktop-platform="darwin"] [class*="sidebarCol"] [class*="_root"][class*="collapsed"] {
   padding-top: 42px !important;
+}
+
+body[data-dsh-desktop-platform="darwin"] [class*="panel"],
+body[data-dsh-desktop-platform="darwin"] [class*="_panel"] {
+  padding-top: 0 !important;
+}
+body[data-dsh-desktop-platform="darwin"] [class*="toggleCluster"] {
+  top: 3px !important;
 }
 
 /* Sidebar workspace & session rows: reveal full title on hover to prevent version/suffix ambiguity (e.g. (2)/(3)) */

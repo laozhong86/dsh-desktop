@@ -1,7 +1,6 @@
 > [!NOTE] 本文档 2026-08-22 自已归档的平行 slim 壳（omnimux-desktop）迁移。
-> 决策参考仍适用：签名证书、发布渠道（GitHub Releases + electron-updater）、CI 矩阵、版本策略。
-> 与 fork 线现状对照：mac/win 签名与公证 preflight 已在 `scripts/release-mac.ts`/`release-win.ts`；
-> 本仓库「shell 不替换运行中 App」的描述对该 fork 线不完全适用，GA 落地时以本仓实际行为为准。
+> **2026 决策更新**：Windows 以 **官网 CDN unsigned** 为主，**Microsoft Store / 付费 Authenticode 暂停**（零额外签名预算）。真源见 `docs/contracts/windows-website-distribution.md` 与 `docs/contracts/release-sop.md`。
+> 与 fork 线现状对照：mac 签名与公证仍走 `scripts/release-mac.ts`；Windows 官网包走 `dist:win`；`dist:win-release`（Trusted Signing）仅付费恢复后使用。
 
 # OmniMux Desktop 公开发布方案
 
@@ -9,11 +8,13 @@
 
 ## 1. 目标
 
-公开发布（GA）要求同时满足三条：
+公开发布（当前可接受门槛）要求：
 
 1. **自由安装**：用户从公开渠道下载并 Open/安装，无需内网、无需 git；
-2. **强制签名信任**：macOS 过 Gatekeeper、Windows 过 SmartScreen，用户不被"未知开发者/危险程序"文案劝退；
-3. **自动更新**：应用内检测新版本并真正替换运行中的 App，而不是丢一个 DMG 让用户手动挂载。
+2. **平台信任（分平台）**：
+   - **macOS**：仍以 Developer ID + 公证过 Gatekeeper 为正式目标；
+   - **Windows（当前）**：官网分发 **允许 unsigned**，接受 SmartScreen / 未知发布者，并在下载页提供绕过说明；付费 Authenticode / 商店上架为可选增强，不是当前硬门槛；
+3. **自动更新**：应用内检测新版本并真正替换运行中的 App（可分阶段；半自动可作为过渡）。
 
 ## 2. 现状盘点（哪个现状对得上文档，就以代码为准）
 
@@ -34,7 +35,7 @@
 | **发布渠道** | electron-builder 无 `publish` 段；desktop 仓无 git 远端（仅 upstream 研究 remote） | 无下载宿主、无更新元数据流 |
 | **macOS 签名证书** | 本机仅一张 `Apple Development` 证书，**无 Developer ID Application**；需先成为 Apple Developer Program 付费会员才能签发 | GA 前置，否则 Gatekeeper 拦 |
 | **真·自动更新** | 现有 `auto-update.ts` 下载整个 DMG→`shell.openPath` 打开，**不替换运行中的应用** | 用户仍要走"挂载→拖入→替换"手动流程，不满足第 3 条 |
-| **Windows 签名** | `release-win.ts` 有签名变量位但无证书坐标系 | SmartScreen 强警告，企业场景流失 |
+| **Windows 付费签名** | 官网默认 `dist:win` unsigned；`dist:win-release` 骨架已就绪但暂停启用 | SmartScreen 可能提示；企业场景弱于已签名包，但**不阻断官网分发** |
 | **Linux 安装格式** | 仅 `dir`，无 .AppImage/.deb/.rpm | 无法"自由安装" |
 | **CI** | 无 `.github` | mac 公证只能在 macOS 做、NSIS 最好在 Windows 做——单机无法全平台产出 |
 | **元数据** | `private:true`、`version 0.1.0` | 非阻断，但发布需改公开 + 定版本 |
@@ -66,19 +67,19 @@
 - 申请路径：加入 Apple Developer Program → Xcode → Settings → Accounts 生成 **Developer ID Application** 并导入 Keychain（或导出 p12 走 `MAC_CERT_P12_BASE64` 通路）。
 - 付费之外的成本是**年度会员续费**（¥688/年）；证书签发免费，二者是"会员付费、签发免费"的关系。
 - 取得 Developer ID 后，本仓 `release-mac.ts` 的 preflight 才会通过；否则现在 `security find-identity` 会失败并**拒绝构建**（这是有意的安全保护）。
-| Windows | `.exe` (NSIS) + `.dmg` 不要，`latest.yml` blockmap | Windows 代码签名证书 | Windows | 🟡 缺签名证书 |
+| Windows | `.exe` (NSIS)，官网主路径 | **当前无强制签名**（`dist:win`）；付费签名可选 | Windows | 🟢 官网 unsigned 可用；🟡 付费签名暂停 |
 | Linux | `.AppImage` + `.deb` | 无 | Linux | 🔴 缺配置 |
 
-### Windows 代码签名（关键前置）
+### Windows 分发与签名（当前 vs 可选）
 
 > [!IMPORTANT]
-> Windows 开发者签名直接决定公开发布是否可行：无签名证书时文档引导用户手动绕过，行为不达第 2 条。优先路线：
+> **当前默认不是付费签名。** 官网公开发布使用 `yarn dist:win`（unsigned NSIS）+ R2/`dl.omnimux.ai`。SmartScreen 提示通过下载页文案引导用户「更多信息 → 仍要运行」。Microsoft Store 因 Policy 10.2.9 暂停，直至付费签名。
 
-- **首选：Windows 代码签名证书（OV 或 EV）**。EV 在 CI 上需硬件 token 入 minter，OV 可 p12 + `CSC_LINK`/`CSC_KEY_PASSWORD` 与现有 mac P12 机制一致，显然好接。证书按年订购，约年百元级。
-- **低成本替代：Azure Trusted Signing**。证书托管在 Azure，通过 OIDC/API 签名，CI 无需持有私钥，安全性更好、单价低。适合企业/团队签发。
-- **过渡（不推荐公开）**：`pnpm run dist:win` 可出未签名 NSIS，仅供内部/私人渠道分发；不满足公开发布门槛。
-
-把证书取证书名后，写入与 mac P12 相同的 `.env` 提供：`WIN_CSC_LINK` + `WIN_CSC_KEY_PASSWORD` + `CSC_NAME`（`release-win.ts` 已预留变量名）。
+- **当前主路径（零额外签名费）**：`yarn dist:win` → `yarn dist:r2-sync` → 官网下载。契约：`windows-website-distribution.md`。
+- **可选付费增强（暂停）**：
+  - Azure Trusted Signing（按月/按次）→ `yarn dist:win-release`（见 `windows-trusted-signing-sop.md`）
+  - 传统 OV/EV Authenticode（通常年费）
+- **不要**：在未明确付费决策前创建 Azure Trusted Signing Basic 账户，或把 unsigned 包再提 Microsoft Store。
 
 ### Linux 格式决策
 

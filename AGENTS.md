@@ -54,6 +54,18 @@ This desktop product is one layer of a wider OmniMux project ecosystem: it forks
 
 This fork syncs with upstream weekly. Before any merge from `origin/master`, read and follow [docs/contracts/upstream-sync.md](docs/contracts/upstream-sync.md) — it defines the four-tier merge decision ladder (auto-merge / template-resolve / user-confirm / reject), the standard SOP, and the mandatory decision log at [docs/contracts/upstream-sync-log.md](docs/contracts/upstream-sync-log.md). A merge without a log entry is not done.
 
+## Release & R2 Distribution SOP
+
+Distribution assets (macOS Universal DMG & Windows x64 NSIS) are hosted in Cloudflare R2 bucket `omnimux-dist` via `https://dl.omnimux.ai`. Detailed contract: [docs/contracts/release-sop.md](docs/contracts/release-sop.md).
+
+- macOS artifact standard: **Universal DMG** (`OmniMux-<version>-universal.dmg` bundling both `arm64` and `x86_64`). Single universal installer serves all Mac devices.
+- Windows artifact standard: **x64 NSIS Installer** (`OmniMux-<version>-x64-Setup.exe`). Supports silent install `/S` for auto-update and **website / CDN** distribution via `yarn dist:win` (unsigned).
+- **Current Windows policy**: website-first, Microsoft Store paused (zero extra signing budget). Contract: [docs/contracts/windows-website-distribution.md](docs/contracts/windows-website-distribution.md). Paid Authenticode / Store resubmission remains optional and follows [docs/contracts/windows-trusted-signing-sop.md](docs/contracts/windows-trusted-signing-sop.md) only after an explicit paid-signing decision.
+- **Public download page**: primary CTAs MUST point at `https://dl.omnimux.ai/` (not Store, not legacy `dshdesktop.cn`). Spec: [docs/contracts/download-page-spec.md](docs/contracts/download-page-spec.md).
+- Sync artifacts to R2: `yarn dist:r2-sync` (or `node scripts/r2-dist-sync.mjs upload`).
+- Verify CDN endpoints: `yarn dist:r2-verify` (or `node scripts/r2-dist-sync.mjs verify`).
+- List R2 bucket assets: `yarn dist:r2-list` (or `node scripts/r2-dist-sync.mjs list`).
+
 ## Parallel development & PR contract
 
 Multi-session feature work MUST follow [docs/contracts/parallel-dev-pr.md](docs/contracts/parallel-dev-pr.md): one task → one path lease → one worktree → one branch → one PR to `fork`/`omnimux`; main checkout is read-only for day-to-day coding; only the boss merges. Local board/leases live under `.workbuddy/` (not committed). After a PR is open, follow-up uses skill `omnimux-pr-handoff` (wraps marketplace github-pr-manager): update `.workbuddy/pr-board.md`, never auto-merge. Plugin-tree Git/PR lives in sibling `omnimux-dsh` contract `docs/contracts/plugin-git-pr.md` + skills `omnimux-plugin-pr` / `omnimux-pr-handoff` — do not reuse this fork's `fork`/`omnimux` topology there.

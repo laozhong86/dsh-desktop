@@ -94,7 +94,7 @@ jobs:
         env:
           OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}\omni-source\plugins
         run: corepack yarn workspace dsh-plugin-desktop stage:preset
-      - name: Build Windows installer
+      - name: Build Windows installer (website unsigned)
         env:
           OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}\omni-source\plugins
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
@@ -115,8 +115,9 @@ jobs:
           retention-days: 14
 
   # 发布到 GitHub Releases：把产物从 14 天临时 artifact 升级为持久、可追溯的
-  # 分发资产，同时是 electron-updater 自动更新链路的 feed 地基。签名认证通过
-  # 前先发 unsigned 产物跑通链路；签名后换 signed 产物 + latest*.yml feed。
+  # 分发资产，同时是 electron-updater 自动更新链路的 feed 地基。
+  # 当前决策：Windows 以官网 unsigned NSIS 为主；Microsoft Store / Trusted Signing
+  # 付费签名路径暂停，见 docs/contracts/release-sop.md。
   publish:
     needs: [build-mac, build-win]
     if: ${{ always() && (needs.build-mac.result == 'success' || needs.build-win.result == 'success') }}
@@ -145,3 +146,10 @@ jobs:
             release-assets/**/*.exe
             release-assets/**/*.zip
           fail_on_unmatched_files: false
+      - name: Sync to Cloudflare R2 (dl.omnimux.ai)
+        if: ${{ env.CLOUDFLARE_API_TOKEN != '' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || '861a8093c2f17a53b4f5a8375a347ff0' }}
+        run: |
+          node scripts/r2-dist-sync.mjs upload --dir release-assets

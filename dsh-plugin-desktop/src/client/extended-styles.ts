@@ -142,7 +142,11 @@ body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extende
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="tabClose"],
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="tabBarPlus"],
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="toggleCluster"],
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="toggleCluster"] *,
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="toggleButton"],
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="toggleButton"] *,
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="bottomClose"],
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="bottomClose"] *,
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="controls"],
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="tabsContainer"],
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) .dshDesktopNoDrag {

@@ -2,7 +2,12 @@
 
 ## 安装与首次启动
 
-从产品下载入口获取 macOS 或 Windows 安装包。安装后的 DSH Desktop 自带运行所需的 Electron、Node 和 DSH 依赖，普通用户不需要另行安装 Node.js 或 pnpm。
+从官方 CDN 下载入口获取 macOS 或 Windows 安装包：
+
+- Windows：[`https://dl.omnimux.ai/releases/latest/OmniMux-Setup.exe`](https://dl.omnimux.ai/releases/latest/OmniMux-Setup.exe)
+- macOS：[`https://dl.omnimux.ai/releases/latest/OmniMux-universal.dmg`](https://dl.omnimux.ai/releases/latest/OmniMux-universal.dmg)
+
+下载页规范见 [`contracts/download-page-spec.md`](contracts/download-page-spec.md)。若 Windows 出现 SmartScreen / 未知发布者提示，按「更多信息 → 仍要运行」继续（详见 [`contracts/windows-website-distribution.md`](contracts/windows-website-distribution.md)）。安装后的应用自带运行所需的 Electron、Node 和 DSH 依赖，普通用户不需要另行安装 Node.js 或 pnpm。
 
 首次启动时，应用会准备默认 profile，并在本机启动官方 DSH Web surface。关闭窗口通常只会隐藏窗口；可以从托盘重新打开，选择 **退出** 才会结束应用和 Host 进程。
 

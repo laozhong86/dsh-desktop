@@ -2,7 +2,12 @@
 
 ## Installation and first launch
 
-Download the macOS or Windows installer from the product download page. DSH Desktop includes Electron, Node, and its pinned DSH dependencies, so normal users do not need to install Node.js or pnpm separately.
+Download the macOS or Windows installer from the official CDN:
+
+- Windows: [`https://dl.omnimux.ai/releases/latest/OmniMux-Setup.exe`](https://dl.omnimux.ai/releases/latest/OmniMux-Setup.exe)
+- macOS: [`https://dl.omnimux.ai/releases/latest/OmniMux-universal.dmg`](https://dl.omnimux.ai/releases/latest/OmniMux-universal.dmg)
+
+See [`contracts/download-page-spec.md`](contracts/download-page-spec.md) for the public download-page contract. If Windows SmartScreen / Unknown publisher appears, use **More info → Run anyway** (details in [`contracts/windows-website-distribution.md`](contracts/windows-website-distribution.md)). The app includes Electron, Node, and its pinned DSH dependencies, so normal users do not need to install Node.js or pnpm separately.
 
 On first launch, the application prepares the default profile and starts the official DSH Web surface locally. Closing the window normally hides it; use **Quit** from the tray when you want to stop the application and Host process.
 

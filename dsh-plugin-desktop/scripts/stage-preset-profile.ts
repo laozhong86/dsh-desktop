@@ -79,6 +79,7 @@ export function stagePresetProfile(): number {
         throw new Error(`staged preset is missing required plugin ${required}: ${owned.join(', ')}`)
       }
     }
+    patchBetterSidebarSettingsNamespace(join(pluginsDir, 'dsh-better-sidebar'))
     writeFileSync(join(presetDir, 'owned-packages.json'), `${JSON.stringify(owned, undefined, 2)}\n`)
     if (!existsSync(join(presetDir, 'seed-version'))) writeFileSync(join(presetDir, 'seed-version'), '1\n')
     return owned.length
@@ -184,6 +185,41 @@ function copyClosure(hoistedRoot: string, entries: readonly string[], destinatio
     cpSync(from, to, { recursive: true, dereference: true })
     const manifest = JSON.parse(readFileSync(join(from, 'package.json'), 'utf8')) as Manifest
     for (const dep of Object.keys(manifest.dependencies ?? {})) queue.push(dep)
+  }
+}
+
+
+/**
+ * alpha.3 removed `settingsNamespace()`; the published sidebar still calls it
+ * and Host boot then fails to import the plugin. Rewrite the staged copy so
+ * packaged Dev/Prod apps boot without a live npm republish.
+ */
+function patchBetterSidebarSettingsNamespace(root: string): void {
+  if (!existsSync(join(root, 'package.json'))) return
+  const replacements: ReadonlyArray<readonly [string, string]> = [
+    [
+      "import { SettingsConflictError, settingsNamespace, type SettingsNamespace } from '@deepseek-ai/dsh-settings'",
+      "import { SettingsConflictError, type SettingsNamespace } from '@deepseek-ai/dsh-settings'",
+    ],
+    [
+      'import { SettingsConflictError, settingsNamespace } from "@deepseek-ai/dsh-settings";',
+      'import { SettingsConflictError } from "@deepseek-ai/dsh-settings";',
+    ],
+    [
+      'const ns: SettingsNamespace = settingsNamespace(SIDEBAR_PREFS_NS)',
+      'const ns: SettingsNamespace = SIDEBAR_PREFS_NS',
+    ],
+    [
+      'const ns = settingsNamespace(SIDEBAR_PREFS_NS);',
+      'const ns = SIDEBAR_PREFS_NS;',
+    ],
+  ]
+  for (const rel of ['src/index.ts', 'lib/index.js'] as const) {
+    const path = join(root, rel)
+    if (!existsSync(path)) continue
+    let text = readFileSync(path, 'utf8')
+    for (const [from, to] of replacements) text = text.replaceAll(from, to)
+    writeFileSync(path, text)
   }
 }
 

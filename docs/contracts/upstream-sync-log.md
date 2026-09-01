@@ -4,6 +4,40 @@
 
 ---
 
+## 2026-09-01 · pin runtime 0.1.2-alpha.3（dd6322d604，本会话 A–E）
+
+- **范围**：submodule `dd6322d604e00eec1ba5e0c8541159906a21094a`（`dsh-v0.1.2-alpha.3`）；vendor `vendor/dsh-runtime/0.1.2-alpha.3`（244 tarball，official profile）；desktop/market `@deepseek-ai/dsh*` → `0.1.2-alpha.3`
+- **配套**：cordis `4.0.2` / group `1.0.2` / include `1.0.7` / loader `1.0.3` / schemastery `^3.18.2`（alpha.3 peer）
+- **补丁**（P0 全 apply-check 通过）：
+  - 迁移并重打：`dsh-web-app` / `dsh` / `open@11` / directory-picker 两枚 / `dsh-subprocess-local` / `dsh-win32-process`
+  - 按 alpha.3 `navIcon` 重打：`dsh-client-ui-settings-general`（desktop 图标）
+  - 复活 P0：`dsh-llm-deepseek`（空 `call.id` / `function.name` 不写入，防 `prepare` 崩）
+  - alpha.1 补丁归档 `_deprecated/patches/runtime-0.1.2-alpha.1/`
+- **源码适配**：`settingsNamespace()` 工厂已从 `@deepseek-ai/dsh-settings` 移除，改用字面量 namespace
+- **验证**：`verify-layout` + `sync-vendored-runtime --check`；desktop 1004 pass / 4 skip；market 268 pass
+- **决策人**：老板本会话批准 A–E
+
+---
+
+## 2026-09-01 · 例行同步进 0.1.2-alpha.1（43 提交，C 级老板本会话批准 A–E）
+
+- **上游范围**：`8ad3491c49..e71a9ef0b1`（43 提交；runtime 0.1.2-alpha.1 + `runtimeSource` vendor 机制、Electron 43.3.0、打包校验改走 `dsh-agent-presets`、Win PTY 拆除、Setup Wizard 升级重跑等）
+- **冲突**（6 文件，脚本因 `verify-packaged-runtime.ts` 行数不一致 abort 后手工解）：
+  - 根 `package.json` scripts：上游 `upstream:install/build/official/pack/prepare-runtime` 与 OmniMux `omnimux:*` **并集**
+  - `dsh-plugin-desktop/package.json`：🟡 B 级 `version` 取上游 `2.0.4`，`description` 保 OmniMux
+  - `verify-packaged-runtime.ts` / `.spec.ts`：跟随上游 alpha 物理路径（`dsh-agent-presets` + `REQUIRED_DSH_CLI_RUNTIME_ENTRIES`）
+  - `tests/plugin.spec.ts`：端口保 `44_120`；`windowsMaterial` 跟随上游默认 `off`（源码 `DEFAULT_WINDOWS_WINDOW_MATERIAL`）
+  - `tests/client-environment.spec.ts`：保 HEAD（合并后 `extended-shell.ts` 未注册 `desktop-frame-titlebar`）
+- **解法**：
+  - 🟡 B 级：品牌字段按合同
+  - 🟠 C 级（老板本会话批准 A–E）：submodule pin、Electron 43.3.0、`runtimeSource`、打包校验结构
+- **分级记录**：A 级自动跟；B 级 2 项品牌；C 级 4 项（submodule / Electron / runtimeSource / packaged-runtime）老板确认；D 级 0
+- **submodule**：工作树补签到 `cd5ef8148158c3a752a658978873241fdf8e2bbc`（`dsh-v0.1.2-alpha.1`），与 `upstream.json` 一致
+- **验证**：本条目提交时尚未跑 yarn install/build（紧随其后）
+- **决策人**：老板本会话批准执行 A–E
+- **提交**：merge `0f3cf4f8e8` + 本条 submodule/log 收尾
+
+---
 ## 2026-08-25 · 例行大同步（232 提交）
 
 - **上游范围**：`f3eb74bb9f..321cbb6683`（232 提交；Setup Wizard 独立初始化向导 UI 与向导设置流程、Extended/Framed 窗口模式与 macOS/Windows 材质支持、Profile Checkpoint 统一三槽位健康检查点管理替代旧 install-recovery、窗口多显示器几何持久化与记忆校验、进程级 pnpm release-age 策略支持、空工具名死循环防护补丁与模型参数弹窗等）

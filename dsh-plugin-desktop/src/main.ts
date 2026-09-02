@@ -18,6 +18,7 @@ import { DSH_LAUNCH_ENVIRONMENT_KEY } from '@deepseek-ai/dsh-launch-environment'
 import type {} from '@deepseek-ai/dsh-web-app'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import { isDesktopInstallerQuitRequest } from './desktop-installer-quit.ts'
+import { isOmnimuxDevLaunch, applyOmnimuxDevEnvironment } from './desktop-identity.ts'
 import { createDesktopBrowserAccess } from './desktop-browser-access.ts'
 import {
   installDesktopDshRuntime,
@@ -327,16 +328,18 @@ async function mirrorDesktopProfilePreferences(
 /** Start one Electron process and leave lifetime to the mounted desktop plugin. */
 async function start(): Promise<void> {
   if (
-    process.env.OMNIMUX_CHANNEL === 'dev'
-    || process.env.NODE_ENV === 'development'
-    || process.execPath.includes('OmniMux Dev')
-    || app.getName().includes('Dev')
-    || process.env.DSH_DESKTOP_DEV === '1'
+    isOmnimuxDevLaunch({
+      env: process.env,
+      execPath: process.execPath,
+      appName: app.getName(),
+      userDataDir: app.getPath('userData'),
+    })
   ) {
     const currentName = app.getName()
     if (!currentName.includes('Dev')) app.setName(`${currentName} Dev`)
     const devUserData = join(app.getPath('appData'), 'OmniMux-Dev')
     app.setPath('userData', devUserData)
+    applyOmnimuxDevEnvironment(process.env)
   }
   if (!app.requestSingleInstanceLock()) {
     app.quit()
@@ -557,6 +560,7 @@ async function start(): Promise<void> {
       env: process.env,
       userDataDir: app.getPath('userData'),
       appName: app.getName(),
+      execPath: process.execPath,
     })
     process.env.DSH_HOME = defaultAppHome
     const homeBase = basename(defaultAppHome)

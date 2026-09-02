@@ -71,10 +71,12 @@ export function resolveDesktopHarnessHome(options?: {
   env?: NodeJS.ProcessEnv
   userDataDir?: string
   appName?: string
+  execPath?: string
 }): string {
   const env = options?.env ?? process.env
   const name = options?.appName ?? ''
   const userData = options?.userDataDir ?? ''
+  const execPath = options?.execPath ?? ''
   const channel = (env.OMNIMUX_CHANNEL ?? '').trim().toLowerCase()
 
   // 1. App identity takes precedence for OmniMux variants to guarantee physical profile isolation
@@ -82,6 +84,8 @@ export function resolveDesktopHarnessHome(options?: {
     name.includes('Dev')
     || userData.includes('OmniMux-Dev')
     || userData.includes('omnimux-dev')
+    || execPath.includes('OmniMux Dev')
+    || execPath.includes('OmniMux-Dev')
     || env.OMNIMUX_DEV === '1'
     || channel === 'dev'
   ) {

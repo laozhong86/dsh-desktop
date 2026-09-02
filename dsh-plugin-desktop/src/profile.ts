@@ -31,7 +31,7 @@ import FileSettingsProvider, {
 import { parseAllDocuments, parseDocument } from 'yaml'
 import { unpackedAsarPath } from './packaged-runtime-path.ts'
 import { findOverlayPackage, resolveOverlayPackage } from './package-overlay.ts'
-import { DESKTOP_DEFAULT_WEB_PORT } from './desktop-port.ts'
+import { DESKTOP_DEFAULT_WEB_PORT, defaultDesktopWebPort } from './desktop-port.ts'
 import {
   desktopBrowserAccessEnabled,
   desktopNetworkExposureForBrowserAccess,
@@ -120,8 +120,8 @@ export function parseDesktopShellMode(value: unknown): DesktopShellMode {
 }
 
 /** Parse the requested loopback Web port and reject values Node cannot listen on. */
-export function parseDesktopPort(value: unknown): number {
-  if (value === undefined) return DEFAULT_DESKTOP_PORT
+export function parseDesktopPort(value: unknown, env: NodeJS.ProcessEnv = process.env): number {
+  if (value === undefined) return defaultDesktopWebPort(env)
   if (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 65_535) return value
   throw new Error(`${BIN_NAME}: ${DESKTOP_SETTINGS_NAMESPACE}.port must be an integer from 0 through 65535`)
 }
@@ -172,7 +172,7 @@ export function desktopStartupSettingsFromSettings(document: unknown): DesktopSt
   )
   return {
     mode,
-    port: parseDesktopPort(values.port),
+    port: parseDesktopPort(values.port, process.env),
     macosMaterial: parseMacosWindowMaterial(values.macosMaterial),
     windowsMaterial: parseWindowsWindowMaterial(values.windowsMaterial),
     openBrowser,

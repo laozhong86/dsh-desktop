@@ -361,10 +361,7 @@
         "CFBundleLocalizations": [
           "en",
           "zh_CN"
-        ],
-        "LSEnvironment": {
-          "OMNIMUX_CHANNEL": "prod"
-        }
+        ]
       },
       "hardenedRuntime": true,
       "icon": "build/app-icon-mac.png",

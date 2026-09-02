@@ -426,6 +426,12 @@ describe('independent Desktop frame', () => {
       expect(css).not.toContain('[data-slot="shell.overlay"] header,\nbody:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="tabBar"],')
       expect(css).toContain('[class*="tabBar"],')
       expect(css).toContain('[class*="tabBar"] *')
+      // Official session/project rows are 32/34px with ellipsis. Hover wrap
+      // (`white-space: normal`) expands the row and shifts the whole list.
+      // Full titles already live on the official HoverCard portal.
+      expect(css).not.toContain('[class*="sessionRow"]:hover [class*="title"]')
+      expect(css).not.toContain('[class*="projectRow"]:hover [class*="title"]')
+      expect(css).not.toMatch(/\[class\*="(?:sessionRow|projectRow)"\]:hover[^{]*\{[^}]*white-space:\s*normal/)
       expect(css).toMatch(/\[class\*="tabBar"\],\nbody:is\(\[data-dsh-desktop-mode="compatibility"\], \[data-dsh-desktop-mode="extended"\]\) \[class\*="tabBar"\] \*,/)
       // macOS sidebarCol::before drag strip shares the titleband with logoRow; logoRow must
       // sit above it with no-drag or Collapse sidebar clicks are swallowed by app-region.

@@ -196,14 +196,6 @@ body[data-dsh-desktop-platform="darwin"] [class*="toggleCluster"] {
   top: 3px !important;
 }
 
-/* Sidebar workspace & session rows: reveal full title on hover to prevent version/suffix ambiguity (e.g. (2)/(3)) */
-[class*="projectRow"]:hover [class*="title"],
-[class*="sessionRow"]:hover [class*="title"] {
-  overflow: visible !important;
-  white-space: normal !important;
-  word-break: break-word !important;
-}
-
 body[data-dsh-desktop-platform="win32"] header,
 body[data-dsh-desktop-platform="win32"] [data-slot="conversation"] > header,
 body[data-dsh-desktop-platform="win32"] .dshDesktopConversationSurface > header {

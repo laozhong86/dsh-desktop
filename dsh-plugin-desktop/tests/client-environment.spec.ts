@@ -145,6 +145,7 @@ describe('advanced desktop layout', () => {
       expect(css).not.toMatch(/data-desktop-platform="darwin"\] \.dshDesktopSidebarSurface \{[^}]*-webkit-app-region: no-drag;/)
       expect(css).toMatch(/\.dshDesktopFrame\[data-desktop-mode="advanced"\]\[data-desktop-platform="darwin"\] \.dshDesktopConversationSurface,\s*\.dshDesktopFrame\[data-desktop-mode="advanced"\]\[data-desktop-platform="darwin"\] \.dshDesktopDetailsSurface \{ grid-row: 2; \}/)
       expect(css).toMatch(new RegExp(`data-desktop-platform="darwin"\\] \\.dshDesktopSidebarSurface::before \\{[^}]*z-index: ${ADVANCED_MACOS_DRAG_LAYER_Z_INDEX};[^}]*left: ${MACOS_TRAFFIC_LIGHT_SAFE_WIDTH}px;[^}]*height: ${ADVANCED_MACOS_DRAG_REGION_HEIGHT}px;[^}]*-webkit-app-region: drag;`))
+      expect(css).toMatch(new RegExp(`\\.dshDesktopSidebarSurface \\[class\\*="logoRow"\\],[^}]*\\.dshDesktopSidebarSurface \\[class\\*="logoRow"\\] \\* \\{[^}]*z-index: ${ADVANCED_MACOS_DRAG_LAYER_Z_INDEX + 1};[^}]*-webkit-app-region: no-drag !important;`))
       expect(css).toMatch(new RegExp(`\\.dshDesktopMacCaptionRow \\{[^}]*position: absolute;[^}]*z-index: ${ADVANCED_MACOS_DRAG_LAYER_Z_INDEX};[^}]*grid-column: 2 / -1;[^}]*grid-row: 1;[^}]*left: 0;[^}]*height: ${ADVANCED_MACOS_DRAG_REGION_HEIGHT}px;[^}]*background: var\\(--dsw-alias-bg-base\\);[^}]*-webkit-app-region: drag;`))
       expect(css).not.toContain('.dshDesktopMacCaptionRow::before')
       expect(css).not.toMatch(/data-desktop-platform="darwin"\] \.dshDesktopSidebarSurface \{[^}]*-webkit-app-region:\s*drag;/)
@@ -426,6 +427,13 @@ describe('independent Desktop frame', () => {
       expect(css).toContain('[class*="tabBar"],')
       expect(css).toContain('[class*="tabBar"] *')
       expect(css).toMatch(/\[class\*="tabBar"\],\nbody:is\(\[data-dsh-desktop-mode="compatibility"\], \[data-dsh-desktop-mode="extended"\]\) \[class\*="tabBar"\] \*,/)
+      // macOS sidebarCol::before drag strip shares the titleband with logoRow; logoRow must
+      // sit above it with no-drag or Collapse sidebar clicks are swallowed by app-region.
+      expect(css).toMatch(/\[class\*="sidebarCol"\]::before,/)
+      expect(css).toMatch(/height:\s*46px;/)
+      expect(css).toMatch(/\[class\*="sidebarCol"\] \[class\*="logoRow"\],/)
+      expect(css).toMatch(/\[class\*="sidebarCol"\] \[class\*="logoRow"\] \*,/)
+      expect(css).toMatch(/\[class\*="logoRow"\][^{]*\{[^}]*z-index:\s*11;[^}]*-webkit-app-region:\s*no-drag !important;/)
       expect(css).toContain('[data-platform="darwin"] .dshDesktopFrameActions { margin-left: auto; }')
       expect(css).toContain('[data-platform="win32"] .dshDesktopFrameActions { margin-right: auto; }')
       expect(css).toMatch(/\.dshDesktopTitlebarIconButton \{[^}]*-webkit-app-region: no-drag;/)

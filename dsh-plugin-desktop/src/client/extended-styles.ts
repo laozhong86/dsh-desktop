@@ -115,7 +115,10 @@ body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extende
 }
 
 /* Drag strip for macOS sidebar top next to traffic lights.
-   Hits empty space above the logo row only — never overlays interactive controls. */
+   Keep empty titleband draggable, but never let this overlay steal logoRow
+   clicks: darwin alignment puts logoRow (brand + Collapse sidebar toggle) in
+   the same 38px band, and Electron app-region hit-tests the ::before itself —
+   button { no-drag } does not punch through a sibling drag layer. */
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"])[data-dsh-desktop-platform="darwin"] [class*="sidebarCol"]::before,
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"])[data-dsh-desktop-platform="darwin"] .dshDesktopSidebarSurface::before {
   content: "";
@@ -126,6 +129,15 @@ body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extende
   right: 0;
   height: 46px;
   -webkit-app-region: drag;
+}
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"])[data-dsh-desktop-platform="darwin"] [class*="sidebarCol"] [class*="logoRow"],
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"])[data-dsh-desktop-platform="darwin"] [class*="sidebarCol"] [class*="logoRow"] *,
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"])[data-dsh-desktop-platform="darwin"] .dshDesktopSidebarSurface [class*="logoRow"],
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"])[data-dsh-desktop-platform="darwin"] .dshDesktopSidebarSurface [class*="logoRow"] * {
+  position: relative;
+  z-index: 11;
+  -webkit-app-region: no-drag !important;
+  pointer-events: auto !important;
 }
 
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) button,

@@ -188,7 +188,6 @@ body[data-dsh-desktop-platform="darwin"] [class*="sidebarCol"] [class*="_root"][
   padding-top: 42px !important;
 }
 
-body[data-dsh-desktop-platform="darwin"] [class*="panel"],
 body[data-dsh-desktop-platform="darwin"] [class*="_panel"] {
   padding-top: 0 !important;
 }

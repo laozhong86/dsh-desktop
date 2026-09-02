@@ -96,12 +96,15 @@ body[data-dsh-desktop-mode="extended"]:not([data-dsh-desktop-material="off"]) {
   --dsh-desktop-frame-fill: color-mix(in srgb, var(--dsw-alias-bg-base) 18%, transparent);
 }
 
-/* Window drag on headers, tab bar, and stage headers */
+/* Window drag on headers and stage headers.
+   Do NOT mark better-sidebar [class*="tabBar"] as drag: the toggleCluster sits
+   on top of that bar's right edge, and Electron app-region hit-testing lets the
+   underlying drag strip swallow those clicks (no toggle, often no window drag
+   either). better-sidebar already sets tabBar to no-drag for issues #103/#111. */
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) header,
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [data-slot="conversation.session.header"],
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [data-slot="conversation"] > header,
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [data-slot="shell.overlay"] header,
-body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="tabBar"],
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="PageHeader"],
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="pageHeader"],
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="-stage"] > header,
@@ -140,6 +143,8 @@ body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extende
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="tab "],
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="tabActive"],
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="tabClose"],
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="tabBar"],
+body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="tabBar"] *,
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="tabBarPlus"],
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="toggleCluster"],
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="toggleCluster"] *,

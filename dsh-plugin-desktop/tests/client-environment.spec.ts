@@ -421,6 +421,11 @@ describe('independent Desktop frame', () => {
       expect(css).toMatch(/\.dshDesktopFrameTitlebar \{[^}]*z-index: 2147483647;/)
       expect(css).toMatch(/\.dshDesktopFrameIdentity \{[^}]*left: 50%;[^}]*transform: translateX\(-50%\);/)
       expect(css).toMatch(/\.dshDesktopFrameActions \{[^}]*-webkit-app-region: no-drag;/)
+      // better-sidebar toggleCluster overlaps tabBar's right edge; tabBar must stay no-drag.
+      expect(css).not.toContain('[data-slot="shell.overlay"] header,\nbody:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) [class*="tabBar"],')
+      expect(css).toContain('[class*="tabBar"],')
+      expect(css).toContain('[class*="tabBar"] *')
+      expect(css).toMatch(/\[class\*="tabBar"\],\nbody:is\(\[data-dsh-desktop-mode="compatibility"\], \[data-dsh-desktop-mode="extended"\]\) \[class\*="tabBar"\] \*,/)
       expect(css).toContain('[data-platform="darwin"] .dshDesktopFrameActions { margin-left: auto; }')
       expect(css).toContain('[data-platform="win32"] .dshDesktopFrameActions { margin-right: auto; }')
       expect(css).toMatch(/\.dshDesktopTitlebarIconButton \{[^}]*-webkit-app-region: no-drag;/)

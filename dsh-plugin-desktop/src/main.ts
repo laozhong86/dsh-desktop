@@ -18,7 +18,7 @@ import { DSH_LAUNCH_ENVIRONMENT_KEY } from '@deepseek-ai/dsh-launch-environment'
 import type {} from '@deepseek-ai/dsh-web-app'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import { isDesktopInstallerQuitRequest } from './desktop-installer-quit.ts'
-import { isOmnimuxDevLaunch, applyOmnimuxDevEnvironment } from './desktop-identity.ts'
+import { isOmnimuxDevLaunch, applyOmnimuxDevEnvironment, resolveDevCdpPort } from './desktop-identity.ts'
 import { createDesktopBrowserAccess } from './desktop-browser-access.ts'
 import {
   installDesktopDshRuntime,
@@ -340,6 +340,13 @@ async function start(): Promise<void> {
     const devUserData = join(app.getPath('appData'), 'OmniMux-Dev')
     app.setPath('userData', devUserData)
     applyOmnimuxDevEnvironment(process.env)
+    // Dev builds expose a Chromium DevTools protocol (CDP) port so agents can
+    // drive and assert against the real Electron renderer (not the web-side
+    // host port). Prod is intentionally left closed.
+    const cdpPort = resolveDevCdpPort({ env: process.env })
+    if (cdpPort !== null) {
+      app.commandLine.appendSwitch('remote-debugging-port', cdpPort)
+    }
   }
   if (!app.requestSingleInstanceLock()) {
     app.quit()

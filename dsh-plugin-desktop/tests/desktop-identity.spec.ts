@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isOmnimuxDevLaunch, applyOmnimuxDevEnvironment } from '../src/desktop-identity.ts'
+import { isOmnimuxDevLaunch, applyOmnimuxDevEnvironment, resolveDevCdpPort, DESKTOP_DEV_CDP_PORT_DEFAULT } from '../src/desktop-identity.ts'
 import {
   DESKTOP_DEV_WEB_PORT,
   DESKTOP_PROD_WEB_PORT,
@@ -70,4 +70,19 @@ describe('desktop-identity & port policy (Issue #350)', () => {
     expect(defaultDesktopWebPort({ OMNIMUX_CHANNEL: 'prod' })).toBe(DESKTOP_PROD_WEB_PORT)
     expect(defaultDesktopWebPort({})).toBe(DESKTOP_PROD_WEB_PORT)
   })
+  it('resolveDevCdpPort: Dev exposes a CDP port (default 9229)', () => {
+    expect(resolveDevCdpPort({ env: { OMNIMUX_CHANNEL: 'dev' } })).toBe(DESKTOP_DEV_CDP_PORT_DEFAULT)
+    expect(resolveDevCdpPort({ env: { OMNIMUX_DEV: '1' } })).toBe(DESKTOP_DEV_CDP_PORT_DEFAULT)
+    expect(resolveDevCdpPort({ isDevLaunch: true, env: {} })).toBe(DESKTOP_DEV_CDP_PORT_DEFAULT)
+  })
+
+  it('resolveDevCdpPort: Dev port is overridable via OMNIMUX_DEV_CDP_PORT', () => {
+    expect(resolveDevCdpPort({ env: { OMNIMUX_CHANNEL: 'dev', OMNIMUX_DEV_CDP_PORT: '9333' } })).toBe('9333')
+  })
+
+  it('resolveDevCdpPort: Prod never exposes CDP', () => {
+    expect(resolveDevCdpPort({ env: { OMNIMUX_CHANNEL: 'prod' } })).toBeNull()
+    expect(resolveDevCdpPort({ isDevLaunch: false, env: {} })).toBeNull()
+  })
+
 })

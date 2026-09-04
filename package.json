@@ -195,7 +195,7 @@
     "@deepseek-ai/dsh-client-ui-goal": "file:vendor/dsh-runtime/0.1.2-alpha.3/deepseek-ai-dsh-client-ui-goal-0.1.2-alpha.3.tgz",
     "@deepseek-ai/dsh-client-ui-input-trigger": "file:vendor/dsh-runtime/0.1.2-alpha.3/deepseek-ai-dsh-client-ui-input-trigger-0.1.2-alpha.3.tgz",
     "@deepseek-ai/dsh-client-ui-jobs": "file:vendor/dsh-runtime/0.1.2-alpha.3/deepseek-ai-dsh-client-ui-jobs-0.1.2-alpha.3.tgz",
-    "@deepseek-ai/dsh-client-ui-layout": "file:vendor/dsh-runtime/0.1.2-alpha.3/deepseek-ai-dsh-client-ui-layout-0.1.2-alpha.3.tgz",
+    "@deepseek-ai/dsh-client-ui-layout": "patch:@deepseek-ai/dsh-client-ui-layout@file%3Avendor/dsh-runtime/0.1.2-alpha.3/deepseek-ai-dsh-client-ui-layout-0.1.2-alpha.3.tgz#./patches/dsh-client-ui-layout@0.1.2-alpha.3.patch",
     "@deepseek-ai/dsh-client-ui-message-feedback": "file:vendor/dsh-runtime/0.1.2-alpha.3/deepseek-ai-dsh-client-ui-message-feedback-0.1.2-alpha.3.tgz",
     "@deepseek-ai/dsh-client-ui-model-selection": "file:vendor/dsh-runtime/0.1.2-alpha.3/deepseek-ai-dsh-client-ui-model-selection-0.1.2-alpha.3.tgz",
     "@deepseek-ai/dsh-client-ui-permission-presets": "file:vendor/dsh-runtime/0.1.2-alpha.3/deepseek-ai-dsh-client-ui-permission-presets-0.1.2-alpha.3.tgz",

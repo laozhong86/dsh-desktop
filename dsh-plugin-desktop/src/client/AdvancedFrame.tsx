@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import type { PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import type {} from './contracts.ts'
 import type { DesktopClientPlatform } from './environment.ts'
 import {
   collapsedSidebarWidth, computeDesktopColumns, DesktopLayoutState,
-  SIDEBAR_AUTO_COLLAPSE, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT,
+  resolveNarrowBreakpoint, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT,
 } from './layout-state.ts'
 
 /** Private values assembled by one Desktop-owned shell registration. */
@@ -42,6 +43,7 @@ export function DesktopOwnedFrame({
   const panels = useSyncExternalStore(subscribeLayout, readLayout, readLayout)
   const frameRef = useRef<HTMLDivElement>(null)
   const [viewport, setViewport] = useState(() => window.innerWidth)
+  const [narrow, setNarrow] = useState(() => resolveNarrowBreakpoint(window.innerWidth, false))
   const detailsSession = useSessions((state) => {
     const current = state.current
     return current !== undefined && state.byId[current]?.blank === false ? current : undefined
@@ -65,7 +67,26 @@ export function DesktopOwnedFrame({
     }
   }, [])
 
-  const narrow = viewport < SIDEBAR_AUTO_COLLAPSE
+  // Breakpoint uses window.innerWidth (rAF-throttled resize), not the
+  // ResizeObserver frame width — that width is squeezed by better-sidebar's
+  // --dsh-sidebar-width / #root margin-right transition and would flash the rail.
+  useEffect(() => {
+    let frame: number | null = null
+    const measure = (): void => {
+      frame = null
+      setNarrow((current) => resolveNarrowBreakpoint(window.innerWidth, current))
+    }
+    const onResize = (): void => {
+      if (frame === null) frame = requestAnimationFrame(measure)
+    }
+    window.addEventListener('resize', onResize)
+    measure()
+    return () => {
+      window.removeEventListener('resize', onResize)
+      if (frame !== null) cancelAnimationFrame(frame)
+    }
+  }, [])
+
   useEffect(() => { layout.setNarrow(narrow) }, [layout, narrow])
 
   const previousSession = useRef(detailsSession)

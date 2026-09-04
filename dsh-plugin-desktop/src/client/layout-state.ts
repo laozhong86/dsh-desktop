@@ -4,7 +4,7 @@ export interface DesktopLayoutSnapshot {
   sidebar: number
   /** Preferred details width; zero means closed. */
   details: number
-  /** Whether the current viewport is below the automatic-collapse breakpoint. */
+  /** Whether the window is below the automatic-collapse breakpoint. */
   narrow: boolean
   /** Manual narrow-screen override that temporarily expands the rail. */
   narrowExpanded: boolean
@@ -28,6 +28,14 @@ export const SIDEBAR_DEFAULT = 280
 export const SIDEBAR_MIN = 264
 export const SIDEBAR_MAX = 420
 export const SIDEBAR_AUTO_COLLAPSE = 1024
+/**
+ * Expand only after the window clears the collapse point by 64px (1088).
+ * Window-manager snap/dock commonly jiggles ±1px around a round size; 64px
+ * absorbs that jitter without making the expand feel delayed — the user has
+ * already resized past 1024 by a noticeable amount. Collapse still fires
+ * strictly below 1024 so a genuinely small window auto-hides the rail.
+ */
+export const SIDEBAR_AUTO_EXPAND = SIDEBAR_AUTO_COLLAPSE + 64
 export const DETAILS_DEFAULT = 360
 export const DETAILS_MIN = 300
 export const DETAILS_MAX = 520
@@ -41,6 +49,24 @@ export function collapsedSidebarWidth(
   return mode === 'advanced' && platform === 'darwin'
     ? MACOS_SIDEBAR_COLLAPSED
     : SIDEBAR_COLLAPSED
+}
+
+/**
+ * Resolve the automatic-collapse flag from **window** width, not frame width.
+ * Dragging the better-sidebar splitter writes `--dsh-sidebar-width` and
+ * transitions `#root { margin-right }`, which squeezes the frame across 1024
+ * while `window.innerWidth` stays put. Using frame width here flashes the
+ * official left rail. The hysteresis band (`[SIDEBAR_AUTO_COLLAPSE,
+ * SIDEBAR_AUTO_EXPAND)`) keeps the current flag so snap/dock ±1px does not
+ * flip `narrow` (which would also reset `narrowExpanded`).
+ * @param windowWidth - `window.innerWidth`.
+ * @param currentlyNarrow - last published `narrow` flag.
+ * @returns whether the window should be treated as narrow.
+ */
+export function resolveNarrowBreakpoint(windowWidth: number, currentlyNarrow: boolean): boolean {
+  if (windowWidth < SIDEBAR_AUTO_COLLAPSE) return true
+  if (windowWidth >= SIDEBAR_AUTO_EXPAND) return false
+  return currentlyNarrow
 }
 
 /**
@@ -102,7 +128,7 @@ export class DesktopLayoutState {
     this.publish({ ...this.snapshot, sidebar: this.snapshot.sidebar === 0 ? SIDEBAR_DEFAULT : 0 })
   }
 
-  /** @param narrow - whether the frame is below the automatic-collapse breakpoint. */
+  /** @param narrow - whether the window is below the automatic-collapse breakpoint. */
   setNarrow(narrow: boolean): void {
     if (this.snapshot.narrow === narrow) return
     this.publish({ ...this.snapshot, narrow, narrowExpanded: false })

@@ -138,7 +138,11 @@ import {
   removeRecoveryPlugin,
 } from './recovery-plugin-uninstall.ts'
 import type { DesktopPnpmBootstrap } from './pnpm.ts'
-import { seedOmnimuxProfile, resolveDesktopHarnessHome } from './preset-profile.ts'
+import {
+  completeOmnimuxProfileMaterialization,
+  seedOmnimuxProfile,
+  resolveDesktopHarnessHome,
+} from './preset-profile.ts'
 import {
   createDesktopExitCoordinator,
   createDesktopShutdown,
@@ -628,6 +632,20 @@ async function start(): Promise<void> {
     lifecycleRecorder.transitionStartupStage(startupStage)
     const presetDir = fileURLToPath(new URL('../preset', import.meta.url))
     const seed = seedOmnimuxProfile({ home: homeDir, presetDir: app.isPackaged ? unpackedAsarPath(presetDir) : presetDir })
+    if (seed.materializationRequired) {
+      await materializeProfile({
+        appExecutable: process.execPath,
+        clearEnvironmentPath: pnpmRuntime.clearEnvironmentPath,
+        pnpmBinPath,
+        nodeBinDir: pnpmRuntime.nodeBinDir,
+        nodeShimPath: pnpmRuntime.nodeShimPath,
+        homeDir,
+        profileDir: seed.profileDir,
+        electronVersion,
+        updateLockfile: true,
+      })
+      completeOmnimuxProfileMaterialization(seed.profileDir)
+    }
     electronLogger.error(`${BIN_NAME}: omnimux profile seed (created=${String(seed.created)}, refreshedPlugins=${String(seed.refreshedPlugins)}): ${seed.profileDir}`)
     const profileStartup = beginDesktopProfileStartup(selectionStatePath, homeDir)
     const activeProfileName = profileStartup.profileName

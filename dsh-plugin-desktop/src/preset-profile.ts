@@ -6,12 +6,20 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs'
 import { homedir } from 'node:os'
-import { dirname, isAbsolute, join, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { parseDocument } from 'yaml'
+import {
+  assertExistingManagedProfile,
+  assertFreshManagedProfileDestination,
+  assertManagedSourceGraph,
+  createFreshManagedSources,
+  managedSourcePath,
+} from './managed-profile.ts'
 
 /** Profile name the desktop Host boots. */
 export const OMNIMUX_PROFILE_NAME = 'omnimux'
@@ -24,6 +32,9 @@ export const OWNED_PACKAGES_FILENAME = 'owned-packages.json'
 
 /** Stamp written inside the user profile after a successful seed or refresh. */
 export const PROFILE_SEED_STAMP = '.omnimux-seed-version'
+
+/** Retry fence removed only after packaged pnpm completes a fresh install. */
+export const PROFILE_MATERIALIZATION_PENDING = '.omnimux-materialization-pending'
 
 /** Bundle names the OmniMux desktop profile must list, in this order when created. */
 export const REQUIRED_BUNDLES = [
@@ -52,6 +63,8 @@ export interface SeedOmnimuxProfileResult {
   readonly created: boolean
   /** True when owned plugin directories were copied this call. */
   readonly refreshedPlugins: boolean
+  /** True while a fresh Profile still needs its first successful pnpm install. */
+  readonly materializationRequired: boolean
 }
 
 /**
@@ -187,14 +200,13 @@ function writeCleanCompatibilitySettings(settingsFile: string): void {
 
 /**
  * Seed or upgrade `$DSH_HOME/profiles/omnimux` from the packaged preset.
- * Existing `cordis.patch.yml` is never overwritten. Missing required bundles
- * are appended. Owned plugin directories refresh when the preset version is
- * newer or a required package is absent.
+ * Existing managed profiles are validated without mutation. Fresh profiles
+ * receive physical package sources outside `node_modules`; startup then runs
+ * the packaged pnpm materializer before composing the Profile.
  * @param options - Harness home and preset directory.
  * @returns which writes this call performed.
  */
 export function seedOmnimuxProfile(options: SeedOmnimuxProfileOptions): SeedOmnimuxProfileResult {
-  seedOmnimuxSettings(options.home)
   const presetDir = resolve(options.presetDir)
   const version = readSeedVersion(join(presetDir, SEED_VERSION_FILENAME))
   const skeletonDir = join(presetDir, 'skeleton')
@@ -210,34 +222,46 @@ export function seedOmnimuxProfile(options: SeedOmnimuxProfileOptions): SeedOmni
   }
 
   const profileDir = join(resolve(options.home), 'profiles', OMNIMUX_PROFILE_NAME)
-  mkdirSync(profileDir, { recursive: true })
+  const candidateDir = join(dirname(profileDir), `.${basename(profileDir)}-initializing`)
   const created = !existsSync(join(profileDir, 'package.json'))
-  writeSkeletonIfAbsent(skeletonDir, profileDir)
-  ensureMinimumReleaseAgeDisabled(profileDir)
-  mergeRequiredBundles(profileDir)
-
-  const stampPath = join(profileDir, PROFILE_SEED_STAMP)
-  const previous = existsSync(stampPath) ? readSeedVersion(stampPath) : 0
   const owned = readOwnedPackages(presetDir, pluginsDir)
-  mergeOwnedDependencies(profileDir, owned)
-  const modulesDir = join(profileDir, 'node_modules')
-  const missingOwned = owned.some(name => !existsSync(join(modulesDir, ...packageDirSegments(name), 'package.json')))
-  const refreshedPlugins = previous < version || missingOwned
-  if (refreshedPlugins) {
-    mkdirSync(modulesDir, { recursive: true })
-    for (const name of owned) {
-      const source = join(pluginsDir, ...packageDirSegments(name))
-      const destination = join(modulesDir, ...packageDirSegments(name))
-      if (!existsSync(join(source, 'package.json'))) {
-        throw new Error(`desktop preset plugin ${JSON.stringify(name)} is missing at ${source}`)
-      }
-      rmSync(destination, { recursive: true, force: true })
-      mkdirSync(dirname(destination), { recursive: true })
-      cpSync(source, destination, { recursive: true, dereference: true })
+  if (!created) {
+    assertRequiredBundles(profileDir)
+    assertExistingManagedProfile(profileDir, owned)
+    seedOmnimuxSettings(options.home)
+    return {
+      profileDir,
+      created: false,
+      refreshedPlugins: false,
+      materializationRequired: existsSync(join(profileDir, PROFILE_MATERIALIZATION_PENDING)),
     }
   }
-  writeFileSync(stampPath, `${String(version)}\n`)
-  return { profileDir, created, refreshedPlugins }
+
+  // Validate the complete packaged source graph before the first Profile write.
+  assertManagedSourceGraph(pluginsDir, owned)
+  assertFreshManagedProfileDestination(profileDir, candidateDir)
+  mkdirSync(dirname(profileDir), { recursive: true })
+  rmSync(candidateDir, { recursive: true, force: true })
+  mkdirSync(candidateDir)
+  try {
+    copyFreshConfiguration(profileDir, candidateDir)
+    writeSkeletonIfAbsent(skeletonDir, candidateDir)
+    ensureMinimumReleaseAgeDisabled(candidateDir)
+    mergeRequiredBundles(candidateDir)
+    createFreshManagedSources(presetDir, candidateDir, owned)
+    writeFileSync(join(candidateDir, PROFILE_SEED_STAMP), `${String(version)}\n`)
+    writeFileSync(join(candidateDir, PROFILE_MATERIALIZATION_PENDING), `${String(version)}\n`)
+    seedOmnimuxSettings(options.home)
+    publishFreshCandidate(candidateDir, profileDir, owned)
+  } finally {
+    rmSync(candidateDir, { recursive: true, force: true })
+  }
+  return { profileDir, created: true, refreshedPlugins: true, materializationRequired: true }
+}
+
+/** Mark the retryable first install complete after packaged pnpm succeeds. */
+export function completeOmnimuxProfileMaterialization(profileDir: string): void {
+  rmSync(join(profileDir, PROFILE_MATERIALIZATION_PENDING), { force: true })
 }
 
 function expandHome(path: string): string {
@@ -272,6 +296,42 @@ function writeSkeletonIfAbsent(skeletonDir: string, profileDir: string): void {
     if (!existsSync(source)) throw new Error(`desktop preset skeleton is missing ${name}: ${source}`)
     writeFileSync(destination, readFileSync(source))
   }
+}
+
+function copyFreshConfiguration(profileDir: string, candidateDir: string): void {
+  if (!existsSync(profileDir)) return
+  for (const name of ['cordis.patch.yml', 'pnpm-workspace.yaml'] as const) {
+    const source = join(profileDir, name)
+    if (existsSync(source)) cpSync(source, join(candidateDir, name))
+  }
+}
+
+function replaceFreshEntry(source: string, destination: string): void {
+  rmSync(destination, { recursive: true, force: true })
+  renameSync(source, destination)
+}
+
+function publishFreshFile(source: string, destination: string): void {
+  renameSync(source, destination)
+}
+
+function publishFreshCandidate(candidateDir: string, profileDir: string, ownedPackages: readonly string[]): void {
+  mkdirSync(profileDir, { recursive: true })
+  publishFreshFile(
+    join(candidateDir, PROFILE_MATERIALIZATION_PENDING),
+    join(profileDir, PROFILE_MATERIALIZATION_PENDING),
+  )
+  for (const name of ['cordis.patch.yml', 'pnpm-workspace.yaml', PROFILE_SEED_STAMP] as const) {
+    publishFreshFile(join(candidateDir, name), join(profileDir, name))
+  }
+  for (const name of ownedPackages) {
+    const destination = managedSourcePath(profileDir, name)
+    mkdirSync(dirname(destination), { recursive: true })
+    replaceFreshEntry(managedSourcePath(candidateDir, name), destination)
+  }
+  // package.json is the commit point: before this atomic rename, retries still
+  // classify the Profile as fresh; afterwards the pending fence forces pnpm.
+  renameSync(join(candidateDir, 'package.json'), join(profileDir, 'package.json'))
 }
 
 /** pnpm 11 defaults to a 1-day release-age window; user-chosen plugins must install now. */
@@ -309,39 +369,21 @@ function mergeRequiredBundles(profileDir: string): void {
   }, undefined, 2)}\n`)
 }
 
-/**
- * List seed-owned packages in the profile `dependencies` as `file:` specs
- * pointing at the copies the seed materialized into `node_modules`. Listing
- * them there makes pnpm treat the owned copies as declared dependencies, so a
- * later `dsh plugin ... remove` of an unrelated community plugin cannot prune
- * them (see the note 2026-08-18-host-peer-resolution-for-profile-plugins).
- * Seed owns these packages; it never writes `link:`.
- * @param profileDir - the profile directory whose `package.json` to update.
- * @param owned - seed-owned package names from the preset.
- */
-function mergeOwnedDependencies(profileDir: string, owned: readonly string[]): void {
-  if (owned.length === 0) return
-  const path = join(profileDir, 'package.json')
-  const manifest = JSON.parse(readFileSync(path, 'utf8')) as {
-    dependencies?: Record<string, string>
-    dsh?: unknown
+function assertRequiredBundles(profileDir: string): void {
+  const manifest = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8')) as {
+    dsh?: { profile?: { bundles?: string[] } }
   }
-  const dependencies = { ...manifest.dependencies }
-  let changed = false
-  for (const name of owned) {
-    // packageDirSegments validates the name for node_modules placement.
-    packageDirSegments(name)
-    const spec = `file:./node_modules/${name}`
-    if (dependencies[name] !== spec) {
-      dependencies[name] = spec
-      changed = true
-    }
+  const bundles = manifest.dsh?.profile?.bundles ?? []
+  const missing = REQUIRED_BUNDLES.filter(name => !bundles.includes(name))
+  if (missing.length > 0) {
+    throw new Error(
+      `OmniMux Profile is missing required bundles ${missing.join(', ')}; repair the Profile manifest explicitly. `
+      + 'The managed-source rebuild preserves bundle configuration and cannot add them.',
+    )
   }
-  if (!changed) return
-  writeFileSync(path, `${JSON.stringify({ ...manifest, dependencies }, undefined, 2)}\n`)
 }
 
-function readOwnedPackages(presetDir: string, pluginsDir: string): string[] {
+export function readOwnedPackages(presetDir: string, pluginsDir: string = join(presetDir, 'plugins')): string[] {
   const listed = join(presetDir, OWNED_PACKAGES_FILENAME)
   if (existsSync(listed)) {
     const parsed = JSON.parse(readFileSync(listed, 'utf8')) as unknown

@@ -12,11 +12,12 @@
  *   node scripts/omnimux.mjs dev stop|ls|rm|watch|unwatch ...
  *   node scripts/omnimux.mjs doctor
  *   node scripts/omnimux.mjs restart
+ *   node scripts/omnimux.mjs profile rebuild --target dev --app /absolute/frozen/OmniMux.app
  *   node scripts/omnimux.mjs stage
  *   node scripts/omnimux.mjs path
  */
 import { spawnSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, readdirSync, realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -68,6 +69,26 @@ function runYarnWorkspace(scriptName, args = []) {
   process.exit(result.status === null ? 1 : result.status)
 }
 
+function runProfile(args) {
+  const appIndex = args.indexOf('--app')
+  const appArgument = appIndex === -1 ? undefined : args[appIndex + 1]
+  if (!appArgument) die('profile rebuild 必须显式传入 --app <frozen-candidate.app>')
+  const app = realpathSync(resolve(appArgument))
+  if (!app.endsWith('.app')) die(`--app 不是 macOS 应用包: ${app}`)
+  const executableDir = join(app, 'Contents', 'MacOS')
+  const executables = readdirSync(executableDir, { withFileTypes: true })
+    .filter(entry => entry.isFile())
+    .map(entry => join(executableDir, entry.name))
+  if (executables.length !== 1) die(`候选 App 的主可执行文件不唯一: ${executableDir}`)
+  const script = join(forkRoot, 'dsh-plugin-desktop/scripts/rebuild-managed-profile.ts')
+  const result = spawnSync(executables[0], [script, ...args], {
+    cwd: forkRoot,
+    env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+    stdio: 'inherit',
+  })
+  process.exit(result.status === null ? 1 : result.status)
+}
+
 function restartApp(target = 'prod') {
   if (target === 'prod' && (process.env.DSH_AGENT_SESSION || process.env.AGENT_ROLE || process.env.CI)) {
     die('Agent / 非交互式进程禁止强杀生产桌面应用 (/Applications/OmniMux.app)！生产应用重启由用户自主掌控。如需测试请使用: yarn omnimux:restart dev')
@@ -103,6 +124,8 @@ function printHelp() {
   dev <start|stop|ls|rm|watch|unwatch> ...
                                   L2 预发布环境（含统一 watch）
   doctor                          三层环境合规自检
+  profile rebuild --target dev --app <frozen-candidate.app>
+                                  从冻结候选 App 全量重建 Dev Profile 依赖图
   stage                           物化进 preset/plugins（发布前）
   path                            打印产品树 / 插件路径
 
@@ -111,6 +134,7 @@ function printHelp() {
   yarn omnimux:sync --prod omnimux-workflow   # 人类明确指令下同步至生产正式版
   yarn omnimux:dev start assets-v2 omnimux-assets
   yarn omnimux:restart dev
+  yarn omnimux:profile rebuild --target dev --app /absolute/path/OmniMux.app
   yarn omnimux:stage
 `)
 }
@@ -130,6 +154,9 @@ switch (cmd) {
     break
   case 'doctor':
     runBash('scripts/dev-doctor.sh', rest)
+    break
+  case 'profile':
+    runProfile(rest)
     break
   case 'restart':
     restartApp(rest[0] || 'prod')

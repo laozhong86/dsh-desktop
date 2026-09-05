@@ -6,19 +6,21 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  realpathSync,
   readdirSync,
   readFileSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs'
-import { homedir, tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { tmpdir } from 'node:os'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { listPackageNames } from '../src/preset-profile.ts'
+import { listPackageNames, packageDirSegments } from '../src/preset-profile.ts'
 
 const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const presetDir = join(desktopRoot, 'preset')
-const pluginsDir = join(presetDir, 'plugins')
+const defaultPresetDir = join(desktopRoot, 'preset')
+const defaultPluginsDir = join(defaultPresetDir, 'plugins')
 
 /**
  * Product-tree plugins staged into the preset. The profile stays on `link:`
@@ -31,62 +33,181 @@ const PRODUCT_PLUGINS = [
   'omnimux',
   'omnimux-accounts',
   'omnimux-assets',
+  'omnimux-products',
   'omnimux-workflow',
+  'omnimux-market',
+  'omnimux-inspiration',
+  'omnimux-clip',
+  'omnimux-video',
+  'omnimux-analytics',
+  'omnimux-publish',
 ] as const
 const REQUIRED_PACKAGES = [...PRODUCT_PLUGINS, 'dsh-better-sidebar']
 interface Manifest {
-  readonly name?: string
-  readonly dependencies?: Readonly<Record<string, string>>
+  name?: string
+  dependencies?: Record<string, string>
+  optionalDependencies?: Record<string, string>
+}
+export interface StagePresetProfileOptions {
+  readonly pluginsRoot?: string
+  readonly presetDir?: string
+  readonly sidebarSpec?: string
 }
 
 /**
  * Stage plugin snapshots the desktop seed copies into the user profile.
  * @returns the number of package directories written under preset/plugins.
  */
-export function stagePresetProfile(): number {
-  mkdirSync(presetDir, { recursive: true })
-  const pluginsRoot = process.env.OMNIMUX_PLUGINS_DIR
+export function stagePresetProfile(options: StagePresetProfileOptions = {}): number {
+  const targetPresetDir = resolve(options.presetDir ?? defaultPresetDir)
+  mkdirSync(targetPresetDir, { recursive: true })
+  const pluginsRoot = options.pluginsRoot ?? process.env.OMNIMUX_PLUGINS_DIR
   if (pluginsRoot === undefined || pluginsRoot === '') {
     throw new Error('OMNIMUX_PLUGINS_DIR is required (absolute path to the omnimux-dsh product-tree plugins directory)')
   }
+  const resolvedPluginsRoot = resolve(pluginsRoot)
   for (const name of PRODUCT_PLUGINS) {
-    if (!existsSync(join(pluginsRoot, name, 'package.json'))) {
-      throw new Error(`product plugin source is missing: ${join(pluginsRoot, name)} (set OMNIMUX_PLUGINS_DIR)`)
+    if (!existsSync(join(resolvedPluginsRoot, name, 'package.json'))) {
+      throw new Error(`product plugin source is missing: ${join(resolvedPluginsRoot, name)} (set OMNIMUX_PLUGINS_DIR)`)
     }
   }
   const staging = mkdtempSync(join(tmpdir(), 'omnimux-preset-'))
+  let candidateDir: string | undefined
   try {
     const dependencies: Record<string, string> = {
-      'dsh-better-sidebar': process.env.DSH_BETTER_SIDEBAR_SPEC ?? '0.14.0',
+      'dsh-better-sidebar': options.sidebarSpec ?? process.env.DSH_BETTER_SIDEBAR_SPEC ?? '0.14.0',
     }
+    const optionalDependencies: Record<string, string> = {}
+    const stagedPackagesRoot = join(staging, 'packages')
+    const packages = new Map<string, { source: string; destination: string }>()
     for (const name of PRODUCT_PLUGINS) {
-      copyPluginSources(join(pluginsRoot, name), join(staging, name))
-      dependencies[name] = `file:./${name}`
+      const source = realpathSync(join(resolvedPluginsRoot, name))
+      const destination = join(stagedPackagesRoot, ...packageDirSegments(name))
+      registerPackage(packages, name, source, destination)
+    }
+    const copied = new Set<string>()
+    for (const name of PRODUCT_PLUGINS) {
+      const entry = packages.get(name)!
+      copyPackageClosure(name, entry.source, entry.destination, stagedPackagesRoot, packages, copied)
+      dependencies[name] = toFileSpec(staging, entry.destination)
+    }
+    for (const [name, entry] of packages) {
+      if ((PRODUCT_PLUGINS as readonly string[]).includes(name)) continue
+      if (Object.hasOwn(dependencies, name)) {
+        throw new Error(
+          `local package ${JSON.stringify(name)} from ${entry.source} conflicts with explicit staging dependency ${JSON.stringify(dependencies[name])}`,
+        )
+      }
+      optionalDependencies[name] = toFileSpec(staging, entry.destination)
     }
     writeFileSync(join(staging, 'package.json'), `${JSON.stringify({
       private: true,
       dependencies,
+      optionalDependencies,
     }, undefined, 2)}\n`)
     writeFileSync(join(staging, 'pnpm-workspace.yaml'), `packages:\n  - .\n\nnodeLinker: hoisted\nautoInstallPeers: false\n`)
-    const installed = installStaging(staging)
-    rmSync(pluginsDir, { recursive: true, force: true })
-    mkdirSync(pluginsDir, { recursive: true })
-    if (installed) copyHoistedModules(join(staging, 'node_modules'), pluginsDir)
-    else copyFromFallback(pluginsRoot, pluginsDir)
-    const owned = listPackageNames(pluginsDir)
+    installStaging(staging)
+
+    candidateDir = mkdtempSync(join(targetPresetDir, '.preset-stage-'))
+    const candidatePluginsDir = join(candidateDir, 'plugins')
+    mkdirSync(candidatePluginsDir)
+    copyHoistedModules(join(staging, 'node_modules'), candidatePluginsDir)
+    const owned = listPackageNames(candidatePluginsDir)
     for (const required of REQUIRED_PACKAGES) {
       if (!owned.includes(required)) {
         throw new Error(`staged preset is missing required plugin ${required}: ${owned.join(', ')}`)
       }
     }
-    patchBetterSidebarSettingsNamespace(join(pluginsDir, 'dsh-better-sidebar'))
-    patchBetterSidebarDragReleaseBounce(join(pluginsDir, 'dsh-better-sidebar'))
-    writeFileSync(join(presetDir, 'owned-packages.json'), `${JSON.stringify(owned, undefined, 2)}\n`)
-    if (!existsSync(join(presetDir, 'seed-version'))) writeFileSync(join(presetDir, 'seed-version'), '1\n')
+    patchBetterSidebarSettingsNamespace(join(candidatePluginsDir, 'dsh-better-sidebar'))
+    patchBetterSidebarDragReleaseBounce(join(candidatePluginsDir, 'dsh-better-sidebar'))
+    writeFileSync(join(candidateDir, 'owned-packages.json'), `${JSON.stringify(owned, undefined, 2)}\n`)
+    const seedVersionPath = join(targetPresetDir, 'seed-version')
+    writeFileSync(
+      join(candidateDir, 'seed-version'),
+      existsSync(seedVersionPath) ? readFileSync(seedVersionPath) : '1\n',
+    )
+    publishCandidate(candidateDir, targetPresetDir)
+    candidateDir = undefined
     return owned.length
   } finally {
+    if (candidateDir !== undefined) rmSync(candidateDir, { recursive: true, force: true })
     rmSync(staging, { recursive: true, force: true })
   }
+}
+
+function registerPackage(
+  packages: Map<string, { source: string; destination: string }>,
+  name: string,
+  source: string,
+  destination: string,
+): void {
+  packageDirSegments(name)
+  const existing = packages.get(name)
+  if (existing !== undefined && existing.source !== source) {
+    throw new Error(`local package ${JSON.stringify(name)} resolves to conflicting sources: ${existing.source} and ${source}`)
+  }
+  if (existing === undefined) packages.set(name, { source, destination })
+}
+
+function copyPackageClosure(
+  name: string,
+  source: string,
+  destination: string,
+  stagedPackagesRoot: string,
+  packages: Map<string, { source: string; destination: string }>,
+  copied: Set<string>,
+): void {
+  if (copied.has(name)) return
+  copied.add(name)
+  copyPluginSources(source, destination)
+  const manifestPath = join(destination, 'package.json')
+  const manifest = readManifest(manifestPath)
+  const optionalDependencies = new Set(Object.keys(manifest.optionalDependencies ?? {}))
+  let changed = false
+  for (const field of ['dependencies', 'optionalDependencies'] as const) {
+    const dependencyMap = manifest[field]
+    if (dependencyMap === undefined) continue
+    for (const [dependencyName, spec] of Object.entries(dependencyMap)) {
+      if (field === 'dependencies' && optionalDependencies.has(dependencyName)) continue
+      if (!spec.startsWith('file:')) continue
+      const sourcePath = spec.slice('file:'.length)
+      if (sourcePath === '') {
+        throw new Error(`local dependency ${JSON.stringify(dependencyName)} in ${join(source, 'package.json')} has an empty file: path`)
+      }
+      const unresolvedSource = resolve(source, sourcePath)
+      if (!existsSync(join(unresolvedSource, 'package.json'))) {
+        throw new Error(`local dependency ${JSON.stringify(dependencyName)} is missing package.json: ${unresolvedSource}`)
+      }
+      const dependencySource = realpathSync(unresolvedSource)
+      const dependencyDestination = join(stagedPackagesRoot, ...packageDirSegments(dependencyName))
+      registerPackage(packages, dependencyName, dependencySource, dependencyDestination)
+      const entry = packages.get(dependencyName)!
+      copyPackageClosure(
+        dependencyName,
+        entry.source,
+        entry.destination,
+        stagedPackagesRoot,
+        packages,
+        copied,
+      )
+      dependencyMap[dependencyName] = toFileSpec(destination, entry.destination)
+      changed = true
+    }
+  }
+  if (changed) writeFileSync(manifestPath, `${JSON.stringify(manifest, undefined, 2)}\n`)
+}
+
+function readManifest(path: string): Manifest {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8')) as Manifest
+  } catch (error) {
+    throw new Error(`cannot read package manifest ${path}: ${String(error)}`)
+  }
+}
+
+function toFileSpec(fromPackageDir: string, targetPackageDir: string): string {
+  const path = relative(fromPackageDir, targetPackageDir).split(sep).join('/')
+  return `file:${path.startsWith('.') ? path : `./${path}`}`
 }
 
 function copyPluginSources(source: string, destination: string): void {
@@ -103,20 +224,24 @@ function copyPluginSources(source: string, destination: string): void {
   })
 }
 
-function installStaging(staging: string): boolean {
+function installStaging(staging: string): void {
   const result = spawnSync('pnpm', ['install', '--prod', '--ignore-scripts', '--config.confirmModulesPurge=false'], {
     cwd: staging,
     encoding: 'utf8',
     env: { ...process.env, CI: 'true' },
   })
-  if (result.status === 0 && existsSync(join(staging, 'node_modules', 'dsh-better-sidebar', 'package.json'))) {
-    return true
-  }
-  process.stderr.write(
-    `stage-preset-profile: pnpm install failed (${result.status === null ? String(result.error) : result.status}); falling back to a local copy\n`,
-  )
-  if (result.stderr !== '') process.stderr.write(result.stderr)
-  return false
+  if (result.status === 0) return
+  const stdout = result.stdout ?? ''
+  const stderr = result.stderr ?? ''
+  const status = result.status === null
+    ? result.signal ?? result.error?.message ?? 'unknown'
+    : String(result.status)
+  throw new Error([
+    `stage-preset-profile: pnpm install failed (${status})`,
+    result.error === undefined ? undefined : `error: ${result.error.message}`,
+    `stdout:\n${stdout === '' ? '<empty>' : stdout.trimEnd()}`,
+    `stderr:\n${stderr === '' ? '<empty>' : stderr.trimEnd()}`,
+  ].filter((line): line is string => line !== undefined).join('\n'))
 }
 
 function copyHoistedModules(source: string, destination: string): void {
@@ -148,44 +273,59 @@ function removeDanglingBinLinks(packageDir: string): void {
   }
 }
 
-function copyFromFallback(pluginsRoot: string, destination: string): void {
-  for (const name of PRODUCT_PLUGINS) {
-    copyPluginSources(join(pluginsRoot, name), join(destination, name))
+export function publishCandidate(
+  candidateDir: string,
+  targetPresetDir: string,
+  rename: typeof renameSync = renameSync,
+): void {
+  const entries = ['plugins', 'owned-packages.json', 'seed-version'] as const
+  const backupRoot = mkdtempSync(join(targetPresetDir, '.preset-backup-'))
+  const backedUp: string[] = []
+  const published: string[] = []
+  try {
+    for (const entry of entries) {
+      const target = join(targetPresetDir, entry)
+      if (!existsSync(target)) continue
+      rename(target, join(backupRoot, entry))
+      backedUp.push(entry)
+    }
+    for (const entry of entries) {
+      rename(join(candidateDir, entry), join(targetPresetDir, entry))
+      published.push(entry)
+    }
+  } catch (error) {
+    const rollbackErrors: string[] = []
+    for (const entry of [...published].reverse()) {
+      try {
+        rmSync(join(targetPresetDir, entry), { recursive: true, force: true })
+      } catch (rollbackError) {
+        rollbackErrors.push(`remove new ${entry}: ${String(rollbackError)}`)
+      }
+    }
+    for (const entry of [...backedUp].reverse()) {
+      try {
+        const target = join(targetPresetDir, entry)
+        if (existsSync(target)) rmSync(target, { recursive: true, force: true })
+        rename(join(backupRoot, entry), target)
+      } catch (rollbackError) {
+        rollbackErrors.push(`restore ${entry}: ${String(rollbackError)}`)
+      }
+    }
+    if (rollbackErrors.length > 0) {
+      throw new Error(
+        `preset publish failed (${String(error)}); rollback also failed; previous preset backup retained at ${backupRoot}: ${rollbackErrors.join('; ')}`,
+      )
+    }
+    rmSync(backupRoot, { recursive: true, force: true })
+    throw error
   }
-  const aigc = join(pluginsRoot, 'omnimux', 'node_modules', 'aigc-provider-runtime-kit')
-  if (existsSync(join(aigc, 'package.json'))) {
-    cpSync(aigc, join(destination, 'aigc-provider-runtime-kit'), { recursive: true, dereference: true })
-  }
-  const sidebarRoot = process.env.DSH_BETTER_SIDEBAR_DIR
-    ?? join(homedir(), '.dsh', 'profiles', 'web', 'node_modules')
-  const sidebarPackage = process.env.DSH_BETTER_SIDEBAR_DIR === undefined
-    ? join(sidebarRoot, 'dsh-better-sidebar')
-    : sidebarRoot
-  if (!existsSync(join(sidebarPackage, 'package.json'))) {
+  try {
+    rmSync(candidateDir, { recursive: true, force: true })
+    rmSync(backupRoot, { recursive: true, force: true })
+  } catch (error) {
     throw new Error(
-      `cannot stage dsh-better-sidebar: pnpm install failed and ${sidebarPackage} is missing (set DSH_BETTER_SIDEBAR_DIR)`,
+      `preset published successfully, but staging cleanup failed; the new preset remains active and the previous backup is retained at ${backupRoot}: ${String(error)}`,
     )
-  }
-  const hoistedRoot = process.env.DSH_BETTER_SIDEBAR_DIR === undefined
-    ? sidebarRoot
-    : dirname(sidebarPackage)
-  copyClosure(hoistedRoot, ['dsh-better-sidebar'], destination)
-}
-
-function copyClosure(hoistedRoot: string, entries: readonly string[], destination: string): void {
-  const queue = [...entries]
-  const seen = new Set<string>()
-  while (queue.length > 0) {
-    const name = queue.pop()
-    if (name === undefined || seen.has(name)) continue
-    seen.add(name)
-    const from = join(hoistedRoot, ...name.split('/'))
-    if (!existsSync(join(from, 'package.json'))) continue
-    const to = join(destination, ...name.split('/'))
-    mkdirSync(dirname(to), { recursive: true })
-    cpSync(from, to, { recursive: true, dereference: true })
-    const manifest = JSON.parse(readFileSync(join(from, 'package.json'), 'utf8')) as Manifest
-    for (const dep of Object.keys(manifest.dependencies ?? {})) queue.push(dep)
   }
 }
 
@@ -390,7 +530,7 @@ function patchBetterSidebarDragReleaseBounce(root: string): void {
 
 function main(): void {
   const count = stagePresetProfile()
-  process.stdout.write(`staged ${String(count)} preset packages into ${pluginsDir}\n`)
+  process.stdout.write(`staged ${String(count)} preset packages into ${defaultPluginsDir}\n`)
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main()

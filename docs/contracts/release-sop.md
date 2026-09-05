@@ -60,7 +60,7 @@ omnimux-dist (Bucket Root)
 
 | 阶段 | 命令 | 说明 |
 | :--- | :--- | :--- |
-| **1. 前置物化** | `yarn omnimux:stage` | **强制铁律**：将所有在研插件物化到 preset 骨架，防止启动报错 |
+| **1. 前置物化** | `yarn omnimux:stage` | 从产品源码完整物化官方 `ALL_PLUGINS` 及其生产依赖；失败时不得发布部分 preset |
 | **2. 版本一致性** | `node scripts/verify-version.mjs` | 校验根 `package.json` 与 `dsh-plugin-desktop/package.json` 版本一致 |
 | **3. macOS 打包** | `yarn dist:mac` / `yarn dist:mac-smoke` | 打包 Universal macOS DMG 镜像 |
 | **4. Windows 官网包（当前默认）** | `yarn dist:win` | 打包 **unsigned** Windows x64 NSIS，用于官网 / R2 分发 |
@@ -68,6 +68,8 @@ omnimux-dist (Bucket Root)
 | **5. R2 产物同步** | `yarn dist:r2-sync` | 自动上传 `dist/` 产物至 R2 并建立 `latest/` 别名（带智能去重） |
 | **6. CDN 巡检** | `yarn dist:r2-verify` | 自动化并发探测 `https://dl.omnimux.ai` 节点可用性与字节数 |
 | **7. 桶清单查询** | `yarn dist:r2-list` | 查阅当前 R2 桶中的所有在线对象与文件大小 |
+
+`omnimux:stage` 必须递归保留 `dependencies` / `optionalDependencies` 可达的本地 `file:` 目录包，并在临时副本中改写为 preset 内部相对路径。只有候选 `plugins/`、`owned-packages.json` 与 `seed-version` 全部校验通过后才能一起发布；pnpm 失败必须输出 status、stdout 与 stderr 并退出，禁止从 profile 或旧 `node_modules` 回退成假成功。
 
 ---
 

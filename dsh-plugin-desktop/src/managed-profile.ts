@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import {
+  chmodSync,
   cpSync,
   existsSync,
   lstatSync,
@@ -25,6 +26,10 @@ export const MANAGED_SOURCE_DIRECTORY = '.materialize-snapshots/plugins'
 
 const REVIEWED_NODE_PTY_VERSION = '1.1.0'
 const PNPM_BUILD_REVIEW_PENDING = 'set this to true or false'
+const NODE_PTY_DARWIN_HELPERS = [
+  'prebuilds/darwin-arm64/spawn-helper',
+  'prebuilds/darwin-x64/spawn-helper',
+] as const
 
 export const OFFICIAL_PROFILE_REBUILD_REMEDY =
   'Run: yarn omnimux:profile rebuild --target dev --app <frozen-candidate.app>'
@@ -292,7 +297,7 @@ export function createFreshManagedSources(
     const destination = join(destinationRoot, ...packagePathSegments(name))
     mkdirSync(dirname(destination), { recursive: true })
     cpSync(join(presetRoot, ...packagePathSegments(name)), destination, { recursive: true, dereference: true })
-    normalizeAndValidateManagedBin(destination, name)
+    prepareManagedPackage(destination, name)
   }
   setManagedDependencies(join(profileDir, 'package.json'), ownedPackages)
   ensureManagedBuildPolicy(profileDir, ownedPackages)
@@ -303,6 +308,11 @@ function setManagedDependencies(manifestPath: string, packageNames: readonly str
   const dependencies = { ...manifest.dependencies }
   for (const name of packageNames) dependencies[name] = managedDependencySpec(name)
   writeFileSync(manifestPath, `${JSON.stringify({ ...manifest, dependencies }, undefined, 2)}\n`)
+}
+
+function prepareManagedPackage(packageDir: string, name: string): void {
+  normalizeAndValidateManagedBin(packageDir, name)
+  if (name === 'node-pty') ensureReviewedNodePtyHelpers(packageDir)
 }
 
 function normalizeAndValidateManagedBin(packageDir: string, name: string): void {
@@ -328,6 +338,24 @@ function normalizeAndValidateManagedBin(packageDir: string, name: string): void 
     const stat = lstatIfPresent(entry)
     if (stat === undefined || stat.isSymbolicLink() || !stat.isFile()) {
       fail(`managed source ${JSON.stringify(name)} bin ${JSON.stringify(command)} is missing or is not a physical file`)
+    }
+  }
+}
+
+function ensureReviewedNodePtyHelpers(packageDir: string): void {
+  if (process.platform !== 'darwin') return
+  const manifest = readManifest(join(packageDir, 'package.json'))
+  if (manifest.version !== REVIEWED_NODE_PTY_VERSION) return
+  for (const relativePath of NODE_PTY_DARWIN_HELPERS) {
+    const helper = resolve(packageDir, relativePath)
+    assertContained(packageDir, helper, `node-pty helper ${relativePath}`)
+    const stat = lstatIfPresent(helper)
+    if (stat === undefined || stat.isSymbolicLink() || !stat.isFile()) {
+      fail(`managed node-pty helper is missing or is not a physical file: ${relativePath}`)
+    }
+    const mode = Number(stat.mode)
+    if ((mode & 0o100) === 0) {
+      chmodSync(helper, (mode & 0o777) | 0o111)
     }
   }
 }
@@ -489,7 +517,7 @@ function copyRebuildCandidate(
     const destination = join(root, ...packagePathSegments(name))
     mkdirSync(dirname(destination), { recursive: true })
     cpSync(source, destination, { recursive: true, dereference: true })
-    normalizeAndValidateManagedBin(destination, name)
+    prepareManagedPackage(destination, name)
   }
   setManagedDependencies(join(candidateDir, 'package.json'), packageNames)
   ensureManagedBuildPolicy(candidateDir, packageNames)
@@ -539,6 +567,7 @@ function assertInstalledGraph(
     const expectedFiles = packedFiles.get(name)
     if (expectedFiles === undefined) fail(`packed file list is missing for ${JSON.stringify(name)}`)
     assertInstalledContent(join(sourceRoot, ...packagePathSegments(name)), dirname(installedManifest), expectedFiles)
+    if (name === 'node-pty') assertInstalledNodePtyHelpers(dirname(installedManifest))
     if (!hasRootExports(source) && typeof source.main === 'string' && source.main !== '') {
       const mainRequest = resolve(dirname(installedManifest), source.main)
       let mainEntry: string
@@ -569,6 +598,18 @@ function assertInstalledGraph(
         )
       }
       assertContained(installedRoot, realpathSync(requireEntry), `installed runtime entry for ${name}`)
+    }
+  }
+}
+
+function assertInstalledNodePtyHelpers(packageDir: string): void {
+  if (process.platform !== 'darwin') return
+  for (const relativePath of NODE_PTY_DARWIN_HELPERS) {
+    const helper = resolve(packageDir, relativePath)
+    assertContained(packageDir, helper, `installed node-pty helper ${relativePath}`)
+    const stat = lstatIfPresent(helper)
+    if (stat === undefined || stat.isSymbolicLink() || !stat.isFile() || (Number(stat.mode) & 0o100) === 0) {
+      fail(`installed node-pty helper is missing, unsafe, or not executable: ${relativePath}`)
     }
   }
 }

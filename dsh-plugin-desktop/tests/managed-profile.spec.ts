@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto'
 import { createRequire } from 'node:module'
 import { spawnSync } from 'node:child_process'
 import {
+  chmodSync,
   cpSync,
   existsSync,
   lstatSync,
@@ -20,6 +21,7 @@ import { dirname, join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   assertManagedSourceGraph,
+  createFreshManagedSources,
   managedDependencySpec,
   managedSourcePath,
   rebuildManagedProfile,
@@ -27,6 +29,10 @@ import {
 
 const OWNED = ['plugin-a', 'dsh-ui-kit'] as const
 const NODE_PTY_OWNED = ['node-pty'] as const
+const NODE_PTY_DARWIN_HELPERS = [
+  'prebuilds/darwin-arm64/spawn-helper',
+  'prebuilds/darwin-x64/spawn-helper',
+] as const
 
 function writeJson(path: string, value: unknown): void {
   mkdirSync(dirname(path), { recursive: true })
@@ -95,13 +101,19 @@ function writeNodePtyPackage(root: string): void {
     name: 'node-pty',
     version: '1.1.0',
     main: 'index.js',
-    files: ['index.js', 'install.cjs'],
+    files: ['index.js', 'install.cjs', 'prebuilds/'],
     bin: 'cli.js',
     scripts: { install: 'node install.cjs' },
   })
   writeFileSync(join(directory, 'index.js'), 'module.exports = "reviewed-node-pty"\n')
   writeFileSync(join(directory, 'install.cjs'), 'require("node:fs").writeFileSync("built.txt", "built\\n")\n')
   writeFileSync(join(directory, 'cli.js'), 'process.stdout.write("fixture-ok\\n")\n')
+  for (const helper of NODE_PTY_DARWIN_HELPERS) {
+    const path = join(directory, helper)
+    mkdirSync(dirname(path), { recursive: true })
+    writeFileSync(path, '#!/bin/sh\nprintf helper-ok\n', { mode: 0o644 })
+  }
+  writeFileSync(join(directory, 'prebuilds', 'darwin-arm64', 'pty.node'), 'native-addon-fixture\n', { mode: 0o644 })
 }
 
 function createNodePtyPreset(root: string): string {
@@ -240,6 +252,13 @@ describe('managed OmniMux Profile rebuild', () => {
       expect(policy).toContain('node-pty@1.1.0: true')
       expect(policy).toContain('node-pty@file:.materialize-snapshots/plugins/node-pty: true')
       expect(readFileSync(join(profileDir, 'node_modules', 'node-pty', 'built.txt'), 'utf8')).toBe('built\n')
+      if (process.platform === 'darwin') {
+        for (const helper of NODE_PTY_DARWIN_HELPERS) {
+          expect(lstatSync(join(profileDir, '.materialize-snapshots', 'plugins', 'node-pty', helper)).mode & 0o100)
+            .toBe(0o100)
+          expect(lstatSync(join(profileDir, 'node_modules', 'node-pty', helper)).mode & 0o100).toBe(0o100)
+        }
+      }
       const installedCli = join(profileDir, 'node_modules', 'node-pty', 'cli.js')
       const cli = spawnSync(process.execPath, [installedCli], { encoding: 'utf8' })
       expect(cli).toMatchObject({ status: 0, stdout: 'fixture-ok\n' })
@@ -247,6 +266,106 @@ describe('managed OmniMux Profile rebuild', () => {
       rmSync(root, { recursive: true, force: true })
     }
   }, 30_000)
+
+  it('repairs only physical reviewed helpers during fresh managed-source creation', () => {
+    const root = mkdtempSync(join(tmpdir(), 'managed-profile-node-pty-fresh-helper-'))
+    try {
+      const presetDir = createNodePtyPreset(root)
+      const profileDir = createNodePtyLegacyProfile(root)
+      if (process.platform === 'darwin') {
+        chmodSync(join(presetDir, 'plugins', 'node-pty', NODE_PTY_DARWIN_HELPERS[0]), 0o641)
+        chmodSync(join(presetDir, 'plugins', 'node-pty', NODE_PTY_DARWIN_HELPERS[1]), 0o740)
+      }
+      createFreshManagedSources(presetDir, profileDir, NODE_PTY_OWNED)
+      if (process.platform === 'darwin') {
+        expect(lstatSync(join(presetDir, 'plugins', 'node-pty', NODE_PTY_DARWIN_HELPERS[0])).mode & 0o777)
+          .toBe(0o641)
+        expect(lstatSync(join(managedSourcePath(profileDir, 'node-pty'), NODE_PTY_DARWIN_HELPERS[0])).mode & 0o777)
+          .toBe(0o751)
+        expect(spawnSync(join(managedSourcePath(profileDir, 'node-pty'), NODE_PTY_DARWIN_HELPERS[0]), [], {
+          encoding: 'utf8',
+        })).toMatchObject({ status: 0, stdout: 'helper-ok' })
+        expect(lstatSync(join(presetDir, 'plugins', 'node-pty', NODE_PTY_DARWIN_HELPERS[1])).mode & 0o777)
+          .toBe(0o740)
+        expect(lstatSync(join(managedSourcePath(profileDir, 'node-pty'), NODE_PTY_DARWIN_HELPERS[1])).mode & 0o777)
+          .toBe(0o740)
+        expect(lstatSync(join(managedSourcePath(profileDir, 'node-pty'), 'prebuilds/darwin-arm64/pty.node')).mode & 0o777)
+          .toBe(0o644)
+      }
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it.runIf(process.platform !== 'darwin')('does not require Darwin helpers on another host platform', () => {
+    const root = mkdtempSync(join(tmpdir(), 'managed-profile-node-pty-non-darwin-'))
+    try {
+      const presetDir = createNodePtyPreset(root)
+      for (const helper of NODE_PTY_DARWIN_HELPERS) {
+        rmSync(join(presetDir, 'plugins', 'node-pty', helper))
+      }
+      const profileDir = createNodePtyLegacyProfile(root)
+      expect(() => createFreshManagedSources(presetDir, profileDir, NODE_PTY_OWNED)).not.toThrow()
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects a linked reviewed helper before any managed Profile write', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'managed-profile-node-pty-linked-helper-'))
+    try {
+      const presetDir = createNodePtyPreset(root)
+      const helper = join(presetDir, 'plugins', 'node-pty', NODE_PTY_DARWIN_HELPERS[0])
+      const external = join(root, 'external-helper')
+      writeFileSync(external, '#!/bin/sh\n')
+      rmSync(helper)
+      symlinkSync(external, helper)
+      const profileDir = createNodePtyLegacyProfile(root)
+      const before = snapshotGraph(profileDir)
+      let materialized = false
+      await expect(rebuildManagedProfile({
+        profileDir,
+        presetDir,
+        ownedPackages: NODE_PTY_OWNED,
+        packedFiles: fakePackedFiles,
+        materialize: async candidate => {
+          materialized = true
+          await fakeMaterialize(candidate)
+        },
+      })).rejects.toThrow('managed source contains symbolic link')
+      expect(materialized).toBe(false)
+      expect(snapshotGraph(profileDir)).toBe(before)
+      expect(readFileSync(external, 'utf8')).toBe('#!/bin/sh\n')
+      if (process.platform !== 'win32') expect(lstatSync(external).mode & 0o111).toBe(0)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it.runIf(process.platform === 'darwin')('rejects a materializer that drops a reviewed helper execute bit', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'managed-profile-node-pty-installed-helper-'))
+    try {
+      const presetDir = createNodePtyPreset(root)
+      const profileDir = createNodePtyLegacyProfile(root)
+      const before = snapshotGraph(profileDir)
+      let materialized = false
+      await expect(rebuildManagedProfile({
+        profileDir,
+        presetDir,
+        ownedPackages: NODE_PTY_OWNED,
+        packedFiles: fakePackedFiles,
+        materialize: async candidate => {
+          materialized = true
+          await fakeMaterialize(candidate)
+          chmodSync(join(candidate, 'node_modules', 'node-pty', NODE_PTY_DARWIN_HELPERS[0]), 0o641)
+        },
+      })).rejects.toThrow('installed node-pty helper is missing, unsafe, or not executable')
+      expect(materialized).toBe(true)
+      expect(snapshotGraph(profileDir)).toBe(before)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
 
   it('preserves every explicit node-pty build denial and publishes nothing', async () => {
     for (const deniedRule of [

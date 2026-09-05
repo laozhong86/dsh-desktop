@@ -71,6 +71,8 @@ omnimux-dist (Bucket Root)
 
 `omnimux:stage` 必须递归保留 `dependencies` / `optionalDependencies` 可达的本地 `file:` 目录包，并在临时副本中改写为 preset 内部相对路径。只有候选 `plugins/`、`owned-packages.json` 与 `seed-version` 全部校验通过后才能一起发布；pnpm 失败必须输出 status、stdout 与 stderr 并退出，禁止从 profile 或旧 `node_modules` 回退成假成功。
 
+打包时将已完成分发筛选的 `preset/` 作为独立 FileSet 保留；不得再用 App 默认的开发文件过滤规则删除插件声明的 `.d.ts`、源码、资源或原生文件，也不得全局关闭 App 过滤。候选验收需比较 stage 与最终 packaged preset 的声明分发清单、文件哈希和必要执行权限，并通过候选 Electron 与 bundled pnpm 执行隔离 Profile 重建和真实终端命令。嵌套依赖清单的官方元数据转换必须逐字段核对安装、解析及生命周期构建语义，不能概括忽略 `package.json` 或 `scripts` 差异。
+
 ---
 
 ## 4. 分发渠道策略

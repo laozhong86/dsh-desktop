@@ -1,0 +1,59 @@
+sequenceDiagram
+  autonumber
+  actor FE as Frontend Engineer
+  participant Kit as Brand Kit<br/>OmniMux/docs/brand/assets
+  participant Vec as octo_ghost_vector.svg
+  participant Src as app-icon.png<br/>1024 RGBA
+  participant MacGen as generate-mac-app-icon-omnimux.mjs
+  participant TraySvg as tray-icon.svg
+  participant TrayGen as generate-tray-icons-omnimux.mjs
+  participant Spec as package.spec.ts
+  participant Build as yarn workspace<br/>dsh-plugin-desktop build
+  participant Pack as electron-builder
+  participant Dock as macOS Dock / Win icon
+  participant Tray as System Tray
+  participant Web as OmniMux web/public
+  participant Landing as LogoMark / Landing
+
+  rect rgb(240,238,252)
+    Note over FE,Landing: T01 源资产锁定（仓库 A 已换紫，仓库 B 仍旧绿）
+    FE->>Kit: 选定主力变体 lavender-black (#b8b7ff)
+    FE->>Vec: 确认 IP 路径：曜石黑身体 + 纯白胶囊眼
+    FE->>Src: sharp 栅格化为 1024x1024 RGBA 满铺方图
+    FE->>TraySvg: 从同一路径导出无底托盘字形（#7961f2 身体）
+  end
+
+  rect rgb(232,228,255)
+    Note over FE,Spec: T02 生成管线与测试契约
+    FE->>MacGen: 输入 app-icon.png
+    MacGen->>MacGen: resize 824 + rx=0.2237 mask + 100px inset
+    MacGen-->>FE: 写出 app-icon-mac.png
+    FE->>TrayGen: 输入 tray-icon.svg / source-32 PNG
+    TrayGen-->>FE: Template 16/@2x + brand 16/20/24/32
+    FE->>Spec: 更新 #C6F14F → #7961f2，刷新 app-icon sha256
+  end
+
+  rect rgb(224,218,255)
+    Note over Build,Tray: T03 桌面构建消费
+    FE->>Build: node generate-mac-app-icon-omnimux.mjs && generate-tray-icons-omnimux.mjs
+    Build->>Pack: mac.icon = app-icon-mac.png
+    Build->>Pack: win/linux.icon = app-icon.png
+    Pack->>Dock: 安装包 / 运行时 Dock 图标
+    Pack->>Tray: darwin=templateImage, win/linux=tray-icon-blue.png
+  end
+
+  rect rgb(248,248,249)
+    Note over Web,Landing: T04 Web / Landing 对齐（大部分已完成）
+    FE->>Web: 抽检 logo.svg / favicon / PWA / og.png
+    Web-->>Landing: LogoMark src=/logo.svg
+    FE->>Web: 修正 FORK_CUSTOMIZATIONS.md 旧绿文案
+    FE->>Web: 抽检 electron/icon.png（已紫）与 tray 单色模板
+  end
+
+  rect rgb(236,253,245)
+    Note over FE,Tray: T05 验收门禁
+    FE->>Spec: vitest package.spec.ts 图标断言
+    FE->>FE: 像素扫描：greenish=0，无 #C6F14F/#C8F135/#A3E635
+    FE->>Dock: 目视 Dock 圆角 + 安全边距
+    FE->>Tray: 浅/深菜单栏 Template 自适应 + Win 极光紫字形
+  end

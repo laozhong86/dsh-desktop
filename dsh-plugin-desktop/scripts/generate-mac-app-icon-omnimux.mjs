@@ -1,4 +1,12 @@
-/** Generate the macOS Dock icon from a 1024 RGBA source (v1: ICC optional). */
+/**
+ * Generate the macOS Dock icon from a 1024 RGBA source (v1: ICC optional).
+ *
+ * Source constraint: build/app-icon.png must be a FULL-BLEED square with
+ * SQUARE corners (produced by scripts/generate-app-icon-source-omnimux.mjs
+ * from the canonical octo_ghost vector). Never feed a pre-rounded brand-kit
+ * variant (`rx="280"`): this script already applies the 22.37% Apple corner
+ * mask, and a rounded source would double-round and eat the Dock safe area.
+ */
 
 import { writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'

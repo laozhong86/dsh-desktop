@@ -1,0 +1,134 @@
+classDiagram
+  class BrandTokens {
+    <<value object>>
+    +string indigo
+    +string vibrant
+    +string lavender
+    +string charcoal
+    +string eyes
+    +string forbiddenGreen[]
+  }
+
+  class OctoGhostVector {
+    <<source of truth>>
+    +viewBox 0 0 1254 1254
+    +fillBackground lavender
+    +fillBody charcoal
+    +fillEyes white
+    +path ghostSilhouette
+  }
+
+  class AppIconSource {
+    +width 1024
+    +height 1024
+    +hasAlpha true
+    +background fullBleedSquare
+    +path app-icon.png
+    +fromVector(OctoGhostVector) AppIconSource
+  }
+
+  class MacAppIcon {
+    +canvas 1024
+    +artwork 824
+    +inset 100
+    +cornerRatio 0.2237
+    +path app-icon-mac.png
+  }
+
+  class MacIconGenerator {
+    +MAC_APP_ICON_CANVAS_SIZE 1024
+    +MAC_APP_ICON_ARTWORK_SIZE 824
+    +MAC_APP_ICON_CORNER_RADIUS_RATIO 0.2237
+    +roundedRectMaskSvg(size, radius) Buffer
+    +applyAppleIconCornerMask(png, size) Buffer
+    +generateMacAppIconOmnimux(source, output) void
+  }
+
+  class TrayGlyphSource {
+    +viewBox 0 0 1254 1254
+    +background none
+    +fillBody vibrant
+    +fillTemplate black
+    +path tray-icon.svg
+  }
+
+  class TrayIconGenerator {
+    +templateSource tray-icon-source-32.png
+    +brandSource tray-icon-source-blue-32.png
+    +BRAND_VIOLET "#7961f2"
+    +generateFromSvg(svg) void
+    +rasterize(source, size, filename) void
+  }
+
+  class TrayBitmaps {
+    +tray-iconTemplate.png 16
+    +tray-iconTemplate@2x.png 32
+    +tray-icon-blue.png 16
+    +tray-icon-blue@1.25x.png 20
+    +tray-icon-blue@1.5x.png 24
+    +tray-icon-blue@2x.png 32
+  }
+
+  class DesktopShell {
+    +iconPath string
+    +trayIcons DesktopTrayIcons
+    +prepareTrayIcon(assets, platform) NativeImage
+  }
+
+  class ElectronBuilder {
+    +mac.icon app-icon-mac.png
+    +win.icon app-icon.png
+    +linux.icon app-icon.png
+  }
+
+  class WebPublicBrand {
+    +logo.svg
+    +logo.png
+    +favicon.ico
+    +favicon-32x32.png
+    +favicon-16x16.png
+    +apple-touch-icon.png
+    +icon-192.png
+    +icon-512.png
+    +maskable-icon-512.png
+    +og.png
+  }
+
+  class LandingLogoMark {
+    +src "/logo.svg"
+    +render() img
+  }
+
+  class BrandKit {
+    +logo-lavender-black.svg
+    +logo-vibrant-purple-black.svg
+    +logo-indigo-black.svg
+    +logo-purple-white.svg
+  }
+
+  class PackageSpecGuard {
+    +expectTrayFill(hex)
+    +expectAppIconSha256(hex)
+    +expectMacGeometry(inset 100, artwork 824)
+  }
+
+  BrandTokens --> OctoGhostVector : colors
+  BrandTokens --> TrayGlyphSource : colors
+  OctoGhostVector --> AppIconSource : rasterize 1024
+  OctoGhostVector --> TrayGlyphSource : body path only
+  AppIconSource --> MacIconGenerator : input
+  MacIconGenerator --> MacAppIcon : output
+  AppIconSource --> ElectronBuilder : win/linux
+  MacAppIcon --> ElectronBuilder : mac
+  AppIconSource --> DesktopShell : non-darwin iconPath
+  MacAppIcon --> DesktopShell : darwin iconPath
+  TrayGlyphSource --> TrayIconGenerator : svg
+  TrayIconGenerator --> TrayBitmaps : png set
+  TrayBitmaps --> DesktopShell : templatePath / bluePath
+  DesktopShell --> ElectronBuilder : packaged files
+  OctoGhostVector --> WebPublicBrand : already shipped
+  WebPublicBrand --> LandingLogoMark : /logo.svg
+  BrandKit --> WebPublicBrand : variants
+  PackageSpecGuard --> AppIconSource : sha256 lock
+  PackageSpecGuard --> TrayGlyphSource : fill lock
+  PackageSpecGuard --> MacAppIcon : geometry lock

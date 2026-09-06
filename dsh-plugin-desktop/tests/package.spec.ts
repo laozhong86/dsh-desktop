@@ -802,10 +802,11 @@ describe('published package surface', () => {
     expect(ciWorkflow).toContain('Documentation-only change; product build and tests are not required.')
   })
 
-  it('keeps one fixed brand-blue tray source for generated native assets', () => {
+  it('keeps one fixed aurora-violet tray source for generated native assets', () => {
     const source = readFileSync(new URL('build/tray-icon.svg', packageRoot), 'utf8')
 
-    expect(source.match(/#C6F14F/gu)).toHaveLength(1)
+    expect(source.match(/#7961f2/gu)).toHaveLength(1)
+    expect(source).not.toMatch(/#C6F14F|#C8F135|#A3E635/iu)
     expect(source).not.toMatch(/<style\b|prefers-color-scheme/iu)
     for (const filename of [
       'tray-iconTemplate.png',
@@ -824,7 +825,7 @@ describe('published package surface', () => {
       .update(readFileSync(new URL('build/app-icon.png', packageRoot)))
       .digest('hex')
 
-    expect(digest).toBe('ad1baf25839507f5dad99bddf716ffc3210b49ba2465339957e21c4f8c0da456')
+    expect(digest).toBe('c5bab3933ac4be23a5697e517e6e4f689370c56c06dab49690fec09712901d5a')
   })
 
   it('generates a centered macOS icon with a 100-pixel visual inset', async () => {

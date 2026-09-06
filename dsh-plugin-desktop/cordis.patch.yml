@@ -26,3 +26,13 @@
     printUrl: false
     surfaceContext: true
     trustedHosts: []
+
+# Hide two official native surface elements unused in the OmniMux social-media
+# workflow: the Trajectory conversation view tab and the Session-log download
+# button. These rows are defined by the dsh-web-app bundle patch; this overlay
+# lands after it (src/profile.ts compose order), so the dsh-client-modules
+# browser scan skips the disabled entries.
+- id: ui-trajectory
+  disabled: true
+- id: session-log-download
+  disabled: true

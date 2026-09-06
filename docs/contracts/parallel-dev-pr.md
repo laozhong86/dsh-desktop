@@ -3,12 +3,12 @@
 > 目的：让多个 WorkBuddy 会话能同时改本仓，且每条改动走完整 PR，直到老板合入。
 > 本合同是**仓库内的持久制度**，不依赖会话记忆。任何 agent 在本仓开特性分支 / 开 PR 前 MUST 读本合同。
 > 对照：GitHub PR Manager skill（跟 PR 层）+ `docs/contracts/upstream-sync.md`（上游同步层）。
-> 拍板（2026-08-23）：base=`omnimux`；合入永远由老板点；主仓脏改动先分组整理；P0 先制度，再 skill/巡检。
+> 拍板（2026-08-23，2026-09-06 修订）：base=`omnimux`；真实测试与浏览器验收全绿后授权自动合入收尾；主仓脏改动先分组整理；P0 先制度，再 skill/巡检。
 
 ## 一句话拓扑
 
 ```
-一任务 → 一路径租约 → 一 worktree → 一分支 → 一 PR → board 跟踪 → 老板合入 → 回收
+一任务 → 一路径租约 → 一 worktree → 一分支 → 一 PR → 严苛验收(L0+L2+浏览器+CI) → 自动合入收尾 → 回收
 ```
 
 ## 硬规则
@@ -18,7 +18,7 @@
 3. **写文件前必须有路径租约**。无租约或租约冲突 → 停手问老板。
 4. **产品 PR 只打 fork**：`laozhong86/omnimux-desktop-fork`，base = `omnimux`。禁止对 `anywhere-labs/deepseek-harness-desktop` 开产品特性 PR。
 5. **禁止直接推 `omnimux` / `master`**。必须走 PR。
-6. **合入权永远属于老板**。agent 不得 `gh pr merge`，除非老板当轮明文授权。
+6. **真实验收通过即自动闭环收尾（条件自治合入）**：当用户在当前任务下达实施/修复/交付指令，且改动满足「L0 单元测试 100% 全绿 + 真实浏览器/L2 独立环境实机验收通过 + CI 门禁全绿」时，视为获得完整收尾授权。Agent 应当主动将 PR 加入 Merge Queue、同步物化至本地开发版（`~/.omnimux-dev`）并清理临时 Worktree 完成闭环交付；仅在测试未通过、遇到未决阻塞、涉及生产正式发布（`--prod`）、或用户显式要求人工逐阶段审查时才暂停汇报。
 7. **禁止改 `deepseek-harness/` submodule 内容**。pin 变更走独立提交 + upstream-sync 纪律。
 8. **触及薄改点**（`main.ts` / `profile-manager.ts` / `update-*.ts` / `bin.ts` 等）按 `upstream-sync.md` C 级：**停等老板**，不得假装普通特性。
 9. **未验收不得标完成**。CI 绿 ≠ 合入；窗口/人眼证据缺失要写明「未验收」。

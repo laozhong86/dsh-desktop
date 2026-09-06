@@ -217,12 +217,11 @@ try {
   }
 
   const picker = ctx.directoryPicker.capability()
-  if (picker.kind !== 'browse') {
+  if (picker.kind !== 'native') {
     throw new Error(`assembled Windows profile selected ${picker.kind} directory picker`)
   }
-  const listing = await picker.list(home)
-  if (listing.path !== home) {
-    throw new Error(`assembled Windows browse picker listed ${listing.path} instead of ${home}`)
+  if (typeof picker.pick !== 'function') {
+    throw new Error('assembled Windows native picker did not expose a pick function')
   }
 
   const expectedUrl = `http://127.0.0.1:${String(ctx.webServer.port)}/?dsh-desktop-mode=advanced&dsh-desktop-platform=win32&dsh-desktop-version=2.0.0&dsh-desktop-material=off&dsh-desktop-mica=1`
@@ -315,7 +314,7 @@ try {
     'dsh-plugin-desktop',
     '@deepseek-ai/dsh-client-ui-conversation',
     '@deepseek-ai/dsh-client-ui-sidebar',
-    '@deepseek-ai/dsh-client-ui-directory-picker-browse',
+    '@deepseek-ai/dsh-client-ui-directory-picker-native',
   ]) {
     if (!ids.has(id)) {
       throw new Error(
@@ -325,7 +324,7 @@ try {
   }
   for (const id of [
     '@deepseek-ai/dsh-client-ui-layout',
-    '@deepseek-ai/dsh-client-ui-directory-picker-native',
+    '@deepseek-ai/dsh-client-ui-directory-picker-browse',
   ]) {
     if (ids.has(id)) throw new Error(`assembled advanced Web graph unexpectedly includes ${id}`)
   }

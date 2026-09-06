@@ -3,5 +3,14 @@
   "commit": "dd6322d604e00eec1ba5e0c8541159906a21094a",
   "sourceVersion": "0.1.2-alpha.3",
   "runtimePackageVersion": "0.1.2-alpha.3",
-  "runtimeSource": "vendor/dsh-runtime/0.1.2-alpha.3/manifest.json"
+  "runtimeSource": "vendor/dsh-runtime/0.1.2-alpha.3/manifest.json",
+  "runtimeOverlay": {
+    "product": {
+      "repository": "https://github.com/omnimux-ai/omnimux-dsh.git",
+      "commit": "962979417809910f6e39f61bbeedd09f43a2e39e",
+      "patchPath": "patches/dsh-0.1.2-alpha.3/ui-commands-client-action.patch",
+      "patchSha256": "3d8ceebcf67c6cebc12a79093595be89ad1885c1b3c6b8ca0674941fca886830",
+      "patchArtifact": "ui-commands-client-action.patch"
+    }
+  }
 }

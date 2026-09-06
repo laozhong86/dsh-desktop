@@ -318,6 +318,7 @@
     "upstream:build:official": "cd deepseek-harness && CI=true DSH_BUILD_CLIENT_PROFILE=official corepack pnpm run build",
     "upstream:pack:dsh": "cd deepseek-harness && CI=true corepack pnpm run release:pack --family dsh",
     "upstream:prepare-runtime": "yarn upstream:install && yarn upstream:build:official && yarn upstream:pack:dsh",
+    "omnimux:runtime-overlay": "node scripts/prepare-runtime-overlay.mjs",
     "omnimux:help": "node scripts/omnimux.mjs --help",
     "omnimux:sync": "node scripts/omnimux.mjs sync",
     "omnimux:restart": "node scripts/omnimux.mjs restart",

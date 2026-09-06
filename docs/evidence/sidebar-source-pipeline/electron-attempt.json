@@ -1,0 +1,8 @@
+{
+  "status": "resolved",
+  "packageRunner": "Electron binary download stalled and ended with SIGTERM; no result files",
+  "localCachedRuntime": "Extracted cached electron-v43.4.0-darwin-arm64.zip into task work directory; direct launch produced no output or result files before bounded termination",
+  "scope": "Electron component harness accepted; full Desktop acceptance not claimed",
+  "resolution": "Runner starts without top-level await and propagates failures with app.exit(1). Probe selects a live bottom-panel toggle and uses current geometry rather than assuming a persisted initial state.",
+  "finalResult": "sidebar-harness-result.json"
+}

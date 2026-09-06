@@ -1,0 +1,66 @@
+[
+  {
+    "_type": "https://in-toto.io/Statement/v0.1",
+    "subject": [
+      {
+        "name": "pkg:npm/dsh-better-sidebar@0.14.0",
+        "digest": {
+          "sha512": "6c48c7bc79e536729792e77efc0fe4678549bcfb7bf60807cbf98aa8429f3833ea2c5a6f773ed97283022372b89da3cec3fd1696aa7a27750347d8765a6eb0e3"
+        }
+      }
+    ],
+    "predicateType": "https://github.com/npm/attestation/tree/main/specs/publish/v0.1",
+    "predicate": {
+      "name": "dsh-better-sidebar",
+      "version": "0.14.0",
+      "registry": "https://registry.npmjs.org"
+    }
+  },
+  {
+    "_type": "https://in-toto.io/Statement/v1",
+    "subject": [
+      {
+        "name": "pkg:npm/dsh-better-sidebar@0.14.0",
+        "digest": {
+          "sha512": "6c48c7bc79e536729792e77efc0fe4678549bcfb7bf60807cbf98aa8429f3833ea2c5a6f773ed97283022372b89da3cec3fd1696aa7a27750347d8765a6eb0e3"
+        }
+      }
+    ],
+    "predicateType": "https://slsa.dev/provenance/v1",
+    "predicate": {
+      "buildDefinition": {
+        "buildType": "https://slsa-framework.github.io/github-actions-buildtypes/workflow/v1",
+        "externalParameters": {
+          "workflow": {
+            "ref": "refs/tags/v0.14.0",
+            "repository": "https://github.com/omdsh-dev/DSH-better-sidebar",
+            "path": ".github/workflows/release.yml"
+          }
+        },
+        "internalParameters": {
+          "github": {
+            "event_name": "release",
+            "repository_id": "1326893710",
+            "repository_owner_id": "312905287"
+          }
+        },
+        "resolvedDependencies": [
+          {
+            "uri": "git+https://github.com/omdsh-dev/DSH-better-sidebar@refs/tags/v0.14.0",
+            "digest": {
+              "gitCommit": "6c891514b544b6e2da51fdab2eb3436cc02da246"
+            }
+          }
+        ]
+      },
+      "runDetails": {
+        "builder": {
+          "id": "https://github.com/actions/runner/github-hosted"
+        },
+        "metadata": {
+          "invocationId": "https://github.com/omdsh-dev/DSH-better-sidebar/actions/runs/32285806183/attempts/1"
+        }
+      }
+    }
+  }
+]

@@ -1,0 +1,112 @@
+--- npm-0.14.0/src/index.ts
++++ legacy-staging/src/index.ts
+@@ -35,7 +35,7 @@
+ import { isTrustedApiRequest, isLoopbackHostname } from './trust-fence.ts'
+ import { registerBundleRoute } from './bundle-route.ts'
+ import * as git from './git.ts'
+-import { SettingsConflictError, settingsNamespace, type SettingsNamespace } from '@deepseek-ai/dsh-settings'
++import { SettingsConflictError, type SettingsNamespace } from '@deepseek-ai/dsh-settings'
+ import { defaultShell, ensureSpawnHelper, PtyManager, shellDisplayName } from './pty-manager.ts'
+ import { AgentPtyRegistry, clampDims, type AgentTerminalHandle } from './agent-pty.ts'
+ import {
+@@ -550,7 +550,7 @@
+     }
+   }
+   ctx.inject(['settings'], (sctx) => {
+-    const ns: SettingsNamespace = settingsNamespace(SIDEBAR_PREFS_NS)
++    const ns: SettingsNamespace = SIDEBAR_PREFS_NS
+     // The structural settings mirror types `schema` as unknown, so the
+     // generic is not inferred here; the real service resolves it from the
+     // schemastery schema (PrefsSchema) — narrow the owner scope explicitly.
+--- npm-0.14.0/src/client/Sidebar.tsx
++++ legacy-staging/src/client/Sidebar.tsx
+@@ -708,11 +708,16 @@
+     // hidden" until a full reload. removeProperty restores the CSS fallback
+     // (var(--dsh-sidebar-width, 0px)); React re-runs cleanup+setup in the
+     // same commit on state changes, so there is no visible flicker.
++  }, [narrow, snapshot.state?.panelOpen, snapshot.state?.width, snapshot.state?.bottomOpen, snapshot.state?.bottomHeight])
++  // Unmount-only release of the layout push (do not clear on width commits —
++  // that re-enables margin transitions against a 0 fallback and jitters the
++  // conversation column after a divider drag).
++  useEffect(() => {
+     return () => {
+       document.documentElement.style.removeProperty('--dsh-sidebar-width')
+       document.documentElement.style.removeProperty('--dsh-sidebar-height')
+     }
+-  }, [narrow, snapshot.state?.panelOpen, snapshot.state?.width, snapshot.state?.bottomOpen, snapshot.state?.bottomHeight])
++  }, [])
+   useEffect(() => {
+     if (anyDragging) document.body.setAttribute('data-dsh-sidebar-dragging', '')
+     else document.body.removeAttribute('data-dsh-sidebar-dragging')
+--- npm-0.14.0/lib/index.js
++++ legacy-staging/lib/index.js
+@@ -6,7 +6,7 @@
+ import { createHash, randomUUID } from "node:crypto";
+ import { fileURLToPath } from "node:url";
+ import { spawn } from "node:child_process";
+-import { SettingsConflictError, settingsNamespace } from "@deepseek-ai/dsh-settings";
++import { SettingsConflictError } from "@deepseek-ai/dsh-settings";
+ import { chmodSync, existsSync, readFileSync, realpathSync } from "node:fs";
+ import { homedir, userInfo } from "node:os";
+ import { defineTool } from "@deepseek-ai/dsh-tools";
+@@ -2718,7 +2718,7 @@
+ 		}
+ 	};
+ 	ctx.inject(["settings"], (sctx) => {
+-		const ns = settingsNamespace(SIDEBAR_PREFS_NS);
++		const ns = SIDEBAR_PREFS_NS;
+ 		const scope = sctx.settings.register(ns, PrefsSchema);
+ 		const viewOf = () => {
+ 			const descriptor = sctx.settings.describe({ redactSecrets: true }).find((candidate) => candidate.ns === ns);
+--- npm-0.14.0/lib/client.js
++++ legacy-staging/lib/client.js
+@@ -8012,10 +8012,6 @@
+ 				const width = !narrow && snapshot.state?.panelOpen === true ? Math.min(snapshot.state.width, window.innerWidth) : 0;
+ 				const height = !narrow && snapshot.state?.bottomOpen === true ? Math.min(snapshot.state.bottomHeight, window.innerHeight) : 0;
+ 				writeGeometry(width, height);
+-				return () => {
+-					document.documentElement.style.removeProperty("--dsh-sidebar-width");
+-					document.documentElement.style.removeProperty("--dsh-sidebar-height");
+-				};
+ 			}, [
+ 				narrow,
+ 				snapshot.state?.panelOpen,
+@@ -8023,6 +8019,12 @@
+ 				snapshot.state?.bottomOpen,
+ 				snapshot.state?.bottomHeight
+ 			]);
++			(0, react.useEffect)(() => {
++				return () => {
++					document.documentElement.style.removeProperty("--dsh-sidebar-width");
++					document.documentElement.style.removeProperty("--dsh-sidebar-height");
++				};
++			}, []);
+ 			(0, react.useEffect)(() => {
+ 				if (anyDragging) document.body.setAttribute("data-dsh-sidebar-dragging", "");
+ 				else document.body.removeAttribute("data-dsh-sidebar-dragging");
+--- npm-0.14.0/lib/client-registry.js
++++ legacy-staging/lib/client-registry.js
+@@ -8012,10 +8012,6 @@
+ 				const width = !narrow && snapshot.state?.panelOpen === true ? Math.min(snapshot.state.width, window.innerWidth) : 0;
+ 				const height = !narrow && snapshot.state?.bottomOpen === true ? Math.min(snapshot.state.bottomHeight, window.innerHeight) : 0;
+ 				writeGeometry(width, height);
+-				return () => {
+-					document.documentElement.style.removeProperty("--dsh-sidebar-width");
+-					document.documentElement.style.removeProperty("--dsh-sidebar-height");
+-				};
+ 			}, [
+ 				narrow,
+ 				snapshot.state?.panelOpen,
+@@ -8023,6 +8019,12 @@
+ 				snapshot.state?.bottomOpen,
+ 				snapshot.state?.bottomHeight
+ 			]);
++			(0, react.useEffect)(() => {
++				return () => {
++					document.documentElement.style.removeProperty("--dsh-sidebar-width");
++					document.documentElement.style.removeProperty("--dsh-sidebar-height");
++				};
++			}, []);
+ 			(0, react.useEffect)(() => {
+ 				if (anyDragging) document.body.setAttribute("data-dsh-sidebar-dragging", "");
+ 				else document.body.removeAttribute("data-dsh-sidebar-dragging");

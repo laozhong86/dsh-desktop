@@ -1,0 +1,6 @@
+Command: corepack yarn install --immutable
+Worktree: /Users/x/Desktop/Project/omnimux-desktop-fork/.worktrees/sidebar-source-pipeline
+Base HEAD: b31f59837ae5a386d92f5102dc26262dcf28d3c5
+Exit: 0
+
+Yarn 4.18.0 completed resolution, validation, fetch, and link. Duration 2.750s. Existing peer dependency warnings (YN0002/YN0086) remained; dsh-subprocess-local rebuilt (YN0007). No lockfile changes.

@@ -1,0 +1,24 @@
+{
+  "date": "2026-09-06",
+  "surface": "Codex built-in browser",
+  "url": "http://127.0.0.1:4179/",
+  "scope": "Actual compiled component with inert test context, not full desktop or shared Dev",
+  "clientSha256": "f927bb56e117ff9beceef610ed7cc82c574c6bd647bdd2153d9850689f2455ed",
+  "nativeDrag": {
+    "widthBefore": "528px",
+    "widthAfter": "608px",
+    "heightBefore": "220px",
+    "heightAfter": "220px",
+    "draggingBefore": false,
+    "draggingAfter": false
+  },
+  "finalDomSnapshot": {
+    "status": "PASS",
+    "liveUpdateKeptVars": true,
+    "pointerupOrder": true,
+    "unmountClearedVars": true,
+    "finalGeometry": "688px × 220px",
+    "observedRemovals": "none"
+  },
+  "evidenceMethod": "Native CUA drag plus rendered DOM inspection; this JSON records observations, not an automated browser export"
+}

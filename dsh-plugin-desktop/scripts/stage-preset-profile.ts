@@ -17,6 +17,11 @@ import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { listPackageNames, packageDirSegments } from '../src/preset-profile.ts'
+import {
+  BETTER_SIDEBAR_PNPM_VERSION,
+  buildPatchedBetterSidebar,
+  verifyInstalledBetterSidebar,
+} from './better-sidebar/build-patched-sidebar.ts'
 
 const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const defaultPresetDir = join(desktopRoot, 'preset')
@@ -51,7 +56,6 @@ interface Manifest {
 export interface StagePresetProfileOptions {
   readonly pluginsRoot?: string
   readonly presetDir?: string
-  readonly sidebarSpec?: string
 }
 
 /**
@@ -59,6 +63,9 @@ export interface StagePresetProfileOptions {
  * @returns the number of package directories written under preset/plugins.
  */
 export function stagePresetProfile(options: StagePresetProfileOptions = {}): number {
+  if (process.env.DSH_BETTER_SIDEBAR_SPEC !== undefined) {
+    throw new Error('DSH_BETTER_SIDEBAR_SPEC is no longer supported; the sidebar source and patch are repository-pinned')
+  }
   const targetPresetDir = resolve(options.presetDir ?? defaultPresetDir)
   mkdirSync(targetPresetDir, { recursive: true })
   const pluginsRoot = options.pluginsRoot ?? process.env.OMNIMUX_PLUGINS_DIR
@@ -71,11 +78,15 @@ export function stagePresetProfile(options: StagePresetProfileOptions = {}): num
       throw new Error(`product plugin source is missing: ${join(resolvedPluginsRoot, name)} (set OMNIMUX_PLUGINS_DIR)`)
     }
   }
-  const staging = mkdtempSync(join(tmpdir(), 'omnimux-preset-'))
+  // Keep every local file: spec on one canonical path namespace. macOS may
+  // expose the same temporary directory as both /var and /private/var;
+  // mixing those spellings makes pnpm resolve a valid tarball as /private/private/var.
+  const staging = realpathSync(mkdtempSync(join(tmpdir(), 'omnimux-preset-')))
   let candidateDir: string | undefined
   try {
+    const sidebar = buildPatchedBetterSidebar(join(staging, 'better-sidebar'))
     const dependencies: Record<string, string> = {
-      'dsh-better-sidebar': options.sidebarSpec ?? process.env.DSH_BETTER_SIDEBAR_SPEC ?? '0.14.0',
+      'dsh-better-sidebar': toFileSpec(staging, sidebar.tarballPath),
     }
     const optionalDependencies: Record<string, string> = {}
     const stagedPackagesRoot = join(staging, 'packages')
@@ -118,8 +129,7 @@ export function stagePresetProfile(options: StagePresetProfileOptions = {}): num
         throw new Error(`staged preset is missing required plugin ${required}: ${owned.join(', ')}`)
       }
     }
-    patchBetterSidebarSettingsNamespace(join(candidatePluginsDir, 'dsh-better-sidebar'))
-    patchBetterSidebarDragReleaseBounce(join(candidatePluginsDir, 'dsh-better-sidebar'))
+    verifyInstalledBetterSidebar(join(candidatePluginsDir, 'dsh-better-sidebar'), sidebar.packedRoot)
     writeFileSync(join(candidateDir, 'owned-packages.json'), `${JSON.stringify(owned, undefined, 2)}\n`)
     const seedVersionPath = join(targetPresetDir, 'seed-version')
     writeFileSync(
@@ -225,7 +235,12 @@ function copyPluginSources(source: string, destination: string): void {
 }
 
 function installStaging(staging: string): void {
-  const result = spawnSync('pnpm', ['install', '--prod', '--ignore-scripts', '--config.confirmModulesPurge=false'], {
+  const installArgs = ['install', '--prod', '--ignore-scripts', '--config.confirmModulesPurge=false']
+  const command = process.platform === 'win32' ? process.env.ComSpec ?? 'cmd.exe' : 'corepack'
+  const args = process.platform === 'win32'
+    ? ['/d', '/s', '/c', `corepack pnpm@${BETTER_SIDEBAR_PNPM_VERSION} ${installArgs.join(' ')}`]
+    : [`pnpm@${BETTER_SIDEBAR_PNPM_VERSION}`, ...installArgs]
+  const result = spawnSync(command, args, {
     cwd: staging,
     encoding: 'utf8',
     env: { ...process.env, CI: 'true' },
@@ -328,206 +343,6 @@ export function publishCandidate(
     )
   }
 }
-
-
-/**
- * alpha.3 removed `settingsNamespace()`; the published sidebar still calls it
- * and Host boot then fails to import the plugin. Rewrite the staged copy so
- * packaged Dev/Prod apps boot without a live npm republish.
- */
-function patchBetterSidebarSettingsNamespace(root: string): void {
-  if (!existsSync(join(root, 'package.json'))) return
-  const replacements: ReadonlyArray<readonly [string, string]> = [
-    [
-      "import { SettingsConflictError, settingsNamespace, type SettingsNamespace } from '@deepseek-ai/dsh-settings'",
-      "import { SettingsConflictError, type SettingsNamespace } from '@deepseek-ai/dsh-settings'",
-    ],
-    [
-      'import { SettingsConflictError, settingsNamespace } from "@deepseek-ai/dsh-settings";',
-      'import { SettingsConflictError } from "@deepseek-ai/dsh-settings";',
-    ],
-    [
-      'const ns: SettingsNamespace = settingsNamespace(SIDEBAR_PREFS_NS)',
-      'const ns: SettingsNamespace = SIDEBAR_PREFS_NS',
-    ],
-    [
-      'const ns = settingsNamespace(SIDEBAR_PREFS_NS);',
-      'const ns = SIDEBAR_PREFS_NS;',
-    ],
-  ]
-  for (const rel of ['src/index.ts', 'lib/index.js'] as const) {
-    const path = join(root, rel)
-    if (!existsSync(path)) continue
-    let text = readFileSync(path, 'utf8')
-    for (const [from, to] of replacements) text = text.replaceAll(from, to)
-    writeFileSync(path, text)
-  }
-}
-
-
-/**
- * Drag-release bounce: layout-push effect cleanup used to removeProperty
- * `--dsh-sidebar-width` on every dependency change. On pointer-up the store
- * commits a new width AND dragging ends in the same React turn, so cleanup
- * briefly drops the CSS var to the 0 fallback while
- * `data-dsh-sidebar-dragging` is cleared (transitions re-enabled). The
- * conversation column then animates in (collapse) and back out (final width)
- * — visible center-pane jitter. Keep the var sticky across width updates;
- * only release it on true unmount (issue #31 still covered). Also flush the
- * final drag size into the DOM before clearing the dragging flag so the
- * committed store width and the live CSS var never disagree for a frame.
- */
-function patchBetterSidebarDragReleaseBounce(root: string): void {
-  if (!existsSync(join(root, 'package.json'))) return
-
-  const srcCleanup = `    return () => {
-      document.documentElement.style.removeProperty('--dsh-sidebar-width')
-      document.documentElement.style.removeProperty('--dsh-sidebar-height')
-    }
-  }, [narrow, snapshot.state?.panelOpen, snapshot.state?.width, snapshot.state?.bottomOpen, snapshot.state?.bottomHeight])
-  useEffect(() => {
-    if (anyDragging) document.body.setAttribute('data-dsh-sidebar-dragging', '')
-    else document.body.removeAttribute('data-dsh-sidebar-dragging')
-  }, [anyDragging])`
-
-  const srcCleanupFixed = `  }, [narrow, snapshot.state?.panelOpen, snapshot.state?.width, snapshot.state?.bottomOpen, snapshot.state?.bottomHeight])
-  // Unmount-only release of the layout push (do not clear on width commits —
-  // that re-enables margin transitions against a 0 fallback and jitters the
-  // conversation column after a divider drag).
-  useEffect(() => {
-    return () => {
-      document.documentElement.style.removeProperty('--dsh-sidebar-width')
-      document.documentElement.style.removeProperty('--dsh-sidebar-height')
-    }
-  }, [])
-  useEffect(() => {
-    if (anyDragging) document.body.setAttribute('data-dsh-sidebar-dragging', '')
-    else document.body.removeAttribute('data-dsh-sidebar-dragging')
-  }, [anyDragging])`
-
-  const libCleanup = `				return () => {
-					document.documentElement.style.removeProperty("--dsh-sidebar-width");
-					document.documentElement.style.removeProperty("--dsh-sidebar-height");
-				};
-			}, [
-				narrow,
-				snapshot.state?.panelOpen,
-				snapshot.state?.width,
-				snapshot.state?.bottomOpen,
-				snapshot.state?.bottomHeight
-			]);
-			(0, react.useEffect)(() => {
-				if (anyDragging) document.body.setAttribute("data-dsh-sidebar-dragging", "");
-				else document.body.removeAttribute("data-dsh-sidebar-dragging");
-			}, [anyDragging]);`
-
-  const libCleanupFixed = `			}, [
-				narrow,
-				snapshot.state?.panelOpen,
-				snapshot.state?.width,
-				snapshot.state?.bottomOpen,
-				snapshot.state?.bottomHeight
-			]);
-			(0, react.useEffect)(() => {
-				return () => {
-					document.documentElement.style.removeProperty("--dsh-sidebar-width");
-					document.documentElement.style.removeProperty("--dsh-sidebar-height");
-				};
-			}, []);
-			(0, react.useEffect)(() => {
-				if (anyDragging) document.body.setAttribute("data-dsh-sidebar-dragging", "");
-				else document.body.removeAttribute("data-dsh-sidebar-dragging");
-			}, [anyDragging]);`
-
-  const srcWidthUp = `                stopDragScheduling()
-                store.reduce(s => setWidth(s, startWidth + (startX - event.clientX)))
-                setDraggingWidth(false)`
-  const srcWidthUpFixed = `                stopDragScheduling()
-                {
-                  const width = clampWidth(startWidth + (startX - event.clientX))
-                  const height = state.bottomOpen ? Math.min(state.bottomHeight, window.innerHeight) : 0
-                  applyDrag(width, height)
-                  store.reduce(s => setWidth(s, width))
-                }
-                setDraggingWidth(false)`
-
-  const srcCornerUp = `              stopDragScheduling()
-              store.reduce(s => setBottomHeight(setWidth(s, startWidth + (startX - event.clientX)), startHeight + (startY - event.clientY)))
-              setDraggingCorner(false)`
-  const srcCornerUpFixed = `              stopDragScheduling()
-              {
-                const width = clampWidth(startWidth + (startX - event.clientX))
-                const height = clampHeight(startHeight + (startY - event.clientY))
-                applyDrag(width, height)
-                store.reduce(s => setBottomHeight(setWidth(s, width), height))
-              }
-              setDraggingCorner(false)`
-
-  const libWidthUp = `								stopDragScheduling();
-								store.reduce((s) => setWidth(s, startWidth + (startX - event.clientX)));
-								setDraggingWidth(false);`
-  const libWidthUpFixed = `								stopDragScheduling();
-								{
-									const width = clampWidth(startWidth + (startX - event.clientX));
-									const height = state.bottomOpen ? Math.min(state.bottomHeight, window.innerHeight) : 0;
-									applyDrag(width, height);
-									store.reduce((s) => setWidth(s, width));
-								}
-								setDraggingWidth(false);`
-
-  const libCornerUp = `								stopDragScheduling();
-								store.reduce((s) => setBottomHeight(setWidth(s, startWidth + (startX - event.clientX)), startHeight + (startY - event.clientY)));
-								setDraggingCorner(false);`
-  const libCornerUpFixed = `								stopDragScheduling();
-								{
-									const width = clampWidth(startWidth + (startX - event.clientX));
-									const height = clampHeight(startHeight + (startY - event.clientY));
-									applyDrag(width, height);
-									store.reduce((s) => setBottomHeight(setWidth(s, width), height));
-								}
-								setDraggingCorner(false);`
-
-  const targets: Array<{ rel: string; pairs: Array<[string, string]> }> = [
-    {
-      rel: 'src/client/Sidebar.tsx',
-      pairs: [
-        [srcCleanup, srcCleanupFixed],
-        [srcWidthUp, srcWidthUpFixed],
-        [srcCornerUp, srcCornerUpFixed],
-      ],
-    },
-    {
-      rel: 'lib/client.js',
-      pairs: [
-        [libCleanup, libCleanupFixed],
-        [libWidthUp, libWidthUpFixed],
-        [libCornerUp, libCornerUpFixed],
-      ],
-    },
-    {
-      rel: 'lib/client-registry.js',
-      pairs: [
-        [libCleanup, libCleanupFixed],
-        [libWidthUp, libWidthUpFixed],
-        [libCornerUp, libCornerUpFixed],
-      ],
-    },
-  ]
-
-  for (const { rel, pairs } of targets) {
-    const path = join(root, rel)
-    if (!existsSync(path)) continue
-    let text = readFileSync(path, 'utf8')
-    let changed = false
-    for (const [from, to] of pairs) {
-      if (!text.includes(from)) continue
-      text = text.replaceAll(from, to)
-      changed = true
-    }
-    if (changed) writeFileSync(path, text)
-  }
-}
-
 function main(): void {
   const count = stagePresetProfile()
   process.stdout.write(`staged ${String(count)} preset packages into ${defaultPluginsDir}\n`)

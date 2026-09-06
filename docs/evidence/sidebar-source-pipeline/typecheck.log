@@ -1,0 +1,6 @@
+Command: corepack yarn typecheck
+Worktree: /Users/x/Desktop/Project/omnimux-desktop-fork/.worktrees/sidebar-source-pipeline
+Base HEAD: b31f59837ae5a386d92f5102dc26262dcf28d3c5
+Exit: 0
+
+Output: contract-types: 4 generated type files are current

@@ -1,0 +1,75 @@
+{
+  "harnessUrl": "http://127.0.0.1:4179/",
+  "capturedAt": "2026-09-06T06:46:08.866Z",
+  "runtime": {
+    "electron": "43.4.0",
+    "chrome": "150.0.7871.224",
+    "node": "24.18.1",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "result": {
+    "pass": true,
+    "liveUpdatesKeptVariables": true,
+    "pointerupGeometryBeforeMarker": true,
+    "unmountClearedVariables": true,
+    "finalWidth": "528px",
+    "finalHeight": "220px",
+    "liveRemovalNames": [],
+    "heightUpdateEvents": [
+      {
+        "kind": "set",
+        "name": "--dsh-sidebar-width",
+        "value": "448px",
+        "at": 231.69999992847443
+      },
+      {
+        "kind": "set",
+        "name": "--dsh-sidebar-height",
+        "value": "220px",
+        "at": 231.69999992847443
+      }
+    ],
+    "pointerupEvents": [
+      {
+        "kind": "set",
+        "name": "--dsh-sidebar-width",
+        "value": "528px",
+        "at": 261.39999997615814
+      },
+      {
+        "kind": "set",
+        "name": "--dsh-sidebar-height",
+        "value": "220px",
+        "at": 261.39999997615814
+      },
+      {
+        "kind": "set",
+        "name": "--dsh-sidebar-width",
+        "value": "528px",
+        "at": 262.6999999284744
+      },
+      {
+        "kind": "set",
+        "name": "--dsh-sidebar-height",
+        "value": "220px",
+        "at": 262.7999999523163
+      },
+      {
+        "kind": "drag-marker-removed",
+        "name": "data-dsh-sidebar-dragging",
+        "at": 262.7999999523163
+      }
+    ],
+    "unmountRemovalNames": [
+      "--dsh-sidebar-width",
+      "--dsh-sidebar-height"
+    ],
+    "bundle": {
+      "bundlePath": "/private/var/folders/s4/bq231_q12pg5k216kgk882d80000gn/T/better-sidebar-pipeline-9vAVi3/first/source/lib/client.js",
+      "packageDir": "/private/var/folders/s4/bq231_q12pg5k216kgk882d80000gn/T/better-sidebar-pipeline-9vAVi3/first/source",
+      "version": "0.14.0",
+      "sha256": "f927bb56e117ff9beceef610ed7cc82c574c6bd647bdd2153d9850689f2455ed"
+    }
+  }
+}

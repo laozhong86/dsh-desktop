@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { spawnSync } from 'node:child_process'
 import {
   existsSync,
@@ -13,6 +13,31 @@ import {
 import { tmpdir } from 'node:os'
 import { join, relative, sep } from 'node:path'
 import { createRequire } from 'node:module'
+
+const sidebarFixture = vi.hoisted(() => ({
+  path: undefined as string | undefined,
+  buildError: undefined as Error | undefined,
+  verifyError: undefined as Error | undefined,
+}))
+vi.mock('../scripts/better-sidebar/build-patched-sidebar.ts', async () => {
+  const fs = await import('node:fs')
+  const pathApi = await import('node:path')
+  return {
+    BETTER_SIDEBAR_PNPM_VERSION: '11.8.0',
+    buildPatchedBetterSidebar: (workRoot: string) => {
+      if (sidebarFixture.buildError !== undefined) throw sidebarFixture.buildError
+      const path = sidebarFixture.path ?? pathApi.join(workRoot, 'fixture-sidebar')
+      if (sidebarFixture.path === undefined) {
+        fs.mkdirSync(path, { recursive: true })
+        fs.writeFileSync(pathApi.join(path, 'package.json'), '{"name":"dsh-better-sidebar","version":"1.0.0"}\n')
+      }
+      return { tarballPath: path, packedRoot: path }
+    },
+    verifyInstalledBetterSidebar: () => {
+      if (sidebarFixture.verifyError !== undefined) throw sidebarFixture.verifyError
+    },
+  }
+})
 import { publishCandidate, stagePresetProfile } from '../scripts/stage-preset-profile.ts'
 import { listPackageNames } from '../src/preset-profile.ts'
 
@@ -31,6 +56,50 @@ const PRODUCT_PLUGINS = [
 ] as const
 
 describe('stagePresetProfile', () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs()
+    sidebarFixture.path = undefined
+    sidebarFixture.buildError = undefined
+    sidebarFixture.verifyError = undefined
+  })
+
+  it('rejects the retired arbitrary sidebar package override', () => {
+    vi.stubEnv('DSH_BETTER_SIDEBAR_SPEC', 'latest')
+    expect(() => stagePresetProfile()).toThrowError('DSH_BETTER_SIDEBAR_SPEC is no longer supported')
+  })
+
+  it('preserves an existing preset when the pinned sidebar build fails', () => {
+    const fixture = mkdtempSync(join(tmpdir(), 'omnimux sidebar build failure '))
+    try {
+      const pluginsRoot = join(fixture, 'product plugins')
+      const presetDir = join(fixture, 'existing preset')
+      createProductPlugins(pluginsRoot)
+      createExistingPreset(presetDir)
+      sidebarFixture.buildError = new Error('pinned patch does not apply')
+
+      expect(() => stagePresetProfile({ pluginsRoot, presetDir })).toThrowError('pinned patch does not apply')
+      expectExistingPreset(presetDir)
+    } finally {
+      rmSync(fixture, { recursive: true, force: true })
+    }
+  })
+
+  it('preserves an existing preset when installed sidebar provenance fails', () => {
+    const fixture = mkdtempSync(join(tmpdir(), 'omnimux sidebar provenance failure '))
+    try {
+      const pluginsRoot = join(fixture, 'product plugins')
+      const presetDir = join(fixture, 'existing preset')
+      createProductPlugins(pluginsRoot)
+      createExistingPreset(presetDir)
+      sidebarFixture.verifyError = new Error('staged sidebar differs from packed build')
+
+      expect(() => stagePresetProfile({ pluginsRoot, presetDir }))
+        .toThrowError('staged sidebar differs from packed build')
+      expectExistingPreset(presetDir)
+    } finally {
+      rmSync(fixture, { recursive: true, force: true })
+    }
+  }, 30_000)
   it('materializes a local file dependency closure from paths containing spaces', () => {
     const fixture = mkdtempSync(join(tmpdir(), 'omnimux stage fixture '))
     try {
@@ -73,11 +142,8 @@ describe('stagePresetProfile', () => {
         "module.exports = { required: require('@fixture/required-leaf'), optional: require('@fixture/tokens') }\n",
       )
 
-      expect(stagePresetProfile({
-        pluginsRoot,
-        presetDir,
-        sidebarSpec: fileSpec(sidebar),
-      })).toBe(15)
+      sidebarFixture.path = sidebar
+      expect(stagePresetProfile({ pluginsRoot, presetDir })).toBe(15)
 
       rmSync(sourceRoot, { recursive: true, force: true })
       const movedPresetDir = join(fixture, 'moved preset with spaces')
@@ -146,11 +212,8 @@ describe('stagePresetProfile', () => {
 
       let failure: unknown
       try {
-        stagePresetProfile({
-          pluginsRoot,
-          presetDir,
-          sidebarSpec: fileSpec(join(fixture, 'missing sidebar package')),
-        })
+        sidebarFixture.path = join(fixture, 'missing sidebar package')
+        stagePresetProfile({ pluginsRoot, presetDir })
       } catch (error) {
         failure = error
       }
@@ -176,7 +239,7 @@ describe('stagePresetProfile', () => {
       })
       createExistingPreset(presetDir)
 
-      expect(() => stagePresetProfile({ pluginsRoot, presetDir, sidebarSpec: '0.0.0-unused' }))
+      expect(() => stagePresetProfile({ pluginsRoot, presetDir }))
         .toThrowError(/local dependency "missing-local" is missing package\.json/)
       expectExistingPreset(presetDir)
     } finally {
@@ -199,7 +262,6 @@ describe('stagePresetProfile', () => {
       expect(() => stagePresetProfile({
         pluginsRoot,
         presetDir: join(fixture, 'target preset'),
-        sidebarSpec: '0.0.0-unused',
       })).toThrowError(/local package "shared-local" resolves to conflicting sources/)
     } finally {
       rmSync(fixture, { recursive: true, force: true })
@@ -226,7 +288,8 @@ describe('stagePresetProfile', () => {
         },
       })
 
-      expect(stagePresetProfile({ pluginsRoot, presetDir, sidebarSpec: fileSpec(sidebar) })).toBe(12)
+      sidebarFixture.path = sidebar
+      expect(stagePresetProfile({ pluginsRoot, presetDir })).toBe(12)
       expect(listPackageNames(join(presetDir, 'plugins'))).not.toContain('@fixture/excluded')
       expect(readJson(join(presetDir, 'owned-packages.json'))).not.toContain('@fixture/excluded')
     } finally {
@@ -251,8 +314,8 @@ describe('stagePresetProfile', () => {
       })
       createExistingPreset(presetDir)
 
-      expect(() => stagePresetProfile({ pluginsRoot, presetDir, sidebarSpec: '0.14.0' }))
-        .toThrowError(/local package "dsh-better-sidebar".+conflicts with explicit staging dependency "0\.14\.0"/)
+      expect(() => stagePresetProfile({ pluginsRoot, presetDir }))
+        .toThrowError(/local package "dsh-better-sidebar".+conflicts with explicit staging dependency/)
       expectExistingPreset(presetDir)
     } finally {
       rmSync(fixture, { recursive: true, force: true })
@@ -319,10 +382,6 @@ function expectExistingPreset(presetDir: string): void {
   expect(existsSync(join(presetDir, 'plugins', 'existing-valid', 'package.json'))).toBe(true)
   expect(readFileSync(join(presetDir, 'owned-packages.json'), 'utf8')).toBe('["existing-valid"]\n')
   expect(readFileSync(join(presetDir, 'seed-version'), 'utf8')).toBe('7\n')
-}
-
-function fileSpec(path: string): string {
-  return `file:${path.split(sep).join('/')}`
 }
 
 function relativeFileSpec(from: string, path: string): string {

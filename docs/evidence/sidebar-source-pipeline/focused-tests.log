@@ -1,0 +1,9 @@
+Command: corepack yarn workspace dsh-plugin-desktop exec vitest run tests/stage-preset-profile.spec.ts tests/preset-profile.spec.ts tests/preset-distribution.spec.ts
+Worktree: /Users/x/Desktop/Project/omnimux-desktop-fork/.worktrees/sidebar-source-pipeline
+Base HEAD: b31f59837ae5a386d92f5102dc26262dcf28d3c5
+Exit: 0
+
+ Test Files  3 passed (3)
+      Tests  27 passed (27)
+   Start at 13:42:19
+   Duration 2.11s (transform 115ms, setup 0ms, import 265ms, tests 2.07s, environment 0ms)

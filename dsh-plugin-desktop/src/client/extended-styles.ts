@@ -191,8 +191,11 @@ body[data-dsh-desktop-platform="darwin"] [class*="sidebarCol"] [class*="_root"][
 body[data-dsh-desktop-platform="darwin"] [class*="_panel"] {
   padding-top: 0 !important;
 }
-body[data-dsh-desktop-platform="darwin"] [class*="toggleCluster"] {
+body[data-dsh-desktop-platform="darwin"]:not([data-dsh-sidebar-collapsed]) [class*="toggleCluster"] {
   top: 3px !important;
+}
+body[data-dsh-desktop-platform="darwin"][data-dsh-sidebar-collapsed] [class*="toggleCluster"] {
+  top: 14px !important;
 }
 
 body[data-dsh-desktop-platform="win32"] header,

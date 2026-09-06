@@ -438,7 +438,7 @@ describe('seedOmnimuxProfile managed sources', () => {
     }
   })
 
-  it('does not downgrade or rewrite an existing valid managed Profile', () => {
+  it('preserves a newer materialized development hub across repeated startups', async () => {
     const root = mkdtempSync(join(tmpdir(), 'omnimux-managed-repeat-'))
     try {
       const presetDir = createPreset(root)
@@ -446,16 +446,45 @@ describe('seedOmnimuxProfile managed sources', () => {
       const first = seedOmnimuxProfile({ home, presetDir })
       const source = join(managedSourcePath(first.profileDir, 'omnimux'), 'index.js')
       writeFileSync(source, 'module.exports = "newer-synced-content"\n')
-      const manifestBefore = readFileSync(join(first.profileDir, 'package.json'))
-      const sourceBefore = readFileSync(source)
+      const guard = join(managedSourcePath(first.profileDir, 'omnimux'), 'src', 'gate', 'guard.js')
+      writeFileSync(guard, 'export const newerSyncedGuard = true\n')
+      const preloader = join(root, 'clear-env.mjs')
+      writeFileSync(preloader, '')
+      await materializeProfile({
+        appExecutable: process.execPath,
+        clearEnvironmentPath: preloader,
+        pnpmBinPath: join(dirname(createRequire(import.meta.url).resolve('pnpm')), 'bin/pnpm.mjs'),
+        nodeBinDir: dirname(process.execPath),
+        nodeShimPath: process.execPath,
+        homeDir: home,
+        profileDir: first.profileDir,
+        electronVersion: '43.3.0',
+        updateLockfile: true,
+      })
+      completeOmnimuxProfileMaterialization(first.profileDir)
+      const installed = join(first.profileDir, 'node_modules', 'omnimux')
+      expect(readFileSync(join(installed, 'index.js'), 'utf8')).toContain('newer-synced-content')
+      const files = [
+        join(first.profileDir, 'package.json'),
+        join(first.profileDir, 'pnpm-lock.yaml'),
+        source,
+        guard,
+        join(installed, 'index.js'),
+        join(installed, 'src', 'gate', 'guard.js'),
+        join(installed, 'src', 'release-channel.json'),
+      ]
+      const before = files.map(path => readFileSync(path))
 
-      expect(seedOmnimuxProfile({ home, presetDir })).toMatchObject({ created: false, refreshedPlugins: false })
-      expect(readFileSync(join(first.profileDir, 'package.json'))).toEqual(manifestBefore)
-      expect(readFileSync(source)).toEqual(sourceBefore)
+      for (let startup = 0; startup < 3; startup++) {
+        expect(seedOmnimuxProfile({ home, presetDir })).toMatchObject({
+          created: false, refreshedPlugins: false, materializationRequired: false,
+        })
+        expect(files.map(path => readFileSync(path))).toEqual(before)
+      }
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
-  })
+  }, 30_000)
 
   it('rejects a legacy self-reference before repair writes', () => {
     const root = mkdtempSync(join(tmpdir(), 'omnimux-managed-legacy-'))

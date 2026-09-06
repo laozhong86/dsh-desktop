@@ -3,7 +3,7 @@
 import { spawnSync } from 'node:child_process'
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
-import { readdirSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { writeAppBuildInfo } from './build-info.mjs'
 
@@ -25,7 +25,13 @@ if (result.status !== 0) {
 }
 
 // Record build provenance so any agent can identify the source tree of this app.
-const appDir = join(packageRoot, 'dist', 'mac-arm64')
-for (const name of readdirSync(appDir)) {
-  if (name.endsWith('.app')) writeAppBuildInfo(join(appDir, name), 'package-dir')
+if (process.platform === 'darwin') {
+  const appDir = join(packageRoot, 'dist', process.arch === 'arm64' ? 'mac-arm64' : 'mac')
+  for (const name of readdirSync(appDir)) {
+    if (!name.endsWith('.app')) continue
+    const appPath = join(appDir, name)
+    const markerPath = join(appPath, 'Contents', 'Resources', 'app.asar.unpacked', 'preset', 'plugins', 'omnimux', 'src', 'release-channel.json')
+    const { channel } = JSON.parse(readFileSync(markerPath, 'utf8'))
+    writeAppBuildInfo(appPath, channel === 'development' ? 'package-dev' : 'package-dir')
+  }
 }

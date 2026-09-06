@@ -2,4 +2,3 @@
 patches/*.patch text eol=lf whitespace=-space-before-tab
 .yarn/patches/*.patch text eol=lf whitespace=-space-before-tab,-blank-at-eol
 _deprecated/**/*.patch text eol=lf whitespace=-space-before-tab,-blank-at-eol
-vendor/dsh-runtime/0.1.2-alpha.3/ui-commands-client-action.patch text eol=lf whitespace=-blank-at-eol,-blank-at-eof

@@ -20,6 +20,10 @@ const pluginPaths = [
 ]
 const mode = process.argv[2]
 
+if (mode !== '--write' && mode !== '--check') {
+  throw new Error('usage: node scripts/sync-vendored-runtime.mjs <--write|--check>')
+}
+
 const readJson = path => JSON.parse(readFileSync(path, 'utf8'))
 const writeJson = (path, value) => writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`)
 const sha256 = path => createHash('sha256').update(readFileSync(path)).digest('hex')
@@ -38,52 +42,6 @@ if (typeof version !== 'string' || !/^[0-9A-Za-z][0-9A-Za-z.-]*$/u.test(version)
 const vendorRelative = `vendor/dsh-runtime/${version}`
 const vendorDirectory = join(root, ...vendorRelative.split('/'))
 const manifestPath = join(vendorDirectory, 'manifest.json')
-const overlayPatchArtifact = 'ui-commands-client-action.patch'
-
-export function validateRuntimeProvenance(value) {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    fail('runtime provenance must be an object')
-  }
-  for (const field of ['repository', 'commit', 'patchPath', 'patchSha256', 'patchArtifact']) {
-    if (typeof value[field] !== 'string' || value[field].length === 0) {
-      fail(`runtime provenance is missing ${field}`)
-    }
-  }
-  if (!/^[0-9a-f]{40}$/iu.test(value.commit)) fail('runtime provenance commit must be a full SHA')
-  if (!/^[0-9a-f]{64}$/iu.test(value.patchSha256)) fail('runtime provenance patchSha256 must be a SHA256')
-  if (value.patchPath.startsWith('/') || value.patchPath.split('/').includes('..')) {
-    fail('runtime provenance patchPath must be repository-relative')
-  }
-  if (value.patchArtifact !== overlayPatchArtifact) fail(`runtime provenance patchArtifact must be ${overlayPatchArtifact}`)
-  return value
-}
-
-export function assertRuntimeProvenanceMatch(expected, actual) {
-  validateRuntimeProvenance(expected)
-  validateRuntimeProvenance(actual)
-  for (const field of ['repository', 'commit', 'patchPath', 'patchSha256', 'patchArtifact']) {
-    if (expected[field] !== actual[field]) fail(`runtime provenance ${field} differs from the persisted expectation`)
-  }
-}
-
-function readWriteProvenance() {
-  const raw = process.env.DSH_RUNTIME_PRODUCT_PROVENANCE
-  if (raw === undefined) fail('managed overlay write requires DSH_RUNTIME_PRODUCT_PROVENANCE')
-  try {
-    const product = validateRuntimeProvenance({ ...JSON.parse(raw), patchArtifact: overlayPatchArtifact })
-    const patchSource = process.env.DSH_RUNTIME_PRODUCT_PATCH_PATH
-    if (patchSource === undefined || !existsSync(patchSource)) {
-      fail('managed overlay write requires DSH_RUNTIME_PRODUCT_PATCH_PATH')
-    }
-    if (sha256(patchSource) !== product.patchSha256) {
-      fail('managed overlay patch bytes differ from DSH_RUNTIME_PRODUCT_PROVENANCE')
-    }
-    return { product, patchSource }
-  } catch (error) {
-    if (error instanceof Error && error.message.startsWith('sync-vendored-runtime:')) throw error
-    fail(`invalid DSH_RUNTIME_PRODUCT_PROVENANCE: ${error instanceof Error ? error.message : String(error)}`)
-  }
-}
 
 function packageName(filename) {
   const suffix = `-${version}.tgz`
@@ -105,10 +63,7 @@ function expectedResolution(entry) {
 }
 
 function writeVendor() {
-  const { product, patchSource } = readWriteProvenance()
-  const packedDirectory = process.env.DSH_PACKED_RUNTIME_DIR
-    ? resolve(process.env.DSH_PACKED_RUNTIME_DIR)
-    : join(root, 'deepseek-harness', 'dist', 'npm')
+  const packedDirectory = join(root, 'deepseek-harness', 'dist', 'npm')
   const orderPath = join(packedDirectory, 'publish-order.txt')
   if (!existsSync(orderPath)) {
     fail('upstream release tarballs are missing; run yarn upstream:prepare-runtime first')
@@ -119,7 +74,6 @@ function writeVendor() {
   }
 
   mkdirSync(vendorDirectory, { recursive: true })
-  copyFileSync(patchSource, join(vendorDirectory, overlayPatchArtifact))
   const packages = filenames.map((filename) => {
     if (basename(filename) !== filename) fail(`tarball path escapes its directory: ${JSON.stringify(filename)}`)
     const source = join(packedDirectory, filename)
@@ -137,7 +91,7 @@ function writeVendor() {
   const names = packages.map(entry => entry.name)
   if (new Set(names).size !== names.length) fail('two tarballs map to the same package name')
 
-  const expectedFiles = new Set([...filenames, 'manifest.json', overlayPatchArtifact])
+  const expectedFiles = new Set([...filenames, 'manifest.json'])
   for (const entry of readdirSync(vendorDirectory, { withFileTypes: true })) {
     if (expectedFiles.has(entry.name)) continue
     if (!entry.isFile()) fail(`unexpected directory in vendored runtime: ${entry.name}`)
@@ -145,22 +99,17 @@ function writeVendor() {
   }
 
   const manifest = {
-    formatVersion: 2,
+    formatVersion: 1,
     repository: upstream.repository,
     commit: upstream.commit,
     version,
     buildProfile: 'official',
-    provenance: {
-      upstream: { repository: upstream.repository, commit: upstream.commit },
-      product,
-    },
     packages,
   }
   writeJson(manifestPath, manifest)
 
   upstream.runtimePackageVersion = version
   upstream.runtimeSource = `${vendorRelative}/manifest.json`
-  upstream.runtimeOverlay = { product }
   writeJson(upstreamPath, upstream)
 
   const workspace = readJson(workspacePath)
@@ -185,7 +134,7 @@ function writeVendor() {
 function checkVendor() {
   if (!existsSync(manifestPath)) fail(`missing ${relative(root, manifestPath)}`)
   const manifest = readJson(manifestPath)
-  if (manifest.formatVersion !== 2) fail('unsupported vendored runtime manifest format')
+  if (manifest.formatVersion !== 1) fail('unsupported vendored runtime manifest format')
   for (const field of ['repository', 'commit']) {
     if (manifest[field] !== upstream[field]) fail(`manifest ${field} differs from upstream.json`)
   }
@@ -193,25 +142,6 @@ function checkVendor() {
     fail('source, runtime, and manifest versions must match')
   }
   if (manifest.buildProfile !== 'official') fail('vendored runtime must use the official client build profile')
-  if (manifest.provenance === null || typeof manifest.provenance !== 'object' || Array.isArray(manifest.provenance)) {
-    fail('vendored runtime manifest has no provenance')
-  }
-  const provenanceUpstream = manifest.provenance.upstream
-  if (provenanceUpstream === null || typeof provenanceUpstream !== 'object' || Array.isArray(provenanceUpstream)
-    || provenanceUpstream.repository !== upstream.repository || provenanceUpstream.commit !== upstream.commit) {
-    fail('vendored runtime provenance upstream differs from upstream.json')
-  }
-  if (upstream.runtimeOverlay === null || typeof upstream.runtimeOverlay !== 'object' || Array.isArray(upstream.runtimeOverlay)) {
-    fail('upstream.json has no persisted runtime overlay expectation')
-  }
-  assertRuntimeProvenanceMatch(upstream.runtimeOverlay.product, manifest.provenance.product)
-  const overlayPatchPath = join(vendorDirectory, manifest.provenance.product.patchArtifact)
-  if (!existsSync(overlayPatchPath) || !statSync(overlayPatchPath).isFile()) {
-    fail(`missing frozen overlay patch ${manifest.provenance.product.patchArtifact}`)
-  }
-  if (sha256(overlayPatchPath) !== manifest.provenance.product.patchSha256) {
-    fail('frozen overlay patch integrity differs from manifest provenance')
-  }
   if (upstream.runtimeSource !== `${vendorRelative}/manifest.json`) {
     fail('upstream.json points at the wrong runtime manifest')
   }
@@ -219,7 +149,7 @@ function checkVendor() {
 
   const workspace = readJson(workspacePath)
   const resolutions = workspace.resolutions ?? {}
-  const expectedFiles = new Set(['manifest.json', manifest.provenance.product.patchArtifact])
+  const expectedFiles = new Set(['manifest.json'])
   const names = new Set()
   for (const entry of manifest.packages) {
     if (entry.version !== version || packageName(entry.filename) !== entry.name || names.has(entry.name)) {
@@ -258,10 +188,5 @@ function checkVendor() {
   )
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === import.meta.filename) {
-  if (mode !== '--write' && mode !== '--check') {
-    throw new Error('usage: node scripts/sync-vendored-runtime.mjs <--write|--check>')
-  }
-  if (mode === '--write') writeVendor()
-  checkVendor()
-}
+if (mode === '--write') writeVendor()
+checkVendor()

@@ -912,7 +912,7 @@ virtualStoreDirMaxLength: 60
     expect(readFileSync(path, 'utf8')).toBe(content)
   })
 
-  it('keeps the Windows browse panel, official subprocess and presets, and desktop pwsh provider', () => {
+  it('keeps the official Windows directory picker, subprocess and presets, and desktop pwsh provider', () => {
     const home = temporaryHome()
     writeFileSync(join(home, 'cordis.patch.yml'), [
       '- id: pwsh-sandbox',
@@ -928,18 +928,10 @@ virtualStoreDirMaxLength: 60
 
     expect(picker).toEqual(expect.objectContaining({
       name: '@deepseek-ai/dsh-host-directory-picker-auto',
-      disabled: true,
     }))
-    expect(rows).toContainEqual(expect.objectContaining({
-      id: 'desktop-directory-picker-browse-host',
-      name: '@deepseek-ai/dsh-host-directory-picker-browse',
-    }))
-    expect(rows).toContainEqual(expect.objectContaining({
-      id: 'desktop-directory-picker-browse-surface',
-      name: '@deepseek-ai/dsh-client-ui-directory-picker-browse',
-    }))
-    expect(rows.map(row => row.name)).not.toContain('@deepseek-ai/dsh-host-directory-picker-native')
-    expect(rows.map(row => row.name)).not.toContain('@deepseek-ai/dsh-client-ui-directory-picker-native')
+    expect(picker?.disabled).toBeFalsy()
+    expect(rows.map(row => row.id)).not.toContain('desktop-directory-picker-browse-host')
+    expect(rows.map(row => row.id)).not.toContain('desktop-directory-picker-browse-surface')
     expect(rows.find(row => row.id === 'subprocess')).toEqual({
       id: 'subprocess',
       name: '@deepseek-ai/dsh-subprocess-local',

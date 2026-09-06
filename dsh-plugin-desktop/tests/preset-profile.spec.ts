@@ -1,25 +1,74 @@
 import { describe, expect, it } from 'vitest'
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir, homedir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { createRequire } from 'node:module'
 import { parseDocument } from 'yaml'
 import {
   completeOmnimuxProfileMaterialization,
   PROFILE_MATERIALIZATION_PENDING,
   resolveDesktopHarnessHome,
   resolveHarnessHome,
+  replaceManagedHub,
   seedOmnimuxProfile,
   seedOmnimuxSettings,
 } from '../src/preset-profile.ts'
 import { managedDependencySpec, managedSourcePath } from '../src/managed-profile.ts'
+import { materializeProfile } from '../src/profile-materializer.ts'
 
 function writeJson(path: string, value: unknown): void {
   writeFileSync(path, `${JSON.stringify(value, undefined, 2)}\n`)
 }
 
-function createPreset(root: string, complete = true): string {
+function readJson(path: string): unknown {
+  return JSON.parse(readFileSync(path, 'utf8')) as unknown
+}
+
+const LIFECYCLE = {
+  'omnimux-accounts': { stage: 'alpha', toolPrefixes: ['omnimux_accounts_'] },
+  'omnimux-publish': { stage: 'alpha', toolPrefixes: ['omnimux_publish_'] },
+  'omnimux-analytics': { stage: 'alpha', toolPrefixes: ['omnimux_analytics_'] },
+} as const
+
+describe('hub policy replacement recovery', () => {
+  for (const rollbackFails of [false, true]) {
+    it(`preserves the previous hub when publish fails and rollback ${rollbackFails ? 'fails' : 'succeeds'}`, () => {
+      const root = mkdtempSync(join(tmpdir(), 'omnimux-hub-recovery-'))
+      try {
+        const installed = join(root, 'managed', 'omnimux')
+        const staging = join(root, '.release-policy')
+        const candidate = join(staging, 'omnimux')
+        mkdirSync(installed, { recursive: true })
+        mkdirSync(candidate, { recursive: true })
+        writeFileSync(join(installed, 'previous'), 'recoverable')
+        let calls = 0
+        const rename: typeof renameSync = (from, to) => {
+          calls++
+          if (calls === 2 || (rollbackFails && calls === 3)) throw new Error('injected rename failure')
+          renameSync(from, to)
+        }
+        expect(() => replaceManagedHub(installed, candidate, rename)).toThrow(rollbackFails ? /previous hub retained at/ : /injected rename failure/)
+        rmSync(staging, { recursive: true, force: true })
+        const backups = readdirSync(join(root, 'managed')).filter(name => name.startsWith('.omnimux-previous-'))
+        if (rollbackFails) {
+          expect(backups).toHaveLength(1)
+          expect(readFileSync(join(root, 'managed', backups[0]!, 'omnimux', 'previous'), 'utf8')).toBe('recoverable')
+        } else {
+          expect(backups).toHaveLength(0)
+          expect(readFileSync(join(installed, 'previous'), 'utf8')).toBe('recoverable')
+        }
+      } finally { rmSync(root, { recursive: true, force: true }) }
+    })
+  }
+})
+
+function createPreset(root: string, complete = true, channel: 'production' | 'development' = 'development'): string {
   const preset = join(root, 'preset')
   const skeleton = join(preset, 'skeleton')
+  const alphaPackages = ['omnimux-accounts', 'omnimux-publish', 'omnimux-analytics']
+  const productPackages = channel === 'production'
+    ? ['omnimux-assets', 'omnimux-workflow']
+    : ['omnimux-accounts', 'omnimux-assets', 'omnimux-workflow', 'omnimux-publish', 'omnimux-analytics']
   mkdirSync(skeleton, { recursive: true })
   writeJson(join(skeleton, 'package.json'), {
     name: 'dsh-profile-omnimux',
@@ -29,15 +78,13 @@ function createPreset(root: string, complete = true): string {
       '@deepseek-ai/dsh-web-app',
       'dsh-better-sidebar',
       'omnimux',
-      'omnimux-accounts',
-      'omnimux-assets',
-      'omnimux-workflow',
+      ...productPackages,
     ] } },
   })
   writeFileSync(join(skeleton, 'cordis.patch.yml'), '[]\n')
   writeFileSync(join(skeleton, 'pnpm-workspace.yaml'), 'packages:\n  - .\nnodeLinker: hoisted\nautoInstallPeers: false\n')
   writeFileSync(join(preset, 'seed-version'), '5\n')
-  const packages = ['dsh-better-sidebar', 'omnimux', 'omnimux-accounts', 'omnimux-assets', 'omnimux-workflow']
+  const packages = ['dsh-better-sidebar', 'omnimux', ...productPackages]
   writeJson(join(preset, 'owned-packages.json'), packages)
   for (const name of packages) {
     if (!complete && name === 'omnimux-workflow') continue
@@ -45,6 +92,16 @@ function createPreset(root: string, complete = true): string {
     mkdirSync(directory, { recursive: true })
     writeJson(join(directory, 'package.json'), { name, version: '1.0.0', main: 'index.js' })
     writeFileSync(join(directory, 'index.js'), `module.exports = ${JSON.stringify(name)}\n`)
+  }
+  const hubSource = join(preset, 'plugins', 'omnimux', 'src')
+  mkdirSync(hubSource)
+  writeJson(join(hubSource, 'plugin-lifecycle.json'), LIFECYCLE)
+  writeJson(join(hubSource, 'release-channel.json'), { channel })
+  const gateSource = join(hubSource, 'gate')
+  mkdirSync(gateSource)
+  writeFileSync(join(gateSource, 'guard.js'), `export const fixtureChannel = ${JSON.stringify(channel)}\n`)
+  if (channel === 'production') {
+    for (const name of alphaPackages) rmSync(join(preset, 'plugins', name), { recursive: true, force: true })
   }
   return preset
 }
@@ -169,6 +226,130 @@ describe('seedOmnimuxProfile managed sources', () => {
       rmSync(root, { recursive: true, force: true })
     }
   })
+
+  it('creates a production Profile from the staged bundle set without Alpha packages', () => {
+    const root = mkdtempSync(join(tmpdir(), 'omnimux-managed-production-'))
+    try {
+      const presetDir = createPreset(root, true, 'production')
+      const home = join(root, 'home')
+      const result = seedOmnimuxProfile({ home, presetDir })
+      const manifest = JSON.parse(readFileSync(join(result.profileDir, 'package.json'), 'utf8')) as {
+        dependencies: Record<string, string>
+        dsh: { profile: { bundles: string[] } }
+      }
+
+      expect(manifest.dsh.profile.bundles).toEqual([
+        '@deepseek-ai/dsh-base',
+        '@deepseek-ai/dsh-web-app',
+        'dsh-better-sidebar',
+        'omnimux',
+        'omnimux-assets',
+        'omnimux-workflow',
+      ])
+      expect(Object.keys(manifest.dependencies)).toEqual(expect.arrayContaining([
+        'dsh-better-sidebar',
+        'omnimux',
+        'omnimux-assets',
+      ]))
+      expect(manifest.dependencies).not.toHaveProperty('omnimux-accounts')
+      expect(manifest.dependencies).toHaveProperty('omnimux-workflow')
+      expect(existsSync(managedSourcePath(result.profileDir, 'omnimux-accounts'))).toBe(false)
+      expect(existsSync(managedSourcePath(result.profileDir, 'omnimux-workflow'))).toBe(true)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects an empty packaged lifecycle registry before creating a Profile', () => {
+    const root = mkdtempSync(join(tmpdir(), 'omnimux-managed-empty-lifecycle-'))
+    try {
+      const presetDir = createPreset(root, true, 'production')
+      const home = join(root, 'home')
+      writeJson(join(presetDir, 'plugins', 'omnimux', 'src', 'plugin-lifecycle.json'), {})
+
+      expect(() => seedOmnimuxProfile({ home, presetDir }))
+        .toThrow('plugin lifecycle registry must contain at least one entry')
+      expect(existsSync(join(home, 'profiles', 'omnimux'))).toBe(false)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('removes Alpha and installs the production hub when an existing same-version Profile upgrades', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'omnimux-managed-alpha-upgrade-'))
+    try {
+      const developmentPreset = createPreset(join(root, 'development'))
+      const productionPreset = createPreset(join(root, 'production'), true, 'production')
+      const home = join(root, 'home')
+      const first = seedOmnimuxProfile({ home, presetDir: developmentPreset })
+      const preloader = join(root, 'clear-env.mjs')
+      writeFileSync(preloader, '')
+      const materializer = {
+        appExecutable: process.execPath,
+        clearEnvironmentPath: preloader,
+        pnpmBinPath: join(dirname(createRequire(import.meta.url).resolve('pnpm')), 'bin/pnpm.mjs'),
+        nodeBinDir: dirname(process.execPath),
+        nodeShimPath: process.execPath,
+        homeDir: home,
+        profileDir: first.profileDir,
+        electronVersion: '43.3.0',
+        updateLockfile: true,
+      }
+      await materializeProfile(materializer)
+      expect(readJson(join(first.profileDir, 'node_modules/omnimux/src/release-channel.json'))).toEqual({ channel: 'development' })
+      completeOmnimuxProfileMaterialization(first.profileDir)
+      for (const name of ['omnimux-accounts', 'omnimux-publish', 'omnimux-analytics']) {
+        const installed = join(first.profileDir, 'node_modules', name)
+        mkdirSync(installed, { recursive: true })
+        writeJson(join(installed, 'package.json'), { name, version: '1.0.0' })
+      }
+      const userPackage = join(first.profileDir, 'node_modules', 'user-package')
+      mkdirSync(userPackage, { recursive: true })
+      writeJson(join(userPackage, 'package.json'), { name: 'user-package', version: '1.0.0' })
+
+      const upgraded = seedOmnimuxProfile({ home, presetDir: productionPreset })
+      const manifest = JSON.parse(readFileSync(join(first.profileDir, 'package.json'), 'utf8')) as {
+        dependencies: Record<string, string>
+        dsh: { profile: { bundles: string[] } }
+      }
+
+      expect(upgraded).toMatchObject({ created: false, refreshedPlugins: true, materializationRequired: true })
+      expect(manifest.dsh.profile.bundles).not.toContain('omnimux-accounts')
+      expect(manifest.dsh.profile.bundles).not.toContain('omnimux-publish')
+      expect(manifest.dsh.profile.bundles).not.toContain('omnimux-analytics')
+      expect(manifest.dsh.profile.bundles).toContain('omnimux-workflow')
+      expect(manifest.dependencies).not.toHaveProperty('omnimux-accounts')
+      expect(manifest.dependencies).not.toHaveProperty('omnimux-publish')
+      expect(manifest.dependencies).not.toHaveProperty('omnimux-analytics')
+      expect(manifest.dependencies).toHaveProperty('omnimux-workflow')
+      expect(existsSync(managedSourcePath(first.profileDir, 'omnimux-accounts'))).toBe(false)
+      expect(existsSync(managedSourcePath(first.profileDir, 'omnimux-publish'))).toBe(false)
+      expect(existsSync(managedSourcePath(first.profileDir, 'omnimux-analytics'))).toBe(false)
+      expect(existsSync(managedSourcePath(first.profileDir, 'omnimux-workflow'))).toBe(true)
+      expect(existsSync(join(first.profileDir, 'node_modules', 'omnimux-accounts'))).toBe(false)
+      expect(existsSync(join(first.profileDir, 'node_modules', 'omnimux-publish'))).toBe(false)
+      expect(existsSync(join(first.profileDir, 'node_modules', 'omnimux-analytics'))).toBe(false)
+      expect(existsSync(userPackage)).toBe(true)
+      expect(readJson(join(managedSourcePath(first.profileDir, 'omnimux'), 'src', 'release-channel.json')))
+        .toEqual({ channel: 'production' })
+      expect(readFileSync(join(managedSourcePath(first.profileDir, 'omnimux'), 'src', 'gate', 'guard.js'), 'utf8'))
+        .toContain('production')
+
+      expect(seedOmnimuxProfile({ home, presetDir: productionPreset }))
+        .toMatchObject({ created: false, refreshedPlugins: false, materializationRequired: true })
+      await materializeProfile(materializer)
+      expect(readJson(join(first.profileDir, 'node_modules/omnimux/src/release-channel.json'))).toEqual({ channel: 'production' })
+      expect(readFileSync(join(first.profileDir, 'node_modules/omnimux/src/gate/guard.js'), 'utf8')).toContain('production')
+      for (const name of ['omnimux-accounts', 'omnimux-publish', 'omnimux-analytics']) {
+        expect(existsSync(join(first.profileDir, 'node_modules', name))).toBe(false)
+      }
+      completeOmnimuxProfileMaterialization(first.profileDir)
+      expect(seedOmnimuxProfile({ home, presetDir: productionPreset }))
+        .toMatchObject({ created: false, refreshedPlugins: false, materializationRequired: false })
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }, 30_000)
 
   it('keeps a failed first materialization retryable on the next startup', () => {
     const root = mkdtempSync(join(tmpdir(), 'omnimux-managed-retry-'))

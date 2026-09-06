@@ -38,7 +38,7 @@ vi.mock('../scripts/better-sidebar/build-patched-sidebar.ts', async () => {
     },
   }
 })
-import { publishCandidate, stagePresetProfile } from '../scripts/stage-preset-profile.ts'
+import { parseReleaseChannel, publishCandidate, stagePresetProfile } from '../scripts/stage-preset-profile.ts'
 import { listPackageNames } from '../src/preset-profile.ts'
 
 const PRODUCT_PLUGINS = [
@@ -54,6 +54,16 @@ const PRODUCT_PLUGINS = [
   'omnimux-analytics',
   'omnimux-publish',
 ] as const
+const ALPHA_PLUGINS = [
+  'omnimux-accounts',
+  'omnimux-publish',
+  'omnimux-analytics',
+] as const
+const LIFECYCLE = {
+  'omnimux-accounts': { stage: 'alpha', toolPrefixes: ['omnimux_accounts_'] },
+  'omnimux-publish': { stage: 'alpha', toolPrefixes: ['omnimux_publish_'] },
+  'omnimux-analytics': { stage: 'alpha', toolPrefixes: ['omnimux_analytics_'] },
+} as const
 
 describe('stagePresetProfile', () => {
   beforeEach(() => {
@@ -77,7 +87,8 @@ describe('stagePresetProfile', () => {
       createExistingPreset(presetDir)
       sidebarFixture.buildError = new Error('pinned patch does not apply')
 
-      expect(() => stagePresetProfile({ pluginsRoot, presetDir })).toThrowError('pinned patch does not apply')
+      expect(() => stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' }))
+        .toThrowError('pinned patch does not apply')
       expectExistingPreset(presetDir)
     } finally {
       rmSync(fixture, { recursive: true, force: true })
@@ -93,7 +104,7 @@ describe('stagePresetProfile', () => {
       createExistingPreset(presetDir)
       sidebarFixture.verifyError = new Error('staged sidebar differs from packed build')
 
-      expect(() => stagePresetProfile({ pluginsRoot, presetDir }))
+      expect(() => stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' }))
         .toThrowError('staged sidebar differs from packed build')
       expectExistingPreset(presetDir)
     } finally {
@@ -110,6 +121,7 @@ describe('stagePresetProfile', () => {
       const tokens = join(sourceRoot, 'shared packages', 'tokens package')
       const sidebar = join(sourceRoot, 'sidebar package')
       const presetDir = join(fixture, 'target preset with spaces')
+      createPresetSkeleton(presetDir)
       createPackage(requiredLeaf, '@fixture/required-leaf')
       createPackage(tokens, '@fixture/tokens')
       createPackage(uiKit, '@fixture/ui-kit', {
@@ -143,7 +155,7 @@ describe('stagePresetProfile', () => {
       )
 
       sidebarFixture.path = sidebar
-      expect(stagePresetProfile({ pluginsRoot, presetDir })).toBe(15)
+      expect(stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' })).toBe(15)
 
       rmSync(sourceRoot, { recursive: true, force: true })
       const movedPresetDir = join(fixture, 'moved preset with spaces')
@@ -213,7 +225,7 @@ describe('stagePresetProfile', () => {
       let failure: unknown
       try {
         sidebarFixture.path = join(fixture, 'missing sidebar package')
-        stagePresetProfile({ pluginsRoot, presetDir })
+        stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' })
       } catch (error) {
         failure = error
       }
@@ -239,7 +251,7 @@ describe('stagePresetProfile', () => {
       })
       createExistingPreset(presetDir)
 
-      expect(() => stagePresetProfile({ pluginsRoot, presetDir }))
+      expect(() => stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' }))
         .toThrowError(/local dependency "missing-local" is missing package\.json/)
       expectExistingPreset(presetDir)
     } finally {
@@ -262,6 +274,7 @@ describe('stagePresetProfile', () => {
       expect(() => stagePresetProfile({
         pluginsRoot,
         presetDir: join(fixture, 'target preset'),
+        releaseChannel: 'development',
       })).toThrowError(/local package "shared-local" resolves to conflicting sources/)
     } finally {
       rmSync(fixture, { recursive: true, force: true })
@@ -276,6 +289,7 @@ describe('stagePresetProfile', () => {
       const excluded = join(sourceRoot, 'shared packages', 'excluded package')
       const sidebar = join(sourceRoot, 'sidebar package')
       const presetDir = join(fixture, 'target preset')
+      createPresetSkeleton(presetDir)
       createPackage(excluded, '@fixture/excluded', {
         os: ['definitely-not-a-node-platform'],
       })
@@ -289,7 +303,7 @@ describe('stagePresetProfile', () => {
       })
 
       sidebarFixture.path = sidebar
-      expect(stagePresetProfile({ pluginsRoot, presetDir })).toBe(12)
+      expect(stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' })).toBe(12)
       expect(listPackageNames(join(presetDir, 'plugins'))).not.toContain('@fixture/excluded')
       expect(readJson(join(presetDir, 'owned-packages.json'))).not.toContain('@fixture/excluded')
     } finally {
@@ -314,7 +328,7 @@ describe('stagePresetProfile', () => {
       })
       createExistingPreset(presetDir)
 
-      expect(() => stagePresetProfile({ pluginsRoot, presetDir }))
+      expect(() => stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' }))
         .toThrowError(/local package "dsh-better-sidebar".+conflicts with explicit staging dependency/)
       expectExistingPreset(presetDir)
     } finally {
@@ -322,13 +336,14 @@ describe('stagePresetProfile', () => {
     }
   })
 
-  it('restores plugins, owned packages, and seed version when publishing fails', () => {
+  it('restores plugins, skeleton, owned packages, and seed version when publishing fails', () => {
     const fixture = mkdtempSync(join(tmpdir(), 'omnimux publish rollback '))
     try {
       const presetDir = join(fixture, 'preset')
       const candidateDir = join(fixture, 'candidate')
       createExistingPreset(presetDir)
       createPackage(join(candidateDir, 'plugins', 'new-valid'), 'new-valid')
+      createPresetSkeleton(candidateDir)
       writeFileSync(join(candidateDir, 'owned-packages.json'), '["new-valid"]\n')
       writeFileSync(join(candidateDir, 'seed-version'), '8\n')
       let renameCount = 0
@@ -346,6 +361,126 @@ describe('stagePresetProfile', () => {
       rmSync(fixture, { recursive: true, force: true })
     }
   })
+
+  it('defaults to a production preset that excludes every lifecycle Alpha plugin', () => {
+    const fixture = mkdtempSync(join(tmpdir(), 'omnimux production stage '))
+    try {
+      const pluginsRoot = join(fixture, 'product plugins')
+      const presetDir = join(fixture, 'preset')
+      createProductPlugins(pluginsRoot)
+      createPresetSkeleton(presetDir)
+
+      expect(stagePresetProfile({ pluginsRoot, presetDir })).toBe(9)
+
+      const output = join(presetDir, 'plugins')
+      const owned = readJson(join(presetDir, 'owned-packages.json')) as unknown as string[]
+      const skeleton = readJson(join(presetDir, 'skeleton', 'package.json'))
+      for (const name of ALPHA_PLUGINS) {
+        expect(existsSync(join(output, name))).toBe(false)
+        expect(owned).not.toContain(name)
+        expect(skeleton.dsh.profile.bundles).not.toContain(name)
+      }
+      expect(readJson(join(output, 'omnimux', 'src', 'release-channel.json'))).toEqual({
+        channel: 'production',
+      })
+      expect(skeleton.dsh.profile.bundles).toEqual([
+        '@deepseek-ai/dsh-base',
+        '@deepseek-ai/dsh-web-app',
+        'dsh-better-sidebar',
+        'omnimux',
+        'omnimux-assets',
+        'omnimux-workflow',
+      ])
+    } finally {
+      rmSync(fixture, { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  it('keeps every lifecycle Alpha plugin only for an explicit development stage', () => {
+    const fixture = mkdtempSync(join(tmpdir(), 'omnimux development stage '))
+    try {
+      const pluginsRoot = join(fixture, 'product plugins')
+      const presetDir = join(fixture, 'preset')
+      createProductPlugins(pluginsRoot)
+      createPresetSkeleton(presetDir)
+
+      expect(stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' })).toBe(12)
+
+      const output = join(presetDir, 'plugins')
+      const owned = readJson(join(presetDir, 'owned-packages.json')) as unknown as string[]
+      const skeleton = readJson(join(presetDir, 'skeleton', 'package.json'))
+      for (const name of ALPHA_PLUGINS) {
+        expect(existsSync(join(output, name, 'package.json'))).toBe(true)
+        expect(owned).toContain(name)
+        expect(skeleton.dsh.profile.bundles).toContain(name)
+      }
+      expect(readJson(join(output, 'omnimux', 'src', 'release-channel.json'))).toEqual({
+        channel: 'development',
+      })
+    } finally {
+      rmSync(fixture, { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  it.each([
+    ['missing lifecycle registry', (pluginsRoot: string) => rmSync(
+      join(pluginsRoot, 'omnimux', 'src', 'plugin-lifecycle.json'),
+    )],
+    ['invalid lifecycle registry', (pluginsRoot: string) => writeFileSync(
+      join(pluginsRoot, 'omnimux', 'src', 'plugin-lifecycle.json'),
+      '{"omnimux-accounts":{"stage":"stable","toolPrefixes":[]}}\n',
+    )],
+    ['empty lifecycle registry', (pluginsRoot: string) => writeFileSync(
+      join(pluginsRoot, 'omnimux', 'src', 'plugin-lifecycle.json'),
+      '{}\n',
+    )],
+    ['missing release marker', (pluginsRoot: string) => rmSync(
+      join(pluginsRoot, 'omnimux', 'src', 'release-channel.json'),
+    )],
+    ['invalid release marker', (pluginsRoot: string) => writeFileSync(
+      join(pluginsRoot, 'omnimux', 'src', 'release-channel.json'),
+      '{"channel":"preview"}\n',
+    )],
+  ])('preserves an existing preset for a %s', (_label, mutate) => {
+    const fixture = mkdtempSync(join(tmpdir(), 'omnimux invalid release policy '))
+    try {
+      const pluginsRoot = join(fixture, 'product plugins')
+      const presetDir = join(fixture, 'existing preset')
+      createProductPlugins(pluginsRoot)
+      createExistingPreset(presetDir)
+      mutate(pluginsRoot)
+
+      expect(() => stagePresetProfile({ pluginsRoot, presetDir })).toThrow()
+      expectExistingPreset(presetDir)
+    } finally {
+      rmSync(fixture, { recursive: true, force: true })
+    }
+  })
+
+  it('fails production staging when a retained package depends on an Alpha plugin', () => {
+    const fixture = mkdtempSync(join(tmpdir(), 'omnimux alpha dependency '))
+    try {
+      const pluginsRoot = join(fixture, 'product plugins')
+      const presetDir = join(fixture, 'existing preset')
+      createProductPlugins(pluginsRoot, {
+        'omnimux-assets': { dependencies: { 'omnimux-publish': 'file:../omnimux-publish' } },
+      })
+      createExistingPreset(presetDir)
+
+      expect(() => stagePresetProfile({ pluginsRoot, presetDir }))
+        .toThrowError('production plugin "omnimux-assets" depends on Alpha plugin "omnimux-publish"')
+      expectExistingPreset(presetDir)
+    } finally {
+      rmSync(fixture, { recursive: true, force: true })
+    }
+  })
+
+  it('requires an explicit valid development channel argument', () => {
+    expect(parseReleaseChannel([])).toBe('production')
+    expect(parseReleaseChannel(['--channel', 'development'])).toBe('development')
+    expect(() => parseReleaseChannel(['development'])).toThrow('usage:')
+    expect(() => parseReleaseChannel(['--channel', 'preview'])).toThrow('usage:')
+  })
 })
 
 interface PackageManifestExtras {
@@ -359,6 +494,10 @@ function createProductPlugins(
   extras: Partial<Record<(typeof PRODUCT_PLUGINS)[number], PackageManifestExtras>> = {},
 ): void {
   for (const name of PRODUCT_PLUGINS) createPackage(join(pluginsRoot, name), name, extras[name])
+  const hubSource = join(pluginsRoot, 'omnimux', 'src')
+  mkdirSync(hubSource)
+  writeFileSync(join(hubSource, 'plugin-lifecycle.json'), `${JSON.stringify(LIFECYCLE, undefined, 2)}\n`)
+  writeFileSync(join(hubSource, 'release-channel.json'), '{\n  "channel": "development"\n}\n')
 }
 
 function createPackage(root: string, name: string, extras: PackageManifestExtras = {}): void {
@@ -374,8 +513,30 @@ function createPackage(root: string, name: string, extras: PackageManifestExtras
 
 function createExistingPreset(presetDir: string): void {
   createPackage(join(presetDir, 'plugins', 'existing-valid'), 'existing-valid')
+  createPresetSkeleton(presetDir)
   writeFileSync(join(presetDir, 'owned-packages.json'), '["existing-valid"]\n')
   writeFileSync(join(presetDir, 'seed-version'), '7\n')
+}
+
+function createPresetSkeleton(presetDir: string): void {
+  const skeleton = join(presetDir, 'skeleton')
+  mkdirSync(skeleton, { recursive: true })
+  writeFileSync(join(skeleton, 'package.json'), `${JSON.stringify({
+    name: 'dsh-profile-omnimux',
+    private: true,
+    dependencies: {},
+    dsh: { profile: { bundles: [
+      '@deepseek-ai/dsh-base',
+      '@deepseek-ai/dsh-web-app',
+      'dsh-better-sidebar',
+      'omnimux',
+      'omnimux-accounts',
+      'omnimux-assets',
+      'omnimux-workflow',
+    ] } },
+  }, undefined, 2)}\n`)
+  writeFileSync(join(skeleton, 'cordis.patch.yml'), '[]\n')
+  writeFileSync(join(skeleton, 'pnpm-workspace.yaml'), 'packages:\n  - .\n')
 }
 
 function expectExistingPreset(presetDir: string): void {

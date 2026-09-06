@@ -26,14 +26,6 @@ import {
 const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const defaultPresetDir = join(desktopRoot, 'preset')
 const defaultPluginsDir = join(defaultPresetDir, 'plugins')
-
-/**
- * Product-tree plugins staged into the preset. The profile stays on `link:`
- * during development; packaging reads the same source trees (the link
- * targets) and materializes offline copies here — one structure, no
- * switching. The source root is required via OMNIMUX_PLUGINS_DIR so the
- * desktop deploy root never embeds a host machine's absolute path.
- */
 const PRODUCT_PLUGINS = [
   'omnimux',
   'omnimux-accounts',
@@ -47,15 +39,37 @@ const PRODUCT_PLUGINS = [
   'omnimux-analytics',
   'omnimux-publish',
 ] as const
-const REQUIRED_PACKAGES = [...PRODUCT_PLUGINS, 'dsh-better-sidebar']
+const CORE_REQUIRED_BUNDLES = [
+  '@deepseek-ai/dsh-base',
+  '@deepseek-ai/dsh-web-app',
+  'dsh-better-sidebar',
+  'omnimux',
+] as const
+const RELEASE_CHANNELS = ['production', 'development'] as const
+type ReleaseChannel = (typeof RELEASE_CHANNELS)[number]
+
+/**
+ * Product-tree plugins staged into the preset. The profile stays on `link:`
+ * during development; packaging reads the same source trees (the link
+ * targets) and materializes offline copies here — one structure, no
+ * switching. The source root is required via OMNIMUX_PLUGINS_DIR so the
+ * desktop deploy root never embeds a host machine's absolute path.
+ */
 interface Manifest {
   name?: string
   dependencies?: Record<string, string>
   optionalDependencies?: Record<string, string>
+  devDependencies?: Record<string, string>
+  dsh?: { profile?: { bundles?: string[] } }
+}
+interface LifecycleEntry {
+  readonly stage: 'alpha'
+  readonly toolPrefixes: readonly string[]
 }
 export interface StagePresetProfileOptions {
   readonly pluginsRoot?: string
   readonly presetDir?: string
+  readonly releaseChannel?: ReleaseChannel
 }
 
 /**
@@ -66,18 +80,25 @@ export function stagePresetProfile(options: StagePresetProfileOptions = {}): num
   if (process.env.DSH_BETTER_SIDEBAR_SPEC !== undefined) {
     throw new Error('DSH_BETTER_SIDEBAR_SPEC is no longer supported; the sidebar source and patch are repository-pinned')
   }
+  const releaseChannel = options.releaseChannel ?? 'production'
+  if (!RELEASE_CHANNELS.includes(releaseChannel)) {
+    throw new Error(`release channel must be production or development: ${JSON.stringify(releaseChannel)}`)
+  }
   const targetPresetDir = resolve(options.presetDir ?? defaultPresetDir)
-  mkdirSync(targetPresetDir, { recursive: true })
   const pluginsRoot = options.pluginsRoot ?? process.env.OMNIMUX_PLUGINS_DIR
   if (pluginsRoot === undefined || pluginsRoot === '') {
     throw new Error('OMNIMUX_PLUGINS_DIR is required (absolute path to the omnimux-dsh product-tree plugins directory)')
   }
   const resolvedPluginsRoot = resolve(pluginsRoot)
-  for (const name of PRODUCT_PLUGINS) {
-    if (!existsSync(join(resolvedPluginsRoot, name, 'package.json'))) {
-      throw new Error(`product plugin source is missing: ${join(resolvedPluginsRoot, name)} (set OMNIMUX_PLUGINS_DIR)`)
-    }
+  const lifecycle = readLifecycleRegistry(resolvedPluginsRoot)
+  readSourceReleaseChannel(resolvedPluginsRoot)
+  const alphaPlugins = new Set(Object.keys(lifecycle))
+  const productPlugins: readonly string[] = PRODUCT_PLUGINS.filter(name => releaseChannel === 'development' || !alphaPlugins.has(name))
+  for (const name of alphaPlugins) {
+    if (!(PRODUCT_PLUGINS as readonly string[]).includes(name)) throw new Error(`unknown lifecycle plugin: ${name}`)
   }
+  for (const name of PRODUCT_PLUGINS) assertProductPluginSource(resolvedPluginsRoot, name)
+  mkdirSync(targetPresetDir, { recursive: true })
   // Keep every local file: spec on one canonical path namespace. macOS may
   // expose the same temporary directory as both /var and /private/var;
   // mixing those spellings makes pnpm resolve a valid tarball as /private/private/var.
@@ -91,19 +112,28 @@ export function stagePresetProfile(options: StagePresetProfileOptions = {}): num
     const optionalDependencies: Record<string, string> = {}
     const stagedPackagesRoot = join(staging, 'packages')
     const packages = new Map<string, { source: string; destination: string }>()
-    for (const name of PRODUCT_PLUGINS) {
+    for (const name of productPlugins) {
       const source = realpathSync(join(resolvedPluginsRoot, name))
       const destination = join(stagedPackagesRoot, ...packageDirSegments(name))
       registerPackage(packages, name, source, destination)
     }
     const copied = new Set<string>()
-    for (const name of PRODUCT_PLUGINS) {
+    for (const name of productPlugins) {
       const entry = packages.get(name)!
-      copyPackageClosure(name, entry.source, entry.destination, stagedPackagesRoot, packages, copied)
+      copyPackageClosure(
+        name,
+        entry.source,
+        entry.destination,
+        stagedPackagesRoot,
+        packages,
+        copied,
+        releaseChannel === 'production' ? alphaPlugins : new Set(),
+      )
       dependencies[name] = toFileSpec(staging, entry.destination)
     }
+    writeReleaseChannel(join(stagedPackagesRoot, 'omnimux'), releaseChannel)
     for (const [name, entry] of packages) {
-      if ((PRODUCT_PLUGINS as readonly string[]).includes(name)) continue
+      if (productPlugins.includes(name)) continue
       if (Object.hasOwn(dependencies, name)) {
         throw new Error(
           `local package ${JSON.stringify(name)} from ${entry.source} conflicts with explicit staging dependency ${JSON.stringify(dependencies[name])}`,
@@ -118,18 +148,22 @@ export function stagePresetProfile(options: StagePresetProfileOptions = {}): num
     }, undefined, 2)}\n`)
     writeFileSync(join(staging, 'pnpm-workspace.yaml'), `packages:\n  - .\n\nnodeLinker: hoisted\nautoInstallPeers: false\n`)
     installStaging(staging)
+    assertNoAlphaPackages(join(staging, 'node_modules'), alphaPlugins, releaseChannel)
 
     candidateDir = mkdtempSync(join(targetPresetDir, '.preset-stage-'))
     const candidatePluginsDir = join(candidateDir, 'plugins')
     mkdirSync(candidatePluginsDir)
     copyHoistedModules(join(staging, 'node_modules'), candidatePluginsDir)
     const owned = listPackageNames(candidatePluginsDir)
-    for (const required of REQUIRED_PACKAGES) {
+    for (const required of [...productPlugins, 'dsh-better-sidebar']) {
       if (!owned.includes(required)) {
         throw new Error(`staged preset is missing required plugin ${required}: ${owned.join(', ')}`)
       }
     }
+    assertNoAlphaPackages(candidatePluginsDir, alphaPlugins, releaseChannel)
+    assertReleaseChannel(candidatePluginsDir, releaseChannel)
     verifyInstalledBetterSidebar(join(candidatePluginsDir, 'dsh-better-sidebar'), sidebar.packedRoot)
+    stageSkeleton(targetPresetDir, candidateDir, alphaPlugins, releaseChannel)
     writeFileSync(join(candidateDir, 'owned-packages.json'), `${JSON.stringify(owned, undefined, 2)}\n`)
     const seedVersionPath = join(targetPresetDir, 'seed-version')
     writeFileSync(
@@ -166,6 +200,7 @@ function copyPackageClosure(
   stagedPackagesRoot: string,
   packages: Map<string, { source: string; destination: string }>,
   copied: Set<string>,
+  excludedPackages: ReadonlySet<string>,
 ): void {
   if (copied.has(name)) return
   copied.add(name)
@@ -179,6 +214,9 @@ function copyPackageClosure(
     if (dependencyMap === undefined) continue
     for (const [dependencyName, spec] of Object.entries(dependencyMap)) {
       if (field === 'dependencies' && optionalDependencies.has(dependencyName)) continue
+      if (excludedPackages.has(dependencyName)) {
+        throw new Error(`production plugin ${JSON.stringify(name)} depends on Alpha plugin ${JSON.stringify(dependencyName)}`)
+      }
       if (!spec.startsWith('file:')) continue
       const sourcePath = spec.slice('file:'.length)
       if (sourcePath === '') {
@@ -199,6 +237,7 @@ function copyPackageClosure(
         stagedPackagesRoot,
         packages,
         copied,
+        excludedPackages,
       )
       dependencyMap[dependencyName] = toFileSpec(destination, entry.destination)
       changed = true
@@ -213,6 +252,142 @@ function readManifest(path: string): Manifest {
   } catch (error) {
     throw new Error(`cannot read package manifest ${path}: ${String(error)}`)
   }
+}
+
+function readLifecycleRegistry(pluginsRoot: string): Readonly<Record<string, LifecycleEntry>> {
+  const path = join(pluginsRoot, 'omnimux', 'src', 'plugin-lifecycle.json')
+  let value: unknown
+  try {
+    value = JSON.parse(readFileSync(path, 'utf8'))
+  } catch (error) {
+    throw new Error(`plugin lifecycle registry is unreadable (${path}): ${String(error)}`)
+  }
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error(`plugin lifecycle registry must be an object: ${path}`)
+  }
+  if (Object.keys(value).length === 0) {
+    throw new Error(`plugin lifecycle registry must contain at least one entry: ${path}`)
+  }
+  for (const [pluginId, entry] of Object.entries(value)) {
+    packageDirSegments(pluginId)
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      throw new Error(`invalid lifecycle entry: ${pluginId}`)
+    }
+    const candidate = entry as Partial<LifecycleEntry>
+    if (candidate.stage !== 'alpha' || !Array.isArray(candidate.toolPrefixes)) {
+      throw new Error(`invalid lifecycle entry: ${pluginId}`)
+    }
+    if (candidate.toolPrefixes.some(prefix => typeof prefix !== 'string' || prefix.length === 0)) {
+      throw new Error(`invalid lifecycle tool prefix: ${pluginId}`)
+    }
+  }
+  return value as Record<string, LifecycleEntry>
+}
+
+function readSourceReleaseChannel(pluginsRoot: string): void {
+  const path = join(pluginsRoot, 'omnimux', 'src', 'release-channel.json')
+  const channel = readReleaseChannel(path)
+  if (channel !== 'development') {
+    throw new Error(`product source release channel must be development: ${path}`)
+  }
+}
+
+function readReleaseChannel(path: string): ReleaseChannel {
+  let value: unknown
+  try {
+    value = JSON.parse(readFileSync(path, 'utf8'))
+  } catch (error) {
+    throw new Error(`release channel marker is unreadable (${path}): ${String(error)}`)
+  }
+  const channel = typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as { channel?: unknown }).channel
+    : undefined
+  if (channel !== 'production' && channel !== 'development') {
+    throw new Error(`release channel marker is invalid (${path}): ${JSON.stringify(channel)}`)
+  }
+  return channel
+}
+
+function assertProductPluginSource(pluginsRoot: string, name: string): void {
+  const path = join(pluginsRoot, ...packageDirSegments(name), 'package.json')
+  if (!existsSync(path)) {
+    throw new Error(`product plugin source is missing: ${dirname(path)} (set OMNIMUX_PLUGINS_DIR)`)
+  }
+  const manifest = readManifest(path)
+  if (manifest.name !== name) {
+    throw new Error(`product plugin source ${path} declares name ${JSON.stringify(manifest.name)}, expected ${JSON.stringify(name)}`)
+  }
+}
+
+function writeReleaseChannel(hubRoot: string, releaseChannel: ReleaseChannel): void {
+  writeFileSync(
+    join(hubRoot, 'src', 'release-channel.json'),
+    `${JSON.stringify({ channel: releaseChannel }, undefined, 2)}\n`,
+  )
+}
+
+function assertReleaseChannel(pluginsDir: string, releaseChannel: ReleaseChannel): void {
+  const path = join(pluginsDir, 'omnimux', 'src', 'release-channel.json')
+  if (readReleaseChannel(path) !== releaseChannel) {
+    throw new Error(`staged hub release channel does not match ${releaseChannel}: ${path}`)
+  }
+}
+
+function assertNoAlphaPackages(
+  pluginsDir: string,
+  alphaPlugins: ReadonlySet<string>,
+  releaseChannel: ReleaseChannel,
+): void {
+  if (releaseChannel !== 'production') return
+  const found = listPackageNames(pluginsDir).filter(name => alphaPlugins.has(name))
+  if (found.length > 0) {
+    throw new Error(`production preset contains Alpha packages: ${found.join(', ')}`)
+  }
+}
+
+function stageSkeleton(
+  targetPresetDir: string,
+  candidateDir: string,
+  alphaPlugins: ReadonlySet<string>,
+  releaseChannel: ReleaseChannel,
+): void {
+  const source = join(targetPresetDir, 'skeleton')
+  const destination = join(candidateDir, 'skeleton')
+  if (!existsSync(join(source, 'package.json'))) {
+    throw new Error(`desktop preset skeleton package.json is missing: ${join(source, 'package.json')}`)
+  }
+  cpSync(source, destination, { recursive: true, dereference: true })
+  const manifestPath = join(destination, 'package.json')
+  const manifest = readManifest(manifestPath)
+  const currentBundles = manifest.dsh?.profile?.bundles
+  if (!Array.isArray(currentBundles) || currentBundles.some(name => typeof name !== 'string' || name === '')) {
+    throw new Error(`desktop preset skeleton bundles are invalid: ${manifestPath}`)
+  }
+  const bundles = currentBundles.filter(name => !alphaPlugins.has(name))
+  if (releaseChannel === 'development') {
+    for (const name of alphaPlugins) if (!bundles.includes(name)) bundles.push(name)
+  }
+  const missingCore = CORE_REQUIRED_BUNDLES.filter(name => !bundles.includes(name))
+  if (missingCore.length > 0) {
+    throw new Error(`desktop preset skeleton is missing mandatory bundles: ${missingCore.join(', ')}`)
+  }
+  const stripAlpha = (dependencies: Record<string, string> | undefined): Record<string, string> | undefined => {
+    if (dependencies === undefined || releaseChannel === 'development') return dependencies
+    return Object.fromEntries(Object.entries(dependencies).filter(([name]) => !alphaPlugins.has(name)))
+  }
+  writeFileSync(manifestPath, `${JSON.stringify({
+    ...manifest,
+    dependencies: stripAlpha(manifest.dependencies),
+    optionalDependencies: stripAlpha(manifest.optionalDependencies),
+    devDependencies: stripAlpha(manifest.devDependencies),
+    dsh: {
+      ...manifest.dsh,
+      profile: {
+        ...manifest.dsh?.profile,
+        bundles,
+      },
+    },
+  }, undefined, 2)}\n`)
 }
 
 function toFileSpec(fromPackageDir: string, targetPackageDir: string): string {
@@ -293,7 +468,7 @@ export function publishCandidate(
   targetPresetDir: string,
   rename: typeof renameSync = renameSync,
 ): void {
-  const entries = ['plugins', 'owned-packages.json', 'seed-version'] as const
+  const entries = ['plugins', 'skeleton', 'owned-packages.json', 'seed-version'] as const
   const backupRoot = mkdtempSync(join(targetPresetDir, '.preset-backup-'))
   const backedUp: string[] = []
   const published: string[] = []
@@ -344,8 +519,16 @@ export function publishCandidate(
   }
 }
 function main(): void {
-  const count = stagePresetProfile()
+  const count = stagePresetProfile({ releaseChannel: parseReleaseChannel(process.argv.slice(2)) })
   process.stdout.write(`staged ${String(count)} preset packages into ${defaultPluginsDir}\n`)
+}
+
+export function parseReleaseChannel(args: readonly string[]): ReleaseChannel {
+  if (args.length === 0) return 'production'
+  if (args.length === 2 && args[0] === '--channel' && RELEASE_CHANNELS.includes(args[1] as ReleaseChannel)) {
+    return args[1] as ReleaseChannel
+  }
+  throw new Error('usage: stage-preset-profile.ts [--channel production|development]')
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main()

@@ -17,9 +17,15 @@ import { join, relative, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const desktopRoot = resolve(fileURLToPath(new URL('../../..', import.meta.url)))
-const patchPath = join(desktopRoot, 'patches/dsh-better-sidebar/0.14.0/omnimux.patch')
 const builderPath = join(desktopRoot, 'dsh-plugin-desktop/scripts/better-sidebar/build-patched-sidebar.ts')
 const stagePath = join(desktopRoot, 'dsh-plugin-desktop/scripts/stage-preset-profile.ts')
+const {
+  buildPatchedBetterSidebar,
+  verifyInstalledBetterSidebar,
+  BETTER_SIDEBAR_COMMIT,
+  BETTER_SIDEBAR_VERSION,
+} = await import(pathToFileURL(builderPath).href)
+const patchPath = join(desktopRoot, 'patches/dsh-better-sidebar', BETTER_SIDEBAR_VERSION, 'omnimux.patch')
 const workRoot = mkdtempSync(join(tmpdir(), 'better-sidebar-pipeline-'))
 const reportPath = process.env.SIDEBAR_PIPELINE_REPORT ?? join(workRoot, 'report.json')
 
@@ -58,7 +64,6 @@ function expectFailure(action, text) {
   throw new Error(`expected failure containing ${text}`)
 }
 
-const { buildPatchedBetterSidebar, verifyInstalledBetterSidebar, BETTER_SIDEBAR_COMMIT } = await import(pathToFileURL(builderPath).href)
 const { stagePresetProfile } = await import(pathToFileURL(stagePath).href)
 const first = buildPatchedBetterSidebar(join(workRoot, 'first'))
 const firstHashes = hashes(first.packedRoot)
@@ -102,9 +107,9 @@ run('git', ['apply', '--check', patchPath], patchProbe)
 const changedSource = join(workRoot, 'changed-source')
 cpSync(patchProbe, changedSource, { recursive: true, dereference: true })
 writeFileSync(
-  join(changedSource, 'src/client/Sidebar.tsx'),
-  readFileSync(join(changedSource, 'src/client/Sidebar.tsx'), 'utf8')
-    .replace("document.documentElement.style.removeProperty('--dsh-sidebar-width')", "document.documentElement.style.removeProperty('--dsh-sidebar-width-mutated')"),
+  join(changedSource, 'package.json'),
+  readFileSync(join(changedSource, 'package.json'), 'utf8')
+    .replace('"cordis.patch.yml"', '"cordis.patch.yml.mutated"'),
 )
 expectFailure(() => run('git', ['apply', '--check', patchPath], changedSource), 'patch failed')
 run('git', ['apply', patchPath], patchProbe)

@@ -4,6 +4,30 @@
 
 ---
 
+## 2026-09-06 · pin runtime 0.1.2-rc.1（a66e470204，跟随侧边栏 0.18.0 升级）
+
+- **范围**：submodule `a66e4702047846cdaa10c66c9d3df3951f5ea70d`（`dsh-v0.1.2-rc.1`）；vendor `vendor/dsh-runtime/0.1.2-rc.1`（242 tarball，official profile）；`upstream.json` 更新指向 rc.1；desktop/market `@deepseek-ai/dsh*` → `0.1.2-rc.1`。
+- **补丁**（全套 rc.1 官方产物检出与适配）：
+  - 检出上游现成补丁集合：`dsh@0.1.2-rc.1.patch`、`dsh-app-boot@0.1.2-rc.1.patch`、`dsh-client-ui-directory-picker-browse@0.1.2-rc.1.patch`、`dsh-client-ui-primitives@0.1.2-rc.1.patch`、`dsh-client-ui-settings-general@0.1.2-rc.1.patch`、`dsh-host-directory-picker-browse@0.1.2-rc.1.patch`、`dsh-settings@0.1.2-rc.1.patch`、`dsh-subprocess-local@0.1.2-rc.1.patch`、`dsh-web-app@0.1.2-rc.1.patch`、`dsh-win32-process@0.1.2-rc.1.patch`。
+  - 清理已失效的 `vendor/dsh-runtime/0.1.2-alpha.3` 与旧补丁 `patches/*@0.1.2-alpha.3.patch`（完好保留 `patches/dsh-better-sidebar/` 与 non-alpha.3 补丁）。
+- **B 级模板与品牌锁定**：
+  - 严格保持 OmniMux 桌面 App 品牌配置（`ai.omnimux.desktop`、`OmniMux`、`omnimux` 命令、preset 打包目录）。
+  - 严格锁定生产端口 `44120`（`DESKTOP_PROD_WEB_PORT`）。
+  - 保持单 channel 构建链，排除 beta channel workspace，保留 OmniMux 专有 scripts。
+- **源码与测试适配**：
+  - `AdvancedFrame.tsx`：确认细节面板已严格包裹在 `<SessionProvider>` 中，保留窄屏防抖迟滞断点逻辑。
+  - `tests/package.spec.ts` 与 `tests/client-directory-picker-browse-patch.spec.ts`：补丁路径断言更新至 rc.1。
+  - `dsh-community-market/tests/contracts.spec.ts`：peerDependencies 断言同步更新至 rc.1。
+  - `scripts/verify-profile-boot.mjs`：适配 PR #51 恢复的 official native directory picker 断言。
+- **验证**：
+  - `verify-layout` + `sync-vendored-runtime --check` 全通过（242 packages verified）。
+  - `corepack yarn workspace dsh-plugin-desktop typecheck`：通过（0 错误）。
+  - `corepack yarn workspace dsh-plugin-desktop test`：112 passed（1075 tests pass）。
+  - `corepack yarn check` 全量门禁：全绿通过。
+- **决策人**：团队拍板跟进 dsh-better-sidebar 0.18.0，工程师实施底座升级。
+
+---
+
 ## 2026-09-01 · pin runtime 0.1.2-alpha.3（dd6322d604，本会话 A–E）
 
 - **范围**：submodule `dd6322d604e00eec1ba5e0c8541159906a21094a`（`dsh-v0.1.2-alpha.3`）；vendor `vendor/dsh-runtime/0.1.2-alpha.3`（244 tarball，official profile）；desktop/market `@deepseek-ai/dsh*` → `0.1.2-alpha.3`

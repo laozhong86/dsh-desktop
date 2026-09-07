@@ -686,4 +686,3 @@ export function smokePackagedElectronRuntime(
     rmSync(smokeHome, { recursive: true, force: true })
   }
 }
-

@@ -81,4 +81,3 @@ if (invokedPath !== undefined && fileURLToPath(import.meta.url) === resolve(invo
     }
   }
 }
-

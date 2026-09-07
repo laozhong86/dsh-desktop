@@ -217,6 +217,17 @@ describe('final Electron fuse verification', () => {
     expect(exists).toHaveBeenCalledWith(universalExecutable)
   })
 
+  it('resolves the empty macOS directory target map produced by electron-builder', () => {
+    const built = {
+      outDir: '/build',
+      configuration: { productName: 'OmniMux' },
+      platformToTargets: new Map([[{ buildConfigurationKey: 'mac' }, new Map()]]),
+    } satisfies ElectronArtifactBuildResult
+    expect(resolveFinalPackagedRuntimeContexts(built, () => true)).toEqual([
+      expect.objectContaining({ electronPlatformName: 'darwin', arch: Arch[process.arch as keyof typeof Arch] }),
+    ])
+  })
+
   it('checks every requested final executable after all artifact builds', async () => {
     const executables = [
       join('/build', 'mac-arm64', 'DSH Desktop.app', 'Contents', 'MacOS', 'DSH Desktop'),

@@ -209,6 +209,8 @@ function requestedArchitectures(
   const targetNames = new Set(
     [...targets.keys()].filter((name): name is string => typeof name === 'string'),
   )
+  // MacPackager omits the --dir target from its result map entirely.
+  if (key === 'mac' && targets.size === 0) targetNames.add(DIR_TARGET)
   const fromConfiguration = configuredTargetArchitectures(
     result.configuration[key],
     targetNames,

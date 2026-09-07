@@ -215,6 +215,10 @@ describe('seedOmnimuxSettings', () => {
       const js = doc.toJS() as Record<string, any>
       expect(js['dsh-desktop']).toBeDefined()
       expect(js['dsh-desktop'].mode).toBe('compatibility')
+      expect(js['dsh-better-sidebar']).toBeDefined()
+      expect(js['dsh-better-sidebar'].agentOpenTools).toBe(true)
+      expect(js['dsh-better-sidebar'].browserAllowedLoopback).toBe('127.0.0.1, localhost')
+      expect(js['dsh-better-sidebar'].tabsEnabled?.browser).toBe(true)
     } finally {
       rmSync(tempHome, { recursive: true, force: true })
     }

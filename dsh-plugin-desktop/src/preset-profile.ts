@@ -196,6 +196,30 @@ export function seedOmnimuxSettings(homeDir: string): void {
             networkExposure: 'loopback',
           })
         }
+        // Ensure dsh-better-sidebar defaults (agentOpenTools + loopback browser access)
+        const sidebar = doc.get('dsh-better-sidebar')
+        if (sidebar && typeof (sidebar as any).set === 'function') {
+          if ((sidebar as any).get('agentOpenTools') === undefined) {
+            ;(sidebar as any).set('agentOpenTools', true)
+          }
+          if ((sidebar as any).get('browserAllowedLoopback') === undefined) {
+            ;(sidebar as any).set('browserAllowedLoopback', '127.0.0.1, localhost')
+          }
+          const tabs = (sidebar as any).get('tabsEnabled')
+          if (tabs && typeof (tabs as any).set === 'function') {
+            if ((tabs as any).get('browser') === undefined) {
+              ;(tabs as any).set('browser', true)
+            }
+          } else if (tabs === undefined) {
+            ;(sidebar as any).set('tabsEnabled', { browser: true })
+          }
+        } else if (!sidebar) {
+          doc.set('dsh-better-sidebar', {
+            agentOpenTools: true,
+            browserAllowedLoopback: '127.0.0.1, localhost',
+            tabsEnabled: { browser: true },
+          })
+        }
         writeFileSync(settingsFile, doc.toString())
       } catch {
         writeCleanCompatibilitySettings(settingsFile)
@@ -229,6 +253,11 @@ function writeCleanCompatibilitySettings(settingsFile: string): void {
     '  windowsMaterial: acrylic',
     '  openBrowser: false',
     '  networkExposure: loopback',
+    'dsh-better-sidebar:',
+    '  agentOpenTools: true',
+    '  browserAllowedLoopback: 127.0.0.1, localhost',
+    '  tabsEnabled:',
+    '    browser: true',
     '',
   ].join('\n')
   writeFileSync(settingsFile, initial)

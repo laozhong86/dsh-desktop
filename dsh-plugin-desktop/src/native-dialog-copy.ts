@@ -47,6 +47,10 @@ export interface DesktopNativeCopy {
   readonly skippedPluginBody: (name: string, additionalCount: number) => string
   readonly unsupportedStorageTitle: string
   readonly unsupportedStorageBody: (label: string) => string
+  readonly switchProfile: string
+  readonly useProfileAnyway: string
+  readonly quit: string
+  readonly unknownVersion: string
 }
 
 const COPY: Record<DesktopLocale, DesktopNativeCopy> = {
@@ -97,6 +101,10 @@ const COPY: Record<DesktopLocale, DesktopNativeCopy> = {
       : `${name} is not installed in this Profile.`,
     unsupportedStorageTitle: 'Storage May Be Unsupported',
     unsupportedStorageBody: label => `${label} is on a volume that may prevent sandboxed commands or plugin installation from working.`,
+    switchProfile: 'Switch Profile',
+    useProfileAnyway: 'Use Anyway',
+    quit: 'Quit',
+    unknownVersion: 'Unknown',
   },
   zh: {
     ok: '确定',
@@ -145,6 +153,10 @@ const COPY: Record<DesktopLocale, DesktopNativeCopy> = {
       : `${name} 未安装在当前 Profile 中。`,
     unsupportedStorageTitle: '存储位置可能不受支持',
     unsupportedStorageBody: label => `${label} 所在的磁盘可能导致沙盒命令或插件安装无法正常工作。`,
+    switchProfile: '切换 Profile',
+    useProfileAnyway: '仍然使用',
+    quit: '退出',
+    unknownVersion: '未知',
   },
 }
 

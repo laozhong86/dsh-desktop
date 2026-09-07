@@ -1,9 +1,10 @@
 /** Fail-loud verification of the runtime entries sealed into Electron's app.asar. */
 
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { readFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { dirname, isAbsolute, join, relative, sep } from 'node:path'
+import { dirname, isAbsolute, join, relative, sep, parse } from 'node:path'
 import { Worker } from 'node:worker_threads'
 import { listPackage } from '@electron/asar'
 import AdmZip from 'adm-zip'
@@ -12,7 +13,44 @@ import {
   MACOS_UNIVERSAL_NATIVE_ENTRIES,
 } from './mac-universal.ts'
 
-const DSH_PACKAGE_ROOT = dirname(createRequire(import.meta.url).resolve('@deepseek-ai/dsh/package.json'))
+/** Resolve a package root even when its exports hide `package.json`. */
+export function resolveRuntimePackageRoot(
+  packageName: string,
+  resolveEntry: (specifier: string) => string = createRequire(import.meta.url).resolve,
+  readManifest: (filename: string) => string = filename => readFileSync(filename, 'utf8'),
+): string {
+  let manifestCause: unknown
+  try {
+    return dirname(resolveEntry(`${packageName}/package.json`))
+  } catch (cause) {
+    manifestCause = cause
+  }
+
+  let directory = dirname(resolveEntry(packageName))
+  const root = parse(directory).root
+  while (true) {
+    try {
+      const manifest: unknown = JSON.parse(readManifest(join(directory, 'package.json')))
+      if (manifest !== null
+        && typeof manifest === 'object'
+        && (manifest as { name?: unknown }).name === packageName) {
+        return directory
+      }
+    } catch {
+      // Continue toward the filesystem root until the owning manifest is found.
+    }
+    if (directory === root) {
+      throw new Error(`dsh-plugin-desktop: cannot locate package root for ${packageName}`, {
+        cause: manifestCause,
+      })
+    }
+    directory = dirname(directory)
+  }
+}
+
+const DSH_PACKAGE_ROOT = resolveRuntimePackageRoot('@deepseek-ai/dsh')
+const PNPM_PACKAGE_ROOT = resolveRuntimePackageRoot('pnpm')
+
 
 /** Every generated JavaScript file shipped by the installed DSH CLI package. */
 export const REQUIRED_DSH_CLI_RUNTIME_ENTRIES = Object.freeze(
@@ -32,6 +70,7 @@ export interface PackagedRuntimeContext {
   readonly electronPlatformName: string
   /** Product metadata used to locate the macOS application bundle. */
   readonly packager: {
+    readonly executableName?: string
     readonly appInfo: {
       readonly productFilename: string
     }
@@ -500,3 +539,150 @@ export async function afterPack(
 }
 
 export default afterPack
+
+function packageVersion(packageRoot: string): string {
+  return (JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as { version: string }).version
+}
+
+const DSH_RUNTIME_VERSION = packageVersion(DSH_PACKAGE_ROOT)
+const PNPM_RUNTIME_VERSION = packageVersion(PNPM_PACKAGE_ROOT)
+
+/** Result surface required from one packaged Electron child. */
+export interface PackagedElectronResult {
+  readonly error?: Error
+  readonly signal?: NodeJS.Signals | null
+  readonly status: number | null
+  readonly stdout: string
+  readonly stderr: string
+}
+
+/** Injectable packaged Electron process seam used by focused tests. */
+export type PackagedElectronRunner = (
+  executable: string,
+  args: readonly string[],
+  environment: NodeJS.ProcessEnv,
+) => PackagedElectronResult
+
+/** Injectable ASAR/CLI/native smoke seam used by the post-fuse artifact hook. */
+export type PackagedElectronSmoke = (context: PackagedRuntimeContext) => void
+
+/** Resolve the packaged Electron executable created beside the application resources. */
+export function resolvePackagedExecutablePath(context: PackagedRuntimeContext): string {
+  const filename = context.packager.appInfo.productFilename
+  if (context.electronPlatformName === 'darwin') {
+    return join(context.appOutDir, `${filename}.app`, 'Contents', 'MacOS', filename)
+  }
+  if (context.electronPlatformName === 'win32') return join(context.appOutDir, `${filename}.exe`)
+  if (context.electronPlatformName === 'linux') {
+    return join(context.appOutDir, context.packager.executableName ?? filename)
+  }
+  throw new Error(
+    `dsh-plugin-desktop: unsupported Electron afterPack platform ${JSON.stringify(context.electronPlatformName)}`,
+  )
+}
+
+function runPackagedElectron(
+  executable: string,
+  args: readonly string[],
+  environment: NodeJS.ProcessEnv,
+): PackagedElectronResult {
+  const result = spawnSync(executable, args, {
+    encoding: 'utf8',
+    env: environment,
+    shell: false,
+    timeout: 60_000,
+    windowsHide: true,
+  })
+  return {
+    ...(result.error === undefined ? {} : { error: result.error }),
+    signal: result.signal,
+    status: result.status,
+    stdout: result.stdout ?? '',
+    stderr: result.stderr ?? '',
+  }
+}
+
+function packagedRuntimeRunnable(context: PackagedRuntimeContext): boolean {
+  if (context.electronPlatformName !== process.platform) return false
+  const { arch } = context
+  if (arch === undefined || arch === 4) return true
+  if (arch === 1) return process.arch === 'x64'
+  if (arch === 3) return process.arch === 'arm64'
+  if (arch === 0) return process.arch === 'ia32'
+  return false
+}
+
+/**
+ * Execute the real packaged runtime through Electron's supported RunAsNode
+ * path using the physical CLI and Worker dependency tree.
+ */
+export function smokePackagedElectronRuntime(
+  context: PackagedRuntimeContext,
+  run: PackagedElectronRunner = runPackagedElectron,
+): void {
+  // A universal executable runs natively on either macOS CPU. Per-architecture
+  // intermediate apps are only executable on the matching packaging host.
+  if (!packagedRuntimeRunnable(context)) return
+  const executable = resolvePackagedExecutablePath(context)
+  const asarRoot = resolvePackagedUnpackedRoot(context)
+  const smokeHome = mkdtempSync(join(tmpdir(), 'dsh-packaged-cli-'))
+  const environment = {
+    ...process.env,
+    ELECTRON_RUN_AS_NODE: '1',
+    DSH_HOME: smokeHome,
+    DSH_TELEMETRY_DISABLED: '1',
+  }
+  const checks = [
+    {
+      label: 'DSH CLI',
+      entry: join(asarRoot, 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js'),
+      args: ['--version'],
+      accepts: (stdout: string) => stdout.trim() === DSH_RUNTIME_VERSION,
+    },
+    {
+      label: 'pnpm CLI',
+      entry: join(asarRoot, 'node_modules', 'pnpm', 'bin', 'pnpm.mjs'),
+      args: ['--version'],
+      accepts: (stdout: string) => stdout.trim() === PNPM_RUNTIME_VERSION,
+    },
+    {
+      label: 'ASAR/Profile/CJS/ripgrep',
+      entry: join(asarRoot, 'lib', 'packaged-runtime-smoke.js'),
+      args: [],
+      accepts: (stdout: string) => stdout.trim() === 'DSH_PACKAGED_RUNTIME_OK',
+    },
+    {
+      label: 'Desktop CLI config composition',
+      entry: join(asarRoot, 'lib', 'desktop-cli.js'),
+      args: ['--profile', 'headless', '--dump-config'],
+      accepts: (stdout: string) => stdout.includes('# == ') && stdout.includes('name:'),
+    },
+    {
+      // This is deliberately the Desktop wrapper rather than DSH's bin.js:
+      // a child RunAsNode process cannot inherit main's resolver hook.
+      label: 'Desktop CLI Loader boot',
+      entry: join(asarRoot, 'lib', 'desktop-cli.js'),
+      args: ['--profile', 'headless', '--help'],
+      accepts: (stdout: string) => stdout.includes('dsh --profile headless'),
+    },
+  ] as const
+  try {
+    for (const check of checks) {
+      const result = run(executable, ['--expose-internals', check.entry, ...check.args], environment)
+      if (result.error !== undefined) {
+        throw new Error(`dsh-plugin-desktop: packaged ${check.label} smoke could not start`, {
+          cause: result.error,
+        })
+      }
+      if (result.status !== 0 || !check.accepts(result.stdout)) {
+        throw new Error(
+          `dsh-plugin-desktop: packaged ${check.label} smoke failed with status ${String(result.status)}; `
+          + `signal=${String(result.signal ?? null)}; `
+          + `stdout=${JSON.stringify(result.stdout.trim())}; stderr=${JSON.stringify(result.stderr.trim())}`,
+        )
+      }
+    }
+  } finally {
+    rmSync(smokeHome, { recursive: true, force: true })
+  }
+}

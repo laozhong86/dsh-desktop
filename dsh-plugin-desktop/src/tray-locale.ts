@@ -1,13 +1,16 @@
 /** Desktop-owned native tray copy for the locales shipped by DSH. */
 
 import type { DesktopLocale } from './runtime.ts'
+import { desktopRecoveryCopy } from './recovery-copy.ts'
 
 export type DesktopTrayLabelKey =
   | 'addProfile'
   | 'checkForUpdates'
   | 'checkingForUpdates'
   | 'downloadingUpdate'
+  | 'enterSafeMode'
   | 'exportDiagnostics'
+  | 'exitSafeMode'
   | 'openDesktop'
   | 'openTerminal'
   | 'profile'
@@ -15,6 +18,7 @@ export type DesktopTrayLabelKey =
   | 'switchToAdvanced'
   | 'switchToCompatibility'
   | 'switchToExtended'
+  | 'installStable'
   | 'unavailableForDesktop'
   | 'updateAvailable'
 
@@ -24,7 +28,9 @@ const labels: Record<DesktopLocale, Record<DesktopTrayLabelKey, (value: string) 
     checkForUpdates: () => 'Check for Updates…',
     checkingForUpdates: () => 'Checking for Updates…',
     downloadingUpdate: version => `Downloading DSH Desktop ${version}…`,
+    enterSafeMode: () => 'Enter Safe Mode…',
     exportDiagnostics: () => 'Export Diagnostics…',
+    exitSafeMode: () => 'Exit Safe Mode and Restart…',
     openDesktop: productName => `Open ${productName}`,
     openTerminal: () => 'Open DSH Terminal',
     profile: profileName => `Profile: ${profileName}`,
@@ -32,6 +38,7 @@ const labels: Record<DesktopLocale, Record<DesktopTrayLabelKey, (value: string) 
     switchToAdvanced: () => 'Switch to Enhanced Mode',
     switchToCompatibility: () => 'Switch to Compatibility Mode',
     switchToExtended: () => 'Switch to Extended Window',
+    installStable: () => 'Install Stable Edition…',
     unavailableForDesktop: profileName => `${profileName} (Unavailable for Desktop)`,
     updateAvailable: version => `DSH Desktop ${version} Available`,
   },
@@ -40,7 +47,9 @@ const labels: Record<DesktopLocale, Record<DesktopTrayLabelKey, (value: string) 
     checkForUpdates: () => '检查更新…',
     checkingForUpdates: () => '正在检查更新…',
     downloadingUpdate: version => `正在下载 DSH Desktop ${version}…`,
+    enterSafeMode: () => '进入安全模式…',
     exportDiagnostics: () => '导出诊断信息…',
+    exitSafeMode: () => '退出安全模式并重启…',
     openDesktop: productName => `打开 ${productName}`,
     openTerminal: () => '打开 DSH 终端',
     profile: profileName => `Profile：${profileName}`,
@@ -48,6 +57,7 @@ const labels: Record<DesktopLocale, Record<DesktopTrayLabelKey, (value: string) 
     switchToAdvanced: () => '切换到增强模式',
     switchToCompatibility: () => '切换到兼容模式',
     switchToExtended: () => '切换到扩展窗口',
+    installStable: () => '安装稳定版…',
     unavailableForDesktop: profileName => `${profileName}（不可用于桌面端）`,
     updateAvailable: version => `DSH Desktop ${version} 可用`,
   },
@@ -143,7 +153,17 @@ export function desktopDiagnosticsPrivacyCopy(locale: DesktopLocale): DesktopDia
 /** Resolve the native confirmation shown before every ordinary relaunch request. */
 export function desktopRestartConfirmationCopy(
   locale: DesktopLocale,
-  target: 'normal' | 'recovery' = 'normal',
+  target: 'normal' | 'recovery' | 'safe-mode' = 'normal',
 ): DesktopRestartConfirmationCopy {
+  if (target === 'safe-mode') {
+    const copy = desktopRecoveryCopy(locale)
+    return {
+      title: copy.confirmSafeMode,
+      message: copy.confirmSafeModeMessage,
+      detail: copy.confirmSafeModeBody,
+      confirm: copy.confirmSafeModeAction,
+      cancel: copy.cancel,
+    }
+  }
   return restartConfirmationCopy[locale][target]
 }

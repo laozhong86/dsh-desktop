@@ -53,13 +53,21 @@ profile 的名字和绝对目录由 `desktopProfiles.current` 提供，不能从
 
 `desktopPnpm.run()` 直接跑内置 pnpm；`runPlugin()` 通过打包的 DSH CLI 维持 profile 初始化、相对 source 和 bundle reconcile。两者都属于当前 generation，并由 subprocess service 管理完整进程树。
 
-Launcher 私有的 `desktopRuntime`、`desktopPnpmBootstrap`、Electron executable、Node helper 和 ABI 环境不是第三方 API。公开 contract 只有 `dsh-plugin-desktop/profile-service` 与 `dsh-plugin-desktop/pnpm`。
+Launcher 私有的 `desktopRuntime`、`desktopPnpmBootstrap`、Electron executable、Node helper 和 ABI 环境不是第三方 API。OmniMux 的公开 contract 是 `dsh-plugin-desktop/profile-service` 与 `dsh-plugin-desktop/pnpm`。
 
 ## 打包与运行时闭包
 
 发布包使用 Electron Builder 和 `app.asar`，但需要物理 unpack 的依赖（例如 pnpm、node-pty、Windows ACL/native 文件）会放在 `app.asar.unpacked`。Packaged runtime gate 会检查 ASAR 入口和物理运行时入口，profile fallback 不能把符号链接指向无法被 Node 解析的虚拟 ASAR 路径。
 
-根 workspace 使用 Yarn；固定的 `deepseek-harness/` 子模块保持上游自己的 pnpm workspace。桌面代码、测试、打包配置和发布脚本属于 `dsh-plugin-desktop/`，不修改上游子模块。
+根 workspace 使用 Yarn；固定的 `deepseek-harness/` 子模块保持上游自己的 pnpm workspace。OmniMux 只交付 `dsh-plugin-desktop` 一条稳定线，DSH `0.1.2-rc.1` 固定在 `upstream.json` 中。
+
+物理运行时包含 `lib`、`node_modules`、包元数据和产品 preset；CLI 与 Worker 共用这套路径。Unsigned directory build 禁止签名和发布；最终产物校验检查 Electron Fuse，并执行包内 CLI 和诊断 Worker。
+
+## 稳定版更新与隔离恢复
+
+OmniMux 使用 `ai.omnimux.desktop` 并保留既有更新端点。版本检查只接受稳定版 SemVer；下载携带预期版本，并在替换安装包前拒绝版本不符的响应。本仓不交付 Beta 应用或通道切换入口。
+
+普通启动会 seed `omnimux` Profile。Dev 使用 `~/.omnimux-dev` 和端口 `45120`；正式环境使用 `~/.omnimux` 和端口 `44120`。Safe Mode 使用临时 Home 和桌面状态目录，跳过产品 seed。退出后恢复普通 Profile 选择；下一次普通启动清理临时环境。
 
 ## 维护者深入阅读
 

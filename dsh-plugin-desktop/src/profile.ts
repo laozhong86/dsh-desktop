@@ -1,9 +1,21 @@
 /** Compatibility profile composition over the official Web bundle and user plugins. */
 
 import { createRequire } from 'node:module'
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  lstatSync,
+  readFileSync,
+  readdirSync,
+  readlinkSync,
+  rmSync,
+  rmdirSync,
+  statSync,
+  type Dirent,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { isIP } from 'node:net'
-import { dirname, join } from 'node:path'
+import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { evaluate, isJsExpr, type EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
@@ -32,6 +44,7 @@ import { parseAllDocuments, parseDocument } from 'yaml'
 import { unpackedAsarPath } from './packaged-runtime-path.ts'
 import { findOverlayPackage, resolveOverlayPackage } from './package-overlay.ts'
 import { DESKTOP_DEFAULT_WEB_PORT, defaultDesktopWebPort } from './desktop-port.ts'
+import { withAsarModuleResolver } from './asar-module-resolver-state.ts'
 import {
   desktopBrowserAccessEnabled,
   desktopNetworkExposureForBrowserAccess,
@@ -41,6 +54,10 @@ import {
   type DesktopNetworkExposure,
 } from './desktop-network.ts'
 import type { DesktopShellMode } from './runtime.ts'
+import {
+  DESKTOP_PACKAGE_NAME,
+  DESKTOP_PACKAGE_NAMES,
+} from './product-identity.ts'
 import {
   DEFAULT_MACOS_WINDOW_MATERIAL,
   DEFAULT_WINDOWS_WINDOW_MATERIAL,
@@ -65,7 +82,7 @@ import {
 export const DESKTOP_PROFILE_NAME = 'desktop'
 
 /** Standalone package name inserted through the launcher-owned desktop layer. */
-export const DESKTOP_PACKAGE_NAME = 'dsh-plugin-desktop'
+export { DESKTOP_PACKAGE_NAME } from './product-identity.ts'
 
 /** Empty include root rewritten before every profile boot. */
 export const DESKTOP_PROFILE_ROOT = 'cordis.yml'
@@ -74,19 +91,21 @@ const BIN_NAME = DESKTOP_PACKAGE_NAME
 const REQUIRED_BUNDLES = requiredWebBundles()
 const REQUIRED_BUNDLE_SET = new Set(REQUIRED_BUNDLES)
 const OBSOLETE_DESKTOP_BUNDLE_SET = new Set(['@deepseek-ai/dsh-desktop-app'])
+// CLI and Worker processes share the physical installation dependency anchor.
 const INSTALL_ANCHOR = unpackedAsarPath(fileURLToPath(new URL('../package.json', import.meta.url)))
 const DESKTOP_PATCH_PATH = fileURLToPath(new URL('../cordis.patch.yml', import.meta.url))
 const PWSH_SANDBOX_ROW_ID = 'pwsh-sandbox'
 const UPSTREAM_PWSH_SANDBOX_PACKAGE = '@deepseek-ai/dsh-pwsh-sandbox'
 const DESKTOP_WINDOWS_PWSH_SANDBOX_ROW_ID = 'desktop-windows-pwsh-sandbox'
-const DESKTOP_WINDOWS_PWSH_SANDBOX_PACKAGE = 'dsh-plugin-desktop/windows-pwsh-sandbox'
+const DESKTOP_WINDOWS_PWSH_SANDBOX_PACKAGE = `${DESKTOP_PACKAGE_NAME}/windows-pwsh-sandbox`
 const AGENT_PRESETS_ROW_ID = 'agent-presets'
 const DEFAULT_DESKTOP_SHELL_MODE: DesktopShellMode = 'compatibility'
 const DEFAULT_DESKTOP_PORT = DESKTOP_DEFAULT_WEB_PORT
 const DESKTOP_WEB_SERVER_ROW_ID = 'desktop-webserver'
-const DESKTOP_WEB_SERVER_PACKAGE = 'dsh-plugin-desktop/webserver'
+const DESKTOP_WEB_SERVER_PACKAGE = `${DESKTOP_PACKAGE_NAME}/webserver`
 const SETTINGS_FILE_PACKAGE = '@deepseek-ai/dsh-settings-file'
 const DESKTOP_SETTINGS_NAMESPACE = 'dsh-desktop'
+const MAX_FALLBACK_MANIFEST_BYTES = 1024 * 1024
 const UI_LAYOUT_PACKAGE = '@deepseek-ai/dsh-client-ui-layout'
 const UI_SIDEBAR_PACKAGE = '@deepseek-ai/dsh-client-ui-sidebar'
 const UI_CONVERSATION_PACKAGE = '@deepseek-ai/dsh-client-ui-conversation'
@@ -233,6 +252,16 @@ function requiredWebPatchReload(): ProfilePatchReload {
   return template.patchReload
 }
 
+/** Resolve required official bundles from the matching Desktop installation. */
+function resolveRequiredBundle(
+  packageName: string,
+  options: Parameters<typeof resolveOverlayPackage>[1],
+) {
+  const selection = resolveOverlayPackage(packageName, options)
+  if (!REQUIRED_BUNDLE_SET.has(packageName) || selection.install === undefined) return selection
+  return { ...selection, selected: selection.install }
+}
+
 /** Prepared profile inputs consumed by app-boot. */
 export interface PreparedDesktopProfile {
   /** Harness home shared by the launcher and generated command environment. */
@@ -294,7 +323,7 @@ export interface SkippedOptionalEntry {
  */
 export function desktopBundleList(current: readonly string[]): string[] {
   const thirdParty = current.filter(name => !REQUIRED_BUNDLE_SET.has(name)
-    && name !== DESKTOP_PACKAGE_NAME
+    && !DESKTOP_PACKAGE_NAMES.has(name)
     && !OBSOLETE_DESKTOP_BUNDLE_SET.has(name))
   return [...REQUIRED_BUNDLES, ...thirdParty]
 }
@@ -496,7 +525,7 @@ function loadRecoveryFilteredProfile(
     const isDshMarket = packageName === DESKTOP_MARKET_IDENTITIES.dshMarket.packageName
     if (!isDshMarket && desktopPluginBundleMutable(packageName) && disabledBundles.has(packageName)) continue
     try {
-      const packageDir = resolveOverlayPackage(packageName, {
+      const packageDir = resolveRequiredBundle(packageName, {
         installPackageUrl,
         profilePackageUrl,
       }).selected.packageDir
@@ -538,7 +567,7 @@ function loadRecoveryFilteredProfile(
   }
 }
 
-/** Resolve the agent presets shipped by the matching dsh CLI dependency. */
+/** Resolve the agent presets shipped by the matching presets dependency. */
 export function shippedPresetRoot(moduleUrl: string = import.meta.url): string {
   const require = createRequire(moduleUrl)
   return unpackedAsarPath(
@@ -1084,11 +1113,110 @@ export function prepareDesktopProfile(
 
 /** Maintain the upstream module fallback for one fully resolved Desktop profile. */
 export function healDesktopProfileModuleFallback(home: string, profile?: Profile): Promise<void> {
-  return healProfilesModuleFallback({
+  const heal = () => healProfilesModuleFallback({
     installAnchor: INSTALL_ANCHOR,
     home,
     ...(profile === undefined ? {} : { profile }),
   })
+  if (!/([\\/])app\.asar\1/u.test(INSTALL_ANCHOR)) return heal()
+  removeObsoleteDesktopSharedModuleFallback(home)
+  return withAsarModuleResolver(heal)
+}
+
+function isDshManagedModuleProxy(directory: string): boolean {
+  const manifestPath = join(directory, 'package.json')
+  try {
+    if (statSync(manifestPath).size > MAX_FALLBACK_MANIFEST_BYTES) return false
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+      dsh?: { moduleFallback?: { targets?: unknown } }
+    }
+    const targets = manifest.dsh?.moduleFallback?.targets
+    return targets !== null && typeof targets === 'object' && !Array.isArray(targets)
+      && Object.keys(targets).length > 0
+      && Object.values(targets).every((target) => {
+        if (typeof target !== 'string') return false
+        try {
+          const url = new URL(target)
+          return url.protocol === 'file:'
+            && /(^|[\\/])app\.asar(?:\.unpacked)?([\\/]|$)/iu.test(fileURLToPath(url))
+        } catch {
+          return false
+        }
+      })
+  } catch {
+    return false
+  }
+}
+
+function removeManagedFallbackEntry(entryPath: string): boolean {
+  let stat: ReturnType<typeof lstatSync>
+  try {
+    stat = lstatSync(entryPath)
+  } catch (cause) {
+    if ((cause as NodeJS.ErrnoException).code === 'ENOENT') return false
+    return false
+  }
+  try {
+    if (stat.isSymbolicLink()) {
+      const target = readlinkSync(entryPath)
+      const absoluteTarget = isAbsolute(target) ? target : resolve(dirname(entryPath), target)
+      // Desktop releases that mirrored the whole dependency graph produced
+      // links into app.asar(.unpacked). No ordinary user Profile installation
+      // needs such a shared parent link.
+      if (!/(^|[\\/])app\.asar(?:\.unpacked)?([\\/]|$)/iu.test(absoluteTarget)) return false
+      unlinkSync(entryPath)
+      return true
+    }
+    if (!stat.isDirectory() || !isDshManagedModuleProxy(entryPath)) return false
+    rmSync(entryPath, { recursive: true, force: true })
+    return true
+  } catch {
+    // A locked legacy link must not make Desktop startup fail. The resolver
+    // also refuses shared/legacy ASAR results, so leaving it is safe.
+    return false
+  }
+}
+
+/**
+ * Remove only provably DSH-generated installation fallbacks from releases
+ * predating the ASAR resolver. Unknown files and directories are preserved.
+ */
+export function removeObsoleteDesktopSharedModuleFallback(home: string): number {
+  const modulesDirectory = join(home, 'profiles', 'node_modules')
+  let entries: Dirent<string>[]
+  try {
+    entries = readdirSync(modulesDirectory, { withFileTypes: true, encoding: 'utf8' })
+  } catch (cause) {
+    if ((cause as NodeJS.ErrnoException).code === 'ENOENT') return 0
+    return 0
+  }
+  let removed = 0
+  for (const entry of entries) {
+    const entryPath = join(modulesDirectory, entry.name)
+    if (entry.name.startsWith('@') && entry.isDirectory()) {
+      let scopedEntries: typeof entries
+      try {
+        scopedEntries = readdirSync(entryPath, { withFileTypes: true, encoding: 'utf8' })
+      } catch {
+        continue
+      }
+      let removedFromScope = 0
+      for (const scopedEntry of scopedEntries) {
+        if (removeManagedFallbackEntry(join(entryPath, scopedEntry.name))) removedFromScope += 1
+      }
+      removed += removedFromScope
+      if (removedFromScope > 0) {
+        try {
+          rmdirSync(entryPath)
+        } catch {
+          // The scope still contains unknown/user-owned data or another writer.
+        }
+      }
+      continue
+    }
+    if (removeManagedFallbackEntry(entryPath)) removed += 1
+  }
+  return removed
 }
 
 /** Expose the package anchor for focused resolution tests. */

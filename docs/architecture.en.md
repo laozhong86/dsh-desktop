@@ -53,13 +53,21 @@ The profile name and absolute directory come from `desktopProfiles.current`; the
 
 `desktopPnpm.run()` runs bundled pnpm directly. `runPlugin()` uses packaged DSH CLI semantics so profile initialization, relative sources, and bundle reconciliation remain authoritative. Both operations belong to the current generation and use the subprocess service for complete process-tree ownership.
 
-The launcher-private `desktopRuntime`, `desktopPnpmBootstrap`, Electron executable, Node helpers, and ABI environment are not third-party APIs. The supported public contracts are only `dsh-plugin-desktop/profile-service` and `dsh-plugin-desktop/pnpm`.
+The launcher-private `desktopRuntime`, `desktopPnpmBootstrap`, Electron executable, Node helpers, and ABI environment are not third-party APIs. OmniMux exposes `dsh-plugin-desktop/profile-service` and `dsh-plugin-desktop/pnpm`.
 
 ## Packaging and runtime closure
 
 Release artifacts use Electron Builder and `app.asar`, while dependencies that must be physical (for example pnpm, node-pty, and Windows ACL/native files) live under `app.asar.unpacked`. The packaged-runtime gate checks both archive entries and physical runtime entries; profile fallback links must not target virtual ASAR paths that Node cannot resolve.
 
-The outer workspace uses Yarn. The pinned `deepseek-harness/` submodule keeps its own pnpm workspace. Desktop source, tests, packaging, and release scripts belong to `dsh-plugin-desktop/`; the upstream submodule is not edited from Desktop branches.
+The outer workspace uses Yarn. The pinned `deepseek-harness/` submodule keeps its own pnpm workspace. OmniMux ships one stable desktop workspace, `dsh-plugin-desktop`, with DSH `0.1.2-rc.1` pinned in `upstream.json`.
+
+The physical runtime includes `lib`, `node_modules`, package metadata, and the product preset. CLI and Worker processes use this same tree. Unsigned directory builds disable signing and publishing; final artifact checks verify Electron fuses and execute the packaged CLI and diagnostic Worker.
+
+## Stable updates and isolated recovery
+
+OmniMux uses `ai.omnimux.desktop` and retains its configured update endpoint. Version checks accept stable SemVer only. Downloads send the expected version and reject mismatched responses before replacing an installer. This repository does not ship a Beta application or a channel-switch action.
+
+Normal startup seeds the `omnimux` Profile. Dev uses `~/.omnimux-dev` and port `45120`; production uses `~/.omnimux` and port `44120`. Safe Mode selects disposable home and desktop-state directories and skips product seeding. Leaving Safe Mode restores normal Profile selection; the next normal launch removes the temporary environment.
 
 ## Maintainer reading
 

@@ -55,6 +55,8 @@ import {
 } from './update-download.ts'
 import type { UpdateCheckResult } from './update-checker.ts'
 import type { DesktopInstallationId } from './desktop-installation-id.ts'
+import { DESKTOP_RELEASE_CHANNEL } from './product-identity.ts'
+import type { DesktopReleaseChannel } from './update-checker.ts'
 import {
   type WindowsVolumeQuery,
 } from './windows-volume-diagnostics.ts'
@@ -127,7 +129,7 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
   private filePickerPending = false
 
   constructor(
-    private readonly restart: (target?: 'recovery') => Promise<void>,
+    private readonly restart: (target?: 'recovery' | 'safe-mode') => Promise<void>,
     private readonly onRendererBoot: (report: RendererBootReport) => boolean | void = () => {},
     private readonly logger: DesktopLogger | undefined = undefined,
     workspaceVolumeQuery: WindowsVolumeQuery | undefined = undefined,
@@ -153,12 +155,13 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
       get isPackaged() { return app.isPackaged },
       get canDownload() { return app.isPackaged && platformStrategy.updateDownloadPlatform !== undefined },
       get currentVersion() { return PRODUCT_VERSION },
+      get releaseChannel() { return DESKTOP_RELEASE_CHANNEL },
       get statePath() { return join(app.getPath('userData'), 'updates', 'state.json') },
       ...(installationId === undefined ? {} : { installationId }),
       request: (url, init) => net.fetch(url, init),
       confirmDownload: version => this.confirmUpdateDownload(version),
       showManualCheckResult: result => this.showManualUpdateCheckResult(result),
-      downloadAndOpen: (version, signal) => this.downloadAndOpenUpdate(version, signal),
+      downloadAndOpen: (version, signal, channel) => this.downloadAndOpenUpdate(version, signal, channel),
       notify: notification => { this.showNotification(notification) },
     }
   }
@@ -492,7 +495,17 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
     await request
   }
 
-  private async confirmAndRestart(target: 'normal' | 'recovery'): Promise<void> {
+  async requestSafeModeRestart(): Promise<void> {
+    if (this.quitting) return
+    if (this.restartRequest !== undefined) return await this.restartRequest
+    const request = this.confirmAndRestart('safe-mode').finally(() => {
+      if (this.restartRequest === request) this.restartRequest = undefined
+    })
+    this.restartRequest = request
+    await request
+  }
+
+  private async confirmAndRestart(target: 'normal' | 'recovery' | 'safe-mode'): Promise<void> {
     const copy = desktopRestartConfirmationCopy(this.currentLocale, target)
     const options: Electron.MessageBoxOptions = {
       type: 'question',
@@ -505,7 +518,7 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
       noLink: true,
     }
     const result = await this.showDesktopMessageBox(options)
-    if (result.response === 0) await this.restart(target === 'recovery' ? 'recovery' : undefined)
+    if (result.response === 0) await this.restart(target === 'normal' ? undefined : target)
   }
 
   /** @inheritdoc */
@@ -658,18 +671,23 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
   }
 
   /** Download a confirmed installer and hand it to the native installation flow. */
-  private async downloadAndOpenUpdate(version: string, signal: AbortSignal): Promise<void> {
+  private async downloadAndOpenUpdate(
+    version: string,
+    signal: AbortSignal,
+    channel: DesktopReleaseChannel = 'stable',
+  ): Promise<void> {
     const copy = desktopNativeCopy(this.currentLocale)
     const platform = this.platformStrategy.updateDownloadPlatform
     if (platform === undefined) {
       throw new Error(`dsh-plugin-desktop: updates are unavailable on ${this.platform}`)
     }
-    const destinationPath = await this.chooseUpdateDestination(version)
+    const destinationPath = await this.chooseUpdateDestination(version, channel)
     if (destinationPath === undefined) return
     signal.throwIfAborted()
     const artifactPath = await downloadDesktopUpdate({
       platform,
       version,
+      ...(channel === 'stable' ? {} : { channel }),
       destinationPath,
       request: (url, init) => net.fetch(url, init),
       signal,
@@ -718,10 +736,13 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
     spec.requestQuit(0)
   }
 
-  private async chooseUpdateDestination(version: string): Promise<string | undefined> {
+  private async chooseUpdateDestination(
+    version: string,
+    channel: DesktopReleaseChannel = 'stable',
+  ): Promise<string | undefined> {
     if (this.platform !== 'darwin' && this.platform !== 'win32') return undefined
     const copy = desktopNativeCopy(this.currentLocale)
-    const filename = desktopUpdateFilename(this.platform, version)
+    const filename = desktopUpdateFilename(this.platform, version, channel)
     const extension = this.platform === 'darwin' ? 'dmg' : 'exe'
     const result = await this.showUpdateSaveDialog({
       title: copy.saveInstallerTitle,
@@ -766,7 +787,7 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
     await resolveDesktopUpdateArtifact(userDataPath, artifact, result.response === 0)
   }
 
-  /** Start the downloaded NSIS installer before releasing the current process. */
+  /** Start the downloaded NSIS installer visibly before releasing the current process. */
   private async launchWindowsUpdateInstaller(installerPath: string): Promise<void> {
     await new Promise<void>((resolve, reject) => {
       let child: ReturnType<typeof spawn>
@@ -775,7 +796,9 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
           detached: true,
           stdio: 'ignore',
           shell: false,
-          windowsHide: true,
+          // UV_PROCESS_WINDOWS_HIDE also applies SW_HIDE to GUI processes,
+          // which leaves an interactive NSIS installer running invisibly.
+          windowsHide: false,
         })
       } catch (cause) {
         reject(cause)

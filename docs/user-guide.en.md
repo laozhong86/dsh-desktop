@@ -1,4 +1,4 @@
-# DSH Desktop User Guide
+# OmniMux User Guide
 
 ## Installation and first launch
 
@@ -40,7 +40,7 @@ The port must be an integer from `0` through `65535`. Changing it performs an or
 
 ## Plugin management
 
-Plugins are extensions that add capabilities to DSH, such as models, tools, interfaces, and workflows. DSH Desktop uses the same plugin system as official Harness, so official plugins install and work directly; multiple plugins follow the same conventions and can be installed and used together.
+Plugins are extensions that add capabilities to DSH, such as models, tools, interfaces, and workflows. OmniMux uses the same plugin system as official Harness, so official plugins install and work directly; multiple plugins follow the same conventions and can be installed and used together.
 
 Ordinary DSH plugins use the upstream CLI semantics:
 
@@ -50,7 +50,7 @@ dsh plugin --profile desktop remove <plugin>
 dsh plugin --profile desktop update
 ```
 
-In the terminal opened from the DSH Desktop tray, bare `dsh` and plugin commands without `--profile` default to the active profile:
+In the terminal opened from the OmniMux tray, bare `dsh` and plugin commands without `--profile` default to the active profile:
 
 ```sh
 dsh plugin add <plugin>
@@ -58,7 +58,7 @@ dsh plugin remove <plugin>
 dsh plugin update
 ```
 
-An explicit `--profile <name>` always wins. Restart DSH Desktop after plugin changes so the new bundle enters the Loader composition.
+An explicit `--profile <name>` always wins. Restart OmniMux after plugin changes so the new bundle enters the Loader composition.
 
 ## Opening the terminal
 
@@ -68,9 +68,9 @@ The welcome text shows the application version, active profile, profile director
 
 ## Updates
 
-Packaged macOS and Windows applications check `https://www.dshdesktop.cn/api/desktop/version` in the background. Startup is not blocked; network errors, non-200 responses, invalid versions, and a server version that is not newer remain silent in the background. A newer version updates the tray and raises one non-blocking system notification per version instead of opening a download confirmation automatically; clicking the notification reveals Desktop.
+Packaged macOS and Windows applications check `https://updates.omnimux.local/api/desktop/version` in the background. Startup is not blocked; network errors, non-200 responses, invalid versions, and a server version that is not newer remain silent in the background. A newer version updates the tray and raises one non-blocking system notification per version instead of opening a download confirmation automatically; clicking the notification reveals Desktop.
 
-**Check for Updates…** in the tray is a manual check. It shows a result even when the installed version is current, and reports a retry message when the check fails. Only a server version strictly newer than the local version produces a download confirmation. Cancelling never requests the counted download endpoint.
+**Check for Updates…** in the tray checks stable releases. It shows the result even when the installed version is current and reports a retry message when the check fails. Cancelling does not start a download.
 
 After confirmation, the app first opens the native **Save Update Installer** dialog, defaulting to the Downloads directory. You can choose another directory and filename; cancelling the dialog does not start a download. After the destination is confirmed, the app requests the fixed platform download URL and remembers the installer location. macOS opens the DMG for the user to replace the application in Applications; Windows prepares the NSIS installer and then asks whether to quit and start installation. After the upgrade completes and the app starts again, it asks whether to delete the installer to free disk space or keep it. Download or installer failures do not damage the current version, and the tray operation can be retried.
 
@@ -82,10 +82,10 @@ Desktop confirmations, warnings, and operation results open as separate shadcn-b
 - **The application crashes repeatedly before the tray appears**: run the installed executable directly with the recovery option. The default Windows installation command is below; replace the path if you selected another installation directory.
 
   ```powershell
-  & "$env:LOCALAPPDATA\Programs\DSH Desktop\DSH Desktop.exe" --export-diagnostics
+  & "$env:LOCALAPPDATA\Programs\OmniMux\OmniMux.exe" --export-diagnostics
   ```
 
-  If the npm desktop launcher is installed, `dsh-desktop --export-diagnostics` provides the same archive. This command does not start Host, profiles, plugins, or a window. It prints the absolute diagnostics ZIP path when complete.
+  For npm installs, use `omnimux --export-diagnostics`. This command does not start Host, profiles, plugins, or a window. It prints the absolute diagnostics ZIP path when complete.
 - **Diagnostic archive contents**: recent application logs, local Crashpad `.dmp` files, the active-run marker, and `system-info.txt`. System information records Desktop, Electron, Node, platform, and architecture versions. Recognized credentials are masked in logs, but local paths, workspace IDs, session IDs, and crash-time memory fragments may remain. Review the archive before public upload and send sensitive dumps only through a trusted channel.
 - **The window disappeared**: check the system tray; closing the window is not quitting.
 - **A plugin is missing**: confirm the command targeted the intended profile and restart the application.

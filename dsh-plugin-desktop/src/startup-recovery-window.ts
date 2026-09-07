@@ -1,6 +1,6 @@
 /** Host-independent Electron recovery window for profile startup failures. */
 
-import { app, BrowserWindow, screen, shell } from 'electron'
+import { app, screen, shell, type BrowserWindow } from 'electron'
 import { execFile } from 'node:child_process'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { basename, dirname } from 'node:path'
@@ -10,6 +10,7 @@ import {
   auxiliaryWindowHasCustomFrame,
 } from './auxiliary-window-options.ts'
 import { showDesktopDialog, showDesktopMessageBox } from './desktop-dialog-window.ts'
+import { createDesktopLocalWindow } from './local-window-policy.ts'
 import type { DesktopLocale } from './runtime.ts'
 import { applicationNeedsReveal, revealApplication } from './electron-reveal.ts'
 import { desktopRestartConfirmationCopy } from './tray-locale.ts'
@@ -34,7 +35,7 @@ const DEFAULT_RECOVERY_MIN_WIDTH = 680
 const DEFAULT_RECOVERY_MIN_HEIGHT = 560
 const RECOVERY_WORK_AREA_INSET = 48
 
-type RecoveryWindowResult = 'restart' | 'quit'
+export type RecoveryWindowResult = 'restart' | 'safe-mode' | 'quit'
 type RecoveryNoticeTone = 'info' | 'success' | 'warning' | 'error'
 
 export type { DesktopStartupFailureStage } from './recovery-copy.ts'
@@ -64,6 +65,10 @@ export interface DesktopStartupRecoveryWindowOptions {
   readonly openTerminal?: () => void | Promise<void>
   /** Main-process validated actions available from the failure generation. */
   readonly profileActions?: DesktopStartupRecoveryProfileActions
+  /** Prepare a fresh isolated environment before a Safe Mode relaunch. */
+  readonly enterSafeMode?: () => void | Promise<void>
+  /** True when this process already uses the disposable Safe Mode environment. */
+  readonly safeModeActive?: boolean
 }
 
 export interface DesktopStartupRecoveryProfile {
@@ -170,6 +175,8 @@ export interface DesktopStartupRecoveryViewModel {
   readonly profileActionToken?: string
   readonly terminalAvailable?: boolean
   readonly profileCreatorAvailable?: boolean
+  readonly safeModeAvailable?: boolean
+  readonly safeModeActive?: boolean
 }
 
 /** Parse only the fixed action origin used by the local shadcn recovery document. */
@@ -197,6 +204,7 @@ export function parseDesktopStartupRecoveryAction(
     'open-profile-directory',
     'open-terminal',
     'open-profile-creator',
+    'enter-safe-mode',
     'switch-profile',
     'restart',
     'quit',
@@ -229,10 +237,11 @@ export class DesktopStartupRecoveryWindow {
   private notice: RecoveryNotice | undefined
   private busy = false
   private restartReady = false
-  private activeTab: DesktopRecoveryTab = 'plugins'
+  private activeTab: DesktopRecoveryTab = 'quick'
   private profiles: readonly DesktopStartupRecoveryProfile[] | undefined
   private resolveResult: ((result: RecoveryWindowResult) => void) | undefined
   private settled = false
+  private renderTail: Promise<void> = Promise.resolve()
 
   constructor(private readonly options: DesktopStartupRecoveryWindowOptions) {}
 
@@ -246,29 +255,18 @@ export class DesktopStartupRecoveryWindow {
       this.snapshotError = cause instanceof Error ? cause.message : String(cause)
     }
     this.refreshProfiles()
-    const window = new BrowserWindow({
+    const window = createDesktopLocalWindow({
+      partition: 'dsh-recovery',
       title: copy.title,
       ...auxiliaryWindowChromeOptions(),
       ...desktopStartupRecoveryWindowBounds(),
       show: false,
       autoHideMenuBar: true,
       backgroundColor: '#202124',
-      webPreferences: {
-        contextIsolation: true,
-        nodeIntegration: false,
-        nodeIntegrationInSubFrames: false,
-        sandbox: true,
-        webSecurity: true,
-        webviewTag: false,
-        spellcheck: false,
-        partition: 'dsh-recovery',
-      },
     })
     this.window = window
     window.accessibleTitle = copy.title
     window.removeMenu()
-    window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
-    window.webContents.on('will-attach-webview', event => { event.preventDefault() })
     const navigate = (event: Electron.Event, href: string): void => {
       const action = parseDesktopStartupRecoveryAction(href)
       event.preventDefault()
@@ -283,6 +281,9 @@ export class DesktopStartupRecoveryWindow {
     app.on('activate', activate)
     if (process.platform === 'darwin') app.on('did-become-active', activate)
     window.once('ready-to-show', show)
+    window.on('close', event => {
+      if (this.busy && !this.settled) event.preventDefault()
+    })
     window.on('closed', () => {
       app.off('activate', activate)
       if (process.platform === 'darwin') app.off('did-become-active', activate)
@@ -351,7 +352,18 @@ export class DesktopStartupRecoveryWindow {
       } else if (action.action === 'open-profile-creator') {
         this.activeTab = 'profiles'
         if (this.options.profileActions === undefined) throw new Error('Profile creation is unavailable for this startup stage.')
+        const previousCurrent = this.profiles?.find(profile => profile.current)?.name
         await this.options.profileActions.openCreator()
+        this.refreshProfiles()
+        const selected = this.profiles?.find(profile => profile.current)?.name
+        if (selected !== undefined && selected !== previousCurrent) {
+          this.notice = {
+            tone: 'success',
+            title: selected,
+            body: copy.profileSelectedSuccess,
+          }
+          this.restartReady = true
+        }
       } else if (action.action === 'switch-profile' && action.id !== undefined && action.name !== undefined) {
         this.activeTab = 'profiles'
         const actions = this.options.profileActions
@@ -368,6 +380,15 @@ export class DesktopStartupRecoveryWindow {
           this.restartReady = true
           this.refreshProfiles()
         })
+      } else if (action.action === 'enter-safe-mode') {
+        this.activeTab = 'quick'
+        if (this.options.safeModeActive === true) return
+        if (this.options.enterSafeMode === undefined) throw new Error('Safe Mode is unavailable for this startup stage.')
+        if (await this.confirmSafeMode()) {
+          await this.runBusy(async () => { await this.options.enterSafeMode?.() })
+          this.finish('safe-mode')
+          return
+        }
       } else if (action.action === 'open-settings-document') {
         this.activeTab = 'diagnostics'
         await this.openConfigurationPath('settingsDocument')
@@ -478,10 +499,31 @@ export class DesktopStartupRecoveryWindow {
     }, window)
     return result.response === 0
   }
+
+  private async confirmSafeMode(): Promise<boolean> {
+    const window = this.window
+    if (window === undefined || window.isDestroyed()) return false
+    const copy = desktopRecoveryCopy(this.options.locale)
+    const result = await showDesktopMessageBox({
+      type: 'question',
+      title: copy.confirmSafeMode,
+      message: copy.confirmSafeModeMessage,
+      detail: copy.confirmSafeModeBody,
+      buttons: [copy.confirmSafeModeAction, copy.cancel],
+      defaultId: 1,
+      cancelId: 1,
+      noLink: true,
+    }, window)
+    return result.response === 0
+  }
   private async runBusy(operation: () => Promise<void>): Promise<void> {
     this.busy = true
-    await this.render()
-    try { await operation() } finally { this.busy = false }
+    try {
+      await this.render()
+      await operation()
+    } finally {
+      this.busy = false
+    }
   }
 
   private async refreshSnapshot(): Promise<void> {
@@ -545,7 +587,13 @@ export class DesktopStartupRecoveryWindow {
     }
   }
 
-  private async render(): Promise<void> {
+  private render(): Promise<void> {
+    const task = this.renderTail.then(async () => { await this.renderDocument() })
+    this.renderTail = task.catch(() => {})
+    return task
+  }
+
+  private async renderDocument(): Promise<void> {
     const window = this.window
     if (window === undefined || window.isDestroyed()) return
     const notice = this.notice
@@ -566,6 +614,8 @@ export class DesktopStartupRecoveryWindow {
       ...(this.options.profileActions === undefined ? {} : { profileActionToken: this.options.profileActions.token }),
       ...(this.options.openTerminal === undefined ? {} : { terminalAvailable: true }),
       ...(this.options.profileActions === undefined ? {} : { profileCreatorAvailable: true }),
+      ...(this.options.enterSafeMode === undefined ? {} : { safeModeAvailable: true }),
+      ...(this.options.safeModeActive === true ? { safeModeActive: true } : {}),
     }
     const state = Buffer.from(JSON.stringify(model), 'utf8').toString('base64url')
     await window.loadFile(RECOVERY_DOCUMENT, {

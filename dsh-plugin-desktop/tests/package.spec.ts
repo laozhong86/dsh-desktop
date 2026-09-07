@@ -147,7 +147,7 @@ describe('published package surface', () => {
   it('pins both selectable Market providers in the published runtime', () => {
     expect(manifest.dependencies).toMatchObject({
       'dsh-community-market': '0.1.0-dev.0',
-      dshmarket: '1.17.1',
+      dshmarket: '1.38.1',
     })
     expect(manifest.optionalDependencies ?? {}).not.toHaveProperty('dshmarket')
   })
@@ -398,7 +398,7 @@ describe('published package surface', () => {
     const main = readFileSync(new URL('src/main.ts', packageRoot), 'utf8')
     const profileImport = main.indexOf('createDesktopWebProfile,')
     const profileService = main.indexOf('await hostCtx.plugin(DesktopProfileService, {')
-    const create = main.indexOf('create: name => createDesktopWebProfile(homeDir, name),', profileService)
+    const create = main.indexOf('create: name => createFreshDesktopProfile(name),', profileService)
     const list = main.indexOf('list: () => listDesktopProfiles(homeDir),', profileService)
     const persist = main.indexOf('persistSelection: name => { selectDesktopProfile(selectionStatePath, homeDir, name) },', profileService)
     const restart = main.indexOf('requestRestart: () => runtime.requestRestart(),', profileService)
@@ -409,6 +409,7 @@ describe('published package surface', () => {
     expect(list).toBeGreaterThan(create)
     expect(persist).toBeGreaterThan(list)
     expect(restart).toBeGreaterThan(persist)
+    expect(main).not.toContain('persistProfileSelection')
   })
 
   it('wires local crash evidence before Electron becomes ready', () => {
@@ -492,7 +493,7 @@ describe('published package surface', () => {
     expect(main).toContain("setupResult.action === 'quit'")
     expect(main).toContain("setupResult.action === 'skip'")
     expect(main).toContain("'skipped',")
-    expect(main).toContain('clearDesktopSetupWizardState(marketUserDataDir, profileDir)')
+    expect(main).toContain('clearDesktopProfileUsageHistory(releaseUserDataLocations, profileDir)')
   })
 
   it('keeps active Profile preferences as the lazy source and serializes runtime mirrors', () => {
@@ -507,9 +508,11 @@ describe('published package surface', () => {
     const materialMigration = main.indexOf('migrateDesktopWindowMaterialSettings(', browserMigration)
     const lazyImport = main.indexOf('profilePreferences = await writeDesktopProfilePreferences(', materialMigration)
     const existingState = main.indexOf('} else {', lazyImport)
-    const mirrorSettings = main.indexOf('mirrorDesktopProfilePreferences(prepared.settingsDocument, profilePreferences)', existingState)
+    const mirrorSettings = main.indexOf('const profileSettingsChanged = await mirrorDesktopProfilePreferences(', existingState)
     const retryMaterialMigration = main.indexOf('migrateDesktopWindowMaterialSettings(', mirrorSettings)
     const mirrorMarket = main.indexOf('selectDesktopMarketProvider(marketUserDataDir, profilePreferences.market)', retryMaterialMigration)
+    const conditionalReprepare = main.indexOf('if (profileSettingsChanged || windowMaterialMigrated)', mirrorMarket)
+    const existingStateEnd = main.indexOf('// Safe Mode must reach the working surface', conditionalReprepare)
     const runtimeQueue = main.indexOf('const enqueueProfilePreferencesWrite = (')
     const flushEffect = main.indexOf("'dsh-plugin-desktop: flush Profile preference writes'", runtimeQueue)
     const marketController = main.indexOf('selectMarket: async provider => {', flushEffect)
@@ -537,6 +540,9 @@ describe('published package surface', () => {
     expect(mirrorSettings).toBeGreaterThan(existingState)
     expect(retryMaterialMigration).toBeGreaterThan(mirrorSettings)
     expect(mirrorMarket).toBeGreaterThan(retryMaterialMigration)
+    expect(conditionalReprepare).toBeGreaterThan(mirrorMarket)
+    expect(existingStateEnd).toBeGreaterThan(conditionalReprepare)
+    expect(main.slice(conditionalReprepare, existingStateEnd)).toContain('prepared = prepareDesktopProfile(')
     expect(runtimeQueue).toBeGreaterThan(mirrorMarket)
     expect(flushEffect).toBeGreaterThan(runtimeQueue)
     expect(marketStateWrite).toBeGreaterThan(marketController)
@@ -642,7 +648,12 @@ describe('published package surface', () => {
       'node_modules/**',
       'preset/**',
     ])
-    expect(manifest.build?.electronFuses).toEqual({ runAsNode: true })
+    expect(manifest.build?.electronFuses).toEqual({
+      enableEmbeddedAsarIntegrityValidation: true,
+      onlyLoadAppFromAsar: true,
+      resetAdHocDarwinSignature: true,
+      runAsNode: true,
+    })
     expect(manifest.build?.toolsets).toEqual({ nsis: '1.2.1' })
     expect(manifest.files).toEqual(expect.arrayContaining([
       'build/app-icon.png',

@@ -1,6 +1,6 @@
 {
   "name": "deepseek-harness-desktop",
-  "version": "2.0.4",
+  "version": "2.0.5",
   "private": true,
   "description": "DSH Desktop product workspace",
   "license": "MIT",
@@ -17,7 +17,6 @@
     "app-builder-lib@npm:26.15.7": "patch:app-builder-lib@npm%3A26.15.7#./patches/app-builder-lib@26.15.7.patch",
     "open@npm:11.0.1": "patch:open@npm%3A11.0.1#./patches/open@11.0.1.patch",
     "open@npm:^11.0.0": "patch:open@npm%3A11.0.1#./patches/open@11.0.1.patch",
-    "dshmarket@npm:1.17.1": "patch:dshmarket@npm%3A1.17.1#./.yarn/patches/dshmarket-npm-1.17.1-d9fe6da08c.patch",
     "koffi@npm:^3.1.0": "3.1.5",
     "@deepseek-ai/dsh-brand": "file:vendor/dsh-runtime/0.1.2-rc.1/deepseek-ai-dsh-brand-0.1.2-rc.1.tgz",
     "@deepseek-ai/dsh-invariants": "file:vendor/dsh-runtime/0.1.2-rc.1/deepseek-ai-dsh-invariants-0.1.2-rc.1.tgz",
@@ -260,7 +259,12 @@
     "@deepseek-ai/dsh-tool-terminal": "file:vendor/dsh-runtime/0.1.2-rc.1/deepseek-ai-dsh-tool-terminal-0.1.2-rc.1.tgz",
     "@deepseek-ai/dsh-typert-generator": "file:vendor/dsh-runtime/0.1.2-rc.1/deepseek-ai-dsh-typert-generator-0.1.2-rc.1.tgz",
     "@deepseek-ai/dsh-web-search-exa": "file:vendor/dsh-runtime/0.1.2-rc.1/deepseek-ai-dsh-web-search-exa-0.1.2-rc.1.tgz",
-    "@deepseek-ai/dsh-web-search-perplexity": "file:vendor/dsh-runtime/0.1.2-rc.1/deepseek-ai-dsh-web-search-perplexity-0.1.2-rc.1.tgz"
+    "@deepseek-ai/dsh-web-search-perplexity": "file:vendor/dsh-runtime/0.1.2-rc.1/deepseek-ai-dsh-web-search-perplexity-0.1.2-rc.1.tgz",
+    "dshmarket@npm:1.38.1": "patch:dshmarket@npm%3A1.38.1#./.yarn/patches/dshmarket-npm-1.38.1-775916754e.patch",
+    "fs-ext@npm:2.1.1": "patch:fs-ext@npm%3A2.1.1#./patches/fs-ext@2.1.1.patch",
+    "pnpm@npm:11.8.0": "patch:pnpm@npm%3A11.8.0#./patches/pnpm@11.8.0.patch",
+    "@vscode/ripgrep@npm:1.18.0": "patch:@vscode/ripgrep@npm%3A1.18.0#./patches/vscode-ripgrep@1.18.0.patch",
+    "@vscode/ripgrep@npm:^1.18.0": "patch:@vscode/ripgrep@npm%3A1.18.0#./patches/vscode-ripgrep@1.18.0.patch"
   },
   "dependenciesMeta": {
     "@deepseek-ai/dsh-subprocess-local": {

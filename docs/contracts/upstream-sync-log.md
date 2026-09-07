@@ -4,6 +4,15 @@
 
 ---
 
+## 2026-09-07 · #59 上游桌面壳稳定线融合（验证中）
+
+- 范围：merge-base `681ba66091fc5b1e827650137f69b3ee4c435922` 至冻结上游 `91b12fcd60fe85a39c6aa21dcd3056d89d0b69a4`（153 个上游提交）；fork base `2b72c8b13d0a73954286d09dccf14a359d31754f`。
+- 用户明确批准 C 级启动/Profile/更新融合，并要求保留上游 merge parent、稳定 DSH rc.1、OmniMux 品牌和物理运行时；本次不发布正式版、不上传 R2、不修改插件源仓。
+- 49 路径的分级与逐项解法、稳定线和打包例外见 [#59 合并记录](../evidence/issue-59-upstream-sync.md)。
+- 本地 `yarn check` 通过；PR CI、隔离 Electron/浏览器与 Dev 验收待完成。尚不可关闭 #59。
+
+---
+
 ## 2026-09-06 · pin runtime 0.1.2-rc.1（a66e470204，跟随侧边栏 0.18.0 升级）
 
 - **范围**：submodule `a66e4702047846cdaa10c66c9d3df3951f5ea70d`（`dsh-v0.1.2-rc.1`）；vendor `vendor/dsh-runtime/0.1.2-rc.1`（242 tarball，official profile）；`upstream.json` 更新指向 rc.1；desktop/market `@deepseek-ai/dsh*` → `0.1.2-rc.1`。

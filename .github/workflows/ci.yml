@@ -27,6 +27,10 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
         with:
+          # GitHub's pull-request merge ref can retain the base branch's
+          # submodule gitlink when the PR advances it to a descendant. Check
+          # out the actual PR head so pinned submodules match upstream.json.
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6
@@ -65,6 +69,7 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
         if: needs.changes.outputs.product == 'true'
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
           submodules: recursive
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6
@@ -99,6 +104,7 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
           submodules: recursive
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6
@@ -135,6 +141,7 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
           submodules: recursive
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6
@@ -164,6 +171,7 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
           submodules: recursive
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38  # v6

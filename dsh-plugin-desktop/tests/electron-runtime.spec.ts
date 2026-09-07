@@ -775,6 +775,66 @@ describe('Electron desktop runtime', () => {
     await release()
   })
 
+  it.each(['darwin', 'win32', 'linux'] as const)('selects multiple files in a parented %s dialog', async platform => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue(platform)
+    const paths = platform === 'win32' ? ['C:\\Work\\a.txt', 'C:\\Work\\b.mp4'] : ['/work/a.txt', '/work/b.mp4']
+    electron.dialog.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: paths })
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const runtime = new ElectronDesktopRuntime(async () => {})
+    const release = runtime.schedule(spec)
+    await runtime.mountScheduled()
+
+    await expect(runtime.pickFiles()).resolves.toEqual(paths)
+    expect(electron.dialog.showOpenDialog).toHaveBeenCalledExactlyOnceWith(
+      electron.browserWindows[0],
+      { properties: ['openFile', 'multiSelections'] },
+    )
+    await release()
+  })
+
+  it('returns no files on cancellation and allows the next picker', async () => {
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const runtime = new ElectronDesktopRuntime(async () => {})
+    electron.dialog.showOpenDialog.mockResolvedValueOnce({ canceled: true, filePaths: ['/discarded.txt'] })
+    await expect(runtime.pickFiles()).resolves.toEqual([])
+    electron.dialog.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: ['/chosen.txt'] })
+    await expect(runtime.pickFiles()).resolves.toEqual(['/chosen.txt'])
+    expect(electron.dialog.showOpenDialog).toHaveBeenNthCalledWith(1, { properties: ['openFile', 'multiSelections'] })
+  })
+
+  it('rejects overlapping file pickers and releases the guard after success or failure', async () => {
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const runtime = new ElectronDesktopRuntime(async () => {})
+    const selected = Promise.withResolvers<{ canceled: boolean, filePaths: string[] }>()
+    electron.dialog.showOpenDialog.mockReturnValueOnce(selected.promise)
+    const first = runtime.pickFiles()
+    await expect(runtime.pickFiles()).rejects.toMatchObject({ code: 'native-picker-busy' })
+    expect(electron.dialog.showOpenDialog).toHaveBeenCalledOnce()
+    selected.resolve({ canceled: false, filePaths: ['/chosen.txt'] })
+    await expect(first).resolves.toEqual(['/chosen.txt'])
+
+    const failure = new Error('Native dialog failed')
+    electron.dialog.showOpenDialog.mockRejectedValueOnce(failure)
+    await expect(runtime.pickFiles()).rejects.toBe(failure)
+    await expect(runtime.pickFiles()).resolves.toEqual([])
+    expect(electron.dialog.showOpenDialog).toHaveBeenCalledTimes(3)
+  })
+
+  it('uses the current shell parent after a generation is replaced', async () => {
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const runtime = new ElectronDesktopRuntime(async () => {})
+    const releaseFirst = runtime.schedule(spec)
+    await runtime.mountScheduled()
+    await runtime.pickFiles()
+    await releaseFirst()
+    const releaseSecond = runtime.schedule(spec)
+    await runtime.mountScheduled()
+    await runtime.pickFiles()
+    expect(electron.dialog.showOpenDialog).toHaveBeenNthCalledWith(2,
+      electron.browserWindows[1], { properties: ['openFile', 'multiSelections'] })
+    await releaseSecond()
+  })
+
   it('blocks unsupported workspace volumes without returning a risky path', async () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
     const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')

@@ -142,6 +142,7 @@ import {
   completeOmnimuxProfileMaterialization,
   seedOmnimuxProfile,
   resolveDesktopHarnessHome,
+  resolveDesktopL2Launch,
 } from './preset-profile.ts'
 import {
   createDesktopExitCoordinator,
@@ -330,8 +331,9 @@ async function mirrorDesktopProfilePreferences(
 }
 
 /** Start one Electron process and leave lifetime to the mounted desktop plugin. */
-async function start(): Promise<void> {
+async function start(l2: ReturnType<typeof resolveDesktopL2Launch>): Promise<void> {
   if (
+    l2 === undefined &&
     isOmnimuxDevLaunch({
       env: process.env,
       execPath: process.execPath,
@@ -567,7 +569,7 @@ async function start(): Promise<void> {
     })
     for (const [name, value] of Object.entries(shellEnvironmentResolution.updates)) process.env[name] = value
     // OmniMux Dev/Prod must bind their own home even when login-shell env carries DSH_HOME=~/.dsh.
-    const defaultAppHome = resolveDesktopHarnessHome({
+    const defaultAppHome = l2?.homeDir ?? resolveDesktopHarnessHome({
       env: process.env,
       userDataDir: app.getPath('userData'),
       appName: app.getName(),
@@ -1349,7 +1351,9 @@ async function start(): Promise<void> {
 }
 
 async function run(): Promise<void> {
-  app.setName(PRODUCT_NAME)
+  const l2 = resolveDesktopL2Launch({ argv: process.argv, isPackaged: app.isPackaged })
+  app.setName(l2 === undefined ? PRODUCT_NAME : `${PRODUCT_NAME} L2 ${l2.task}`)
+  if (l2 !== undefined) app.setPath('userData', l2.userDataDir)
   if (process.argv.includes('--export-diagnostics')) {
     try {
       await app.whenReady()
@@ -1373,7 +1377,7 @@ async function run(): Promise<void> {
     }
     return
   }
-  await start()
+  await start(l2)
 }
 
 /** Last-resort branch for launcher failures that happen before start's owned coordinator exists. */

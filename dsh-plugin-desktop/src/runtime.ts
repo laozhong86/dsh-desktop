@@ -218,6 +218,9 @@ export interface DesktopRuntime {
   /** Open the desktop operating system's native workspace-folder chooser. */
   pickDirectory(): Promise<string | null>
 
+  /** Select local files; cancellation returns an empty array and concurrent requests reject. */
+  pickFiles(): Promise<string[]>
+
   /** Open the isolated native Profile creator, focusing an existing instance. */
   openProfileCreateWindow(options: Omit<ProfileCreateWindowOptions, 'locale'>): void
 

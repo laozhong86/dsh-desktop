@@ -124,6 +124,7 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
   private rendererHealthGate: DesktopRendererHealthGate | undefined
   private profileCreateWindow: ProfileCreateWindow | undefined
   private restartRequest: Promise<void> | undefined
+  private filePickerPending = false
 
   constructor(
     private readonly restart: (target?: 'recovery') => Promise<void>,
@@ -277,6 +278,22 @@ export class ElectronDesktopRuntime implements DesktopRuntime {
   /** @inheritdoc */
   async pickDirectory(): Promise<string | null> {
     return await this.workspaceAdmission.pickDirectory()
+  }
+
+  async pickFiles(): Promise<string[]> {
+    if (this.filePickerPending) {
+      throw Object.assign(new Error('A native file picker is already open'), { code: 'native-picker-busy' })
+    }
+    this.filePickerPending = true
+    try {
+      const options: Electron.OpenDialogOptions = { properties: ['openFile', 'multiSelections'] }
+      const result = this.generation === undefined
+        ? await dialog.showOpenDialog(options)
+        : await this.generation.showOpenDialog(options)
+      return result.canceled ? [] : result.filePaths
+    } finally {
+      this.filePickerPending = false
+    }
   }
 
   /** @inheritdoc */

@@ -6,6 +6,8 @@ import {
   mkdtempSync,
   mkdirSync,
   readFileSync,
+  realpathSync,
+  statSync,
   readdirSync,
   renameSync,
   rmSync,
@@ -70,6 +72,35 @@ export interface SeedOmnimuxProfileResult {
   readonly refreshedPlugins: boolean
   /** True while a fresh Profile still needs its first successful pnpm install. */
   readonly materializationRequired: boolean
+}
+
+/** Explicit unpackaged Electron QA identity contained within one prepared L2 task. */
+export interface DesktopL2Launch {
+  task: string
+  homeDir: string
+  userDataDir: string
+}
+
+/** Resolve only the explicit task flag; ambient home/channel variables cannot opt into L2. */
+export function resolveDesktopL2Launch(options: {
+  argv: readonly string[]
+  isPackaged: boolean
+  homeDirectory?: string
+}): DesktopL2Launch | undefined {
+  const flags = options.argv.filter(arg => arg.startsWith('--omnimux-l2-task'))
+  if (flags.length === 0) return undefined
+  if (options.isPackaged) throw new Error('L2 task launch requires an unpackaged Electron runtime')
+  const task = flags.length === 1 ? /^--omnimux-l2-task=([A-Za-z0-9_-]+)$/.exec(flags[0]!)?.[1] : undefined
+  if (task === undefined) throw new Error('Expected one --omnimux-l2-task=<task> flag')
+  const userHome = realpathSync(options.homeDirectory ?? homedir())
+  const homeDir = join(userHome, '.dsh-dev', 'tasks', task)
+  const userDataDir = join(homeDir, 'electron-user-data')
+  for (const directory of [homeDir, userDataDir]) {
+    if (realpathSync(directory) !== directory || !statSync(directory).isDirectory()) {
+      throw new Error('L2 task home and electron-user-data must be prepared directories without symlink redirects')
+    }
+  }
+  return { task, homeDir, userDataDir }
 }
 
 /**

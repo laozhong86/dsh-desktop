@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir, homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { createRequire } from 'node:module'
@@ -8,6 +8,7 @@ import {
   completeOmnimuxProfileMaterialization,
   PROFILE_MATERIALIZATION_PENDING,
   resolveDesktopHarnessHome,
+  resolveDesktopL2Launch,
   resolveHarnessHome,
   replaceManagedHub,
   seedOmnimuxProfile,
@@ -105,6 +106,44 @@ function createPreset(root: string, complete = true, channel: 'production' | 'de
   }
   return preset
 }
+
+describe('explicit L2 desktop launch', () => {
+  it('leaves normal launch unchanged without the task flag', () => {
+    expect(resolveDesktopL2Launch({ argv: ['electron', 'main.js'], isPackaged: true })).toBeUndefined()
+  })
+
+  it.each(['--omnimux-l2-task=', '--omnimux-l2-task=../escape', '--omnimux-l2-task=/tmp/task', '--omnimux-l2-task'])('rejects invalid task flag %s', flag => {
+    expect(() => resolveDesktopL2Launch({ argv: [flag], isPackaged: false })).toThrow('Expected one')
+  })
+
+  it('rejects duplicate flags and packaged launches', () => {
+    const flag = '--omnimux-l2-task=composer-61'
+    expect(() => resolveDesktopL2Launch({ argv: [flag, flag], isPackaged: false })).toThrow('Expected one')
+    expect(() => resolveDesktopL2Launch({ argv: [flag], isPackaged: true })).toThrow('unpackaged')
+  })
+
+  it('uses prepared task directories and rejects missing or redirected destinations', () => {
+    const root = mkdtempSync(join(tmpdir(), 'desktop-l2-launch-'))
+    // macOS temporary directories may have an aliased /var prefix.
+    const userHome = realpathSync(root)
+    const homeDir = join(userHome, '.dsh-dev', 'tasks', 'composer-61')
+    const userDataDir = join(homeDir, 'electron-user-data')
+    const options = { argv: ['--omnimux-l2-task=composer-61'], isPackaged: false, homeDirectory: userHome }
+    try {
+      expect(() => resolveDesktopL2Launch(options)).toThrow()
+      mkdirSync(userDataDir, { recursive: true })
+      expect(resolveDesktopL2Launch(options)).toEqual({ task: 'composer-61', homeDir, userDataDir })
+      rmSync(userDataDir, { recursive: true })
+      const outside = join(userHome, 'outside')
+      mkdirSync(outside)
+      symlinkSync(outside, userDataDir, process.platform === 'win32' ? 'junction' : 'dir')
+      expect(() => resolveDesktopL2Launch(options)).toThrow('symlink redirects')
+      rmSync(homeDir, { recursive: true })
+      symlinkSync(outside, homeDir, process.platform === 'win32' ? 'junction' : 'dir')
+      expect(() => resolveDesktopL2Launch(options)).toThrow('symlink redirects')
+    } finally { rmSync(root, { recursive: true, force: true }) }
+  })
+})
 
 describe('resolveDesktopHarnessHome', () => {
   it('routes OmniMux Dev to ~/.omnimux-dev even when ambient DSH_HOME points at ~/.dsh', () => {

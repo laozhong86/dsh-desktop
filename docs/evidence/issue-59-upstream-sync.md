@@ -70,7 +70,7 @@
 - 排除 605 个 Beta 专属 workspace、vendor、patch 与 variant 检查文件；保持 rc.1 gitlink 和单通道 CI。
 - `app.asar.unpacked` 保留完整物理 CLI/Worker/preset 依赖树，不采用上游 1,500 文件 / 128 MiB 限额。最终 Fuse hook 仍运行真实 Electron 子进程检查。
 - 新版 dshmarket 原生的 `exactNpmArgs` / `runExternalMarketPluginInstall` 已覆盖旧精确安装补丁；`readProfileManifestSnapshot` / `restoreProfileManifest` 原生回滚 dependencies 与完整 bundles 字段。保留新版本有效自更新补丁。
-- 上游 Windows NSIS A/B 反向 patch 的 include 路径补全 `./`；实测旧写法静默跳过目标，修正后的回归通过。
+- Windows NSIS A/B 反向 patch 使用包相对 include 路径，移除多余的 `--directory=.`。macOS 与 CI 的 Git 对 `./` 归一化行为不同，原组合会静默跳过目标；使用 `-C` 与 `GIT_CEILING_DIRECTORIES` 确定隔离目录。
 
 - 移除仅服务跨通道提示、已无调用方的独立 Profile selector 与相关文案；Profile 创建/切换仍由现有恢复与设置流程提供。
 
@@ -78,7 +78,9 @@
 
 - macOS arm64 development preset 成功暂存 286 个包；unsigned package-dir 和 Dev identity stamp 成功。候选包 build-info：Desktop 2.0.5、DSH 0.1.2-rc.1、上游 91b12fcd60、候选 7ca3a7331b。
 - 最终 Fuse hook 实际验证 RunAsNode、ASAR integrity、OnlyLoadAppFromAsar，并执行打包 Electron 的 DSH CLI、pnpm CLI、Profile/CJS/ripgrep、Desktop CLI composition 和 Loader boot 五项检查，全部通过。
-- 首轮 macOS 目录构建暴露空目标表：electron-builder 26.15.7 的 MacPackager 对 dir 不调用 mapper。已支持此结果，相关 21 项回归和 typecheck 通过。CI 的两个尾部空行同时清理，最新 changes gate 已通过。
+- 首轮 macOS 目录构建暴露空目标表：electron-builder 26.15.7 的 MacPackager 对 dir 不调用 mapper。已支持此结果，相关 21 项回归和 typecheck 通过。CI 的两个尾部空行同时清理，changes gate 已通过。
 - 隔离任务 `issue59-upstream-qa` 使用独立 home / Electron userData；正常启动、Safe Mode、恢复正常分别报告 renderer healthy（24.282 s / 1.619 s / 3.191 s）。正常运行 ID `d0c041cc-937f-4243-8c20-a0f64ba2408e`，Safe Mode `b6e74eb0-3cfd-443c-bb9b-96f727018c27`，恢复正常 `4c19d6f4-bca3-4cd5-b281-0e6ea563bc28`。
 - Safe Mode 只有 dsh-base / dsh-web-app，没有 OmniMux preset。正常 settings、Profile manifest 和 Hub snapshot manifest 哈希未变；退出后 safe-mode 目录被删除。
 - Codex 内置浏览器打开本地 45959 返回 `net::ERR_BLOCKED_BY_CLIENT`。仅健康信号与运行时检查不能替代交互验收；尚无浏览器验收通过证据。
+
+- 后续 Linux CI 发现 NSIS A/B 路径匹配差异，已去掉 `--directory=.` 并恢复规范 include 路径；本地真实 reverse-apply 回归通过（17 passed / 1 skipped），等待远端复验。

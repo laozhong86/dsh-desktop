@@ -14,11 +14,18 @@ import { applyDesktopSettings } from './desktop-settings.ts'
 import { installDesktopDirectoryPickerBridge } from './directory-picker.ts'
 import { parseDesktopClientEnvironment } from './environment.ts'
 import { applyExtendedShell, applyFramedShell } from './extended-shell.ts'
+import { installDesktopTitleBarDoubleClick } from './titlebar-double-click.ts'
 import { desktopWindowService, provideDesktopWindow } from './window-service.ts'
 
 export { applyAdvancedShell } from './advanced-shell.ts'
 export { applyDesktopSettings } from './desktop-settings.ts'
 export { applyExtendedShell, applyFramedShell } from './extended-shell.ts'
+export {
+  installDesktopTitleBarDoubleClick,
+  shouldTriggerTitleBarDoubleClick,
+  TITLEBAR_INTERACTIVE_SELECTORS,
+  TITLEBAR_MAX_CLIENT_Y,
+} from './titlebar-double-click.ts'
 export {
   createDesktopSettingsApi,
   desktopSettingsPaths,
@@ -96,6 +103,12 @@ export function apply(ctx: ClientContext): void {
     ctx.effect(
       () => installDesktopDirectoryPickerBridge(),
       'dsh-plugin-desktop: native directory picker bridge',
+    )
+  }
+  if (environment.platform !== 'linux') {
+    ctx.effect(
+      () => installDesktopTitleBarDoubleClick(environment.platform),
+      'dsh-plugin-desktop: native titlebar double-click',
     )
   }
   if (environment.mode === 'advanced') applyAdvancedShell(ctx, environment)

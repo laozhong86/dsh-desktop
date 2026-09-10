@@ -17,6 +17,7 @@ import type { ElectronPlatformStrategy } from './electron-platform.ts'
 import type { DesktopNotification, DesktopShellSpec } from './runtime.ts'
 import { prepareTrayIcon } from './tray-icons.ts'
 import { desktopWindowOptions } from './window-options.ts'
+import { attachTitleBarDoubleClickListener } from './titlebar-double-click.ts'
 import type { DesktopRendererAccessHeader } from './desktop-browser-access.ts'
 import {
   fitMainWindowBounds,
@@ -388,6 +389,10 @@ export class ElectronShellGeneration {
     window.on('move', scheduleWindowStateWrite)
     window.on('resize', scheduleWindowStateWrite)
     window.on('page-title-updated', preserveBlankTitle)
+    const detachTitleBarDoubleClickListener = attachTitleBarDoubleClickListener({
+      window,
+      platform: platform.platform,
+    })
     window.webContents.on('before-input-event', handleZoomShortcut)
     window.webContents.on('will-frame-navigate', navigate)
     window.webContents.on('will-redirect', redirect)
@@ -418,6 +423,7 @@ export class ElectronShellGeneration {
       window.off('resize', scheduleWindowStateWrite)
       window.off('page-title-updated', preserveBlankTitle)
       window.off('ready-to-show', revealStartupSurface)
+      detachTitleBarDoubleClickListener()
       cleanupFullscreenTransition()
       window.webContents.off('before-input-event', handleZoomShortcut)
       window.webContents.off('will-frame-navigate', navigate)

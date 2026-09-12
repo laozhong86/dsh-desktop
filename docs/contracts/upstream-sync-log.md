@@ -35,6 +35,7 @@
   - 已清：`.github/workflows/ci.yml` 的 beta workspace 循环；全仓已无 `claimDesktopLayout` / `resolveRequiredBundle` / `DETAILS_*` / `stageShippedAgentPresets` 引用。
   - 待跟进（非本次合并引入）：`dsh-plugin-desktop/dist/mac-release/**` 与 `dist/OmniMux.app-2.0.2-bak/**` 内打包的 `pnpm` 仍是未打补丁的旧副本，若作为候选发布物需重新 stage/打包。
 - **测试断言对账**：20 个失败用例全部为「断言仍描述合并前世界」，逐项以合并后实现为准：`package.spec`（窗口安全策略/Profile checkpoint/compat 选择器列表已随 fork 的移除而更新；托盘色 `#7961f2`、iOS 图标 sha256、macOS 图标 8-bit sRGB 按实际产物重算）、`updates.spec`（取消 Beta 双频道，改单 stable 且保留「旧版本永不安装、安装必经显式动作」）、`dev-package.spec`（`package:dir` 链补 `prepare:electron-native`）、`desktop-data-directory.spec`（profile 名 `omnimux`）、`plugin.spec`（productName `OmniMux`）、`client-narrow-breakpoint.spec`（SSR 用例改 `GlobalStandardProps`，窄屏契约断言原样保留）；`dshmarket-compat` / `profile` / `pnpm` 三个文件零改动（失败全部源于陈旧 node_modules）。无删除用例、无放水断言。
+- **preset 种子校验口径**：`verifySelectiveUnpackedRuntime` 新增 `requirePreset`（默认 `true`，所有直接调用方维持严格），`verifyPackagedRuntime` 按桌面包是否真的 stage 出 `preset/plugins/omnimux/package.json`（由脚本自身位置推导，不读 `process.cwd()`）决定该值；未 stage 时跳过校验并在 stderr 输出单行声明。CI 打包 job 不 stage（无 plugins 源），故只验证打包链路本身；发布打包仍必须 stage 后才能通过严格校验。
 
 ## 2026-09-07 · #59 上游桌面壳稳定线融合（验证中）
 

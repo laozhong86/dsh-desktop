@@ -16,11 +16,13 @@ import {
   formatUnpackedRuntimeSummary,
   FORBIDDEN_UNPACKED_RUNTIME_ENTRIES,
   indexPackagedAsarHeader,
+  isPresetSeedStaged,
   listDesktopRuntimeEntries,
   MAX_PNPM_SMART_UNPACK_BYTES,
   MAX_PNPM_SMART_UNPACK_FILES,
   MAX_UNPACKED_RUNTIME_BYTES,
   MAX_UNPACKED_RUNTIME_FILES,
+  PRESET_SEED_NOT_STAGED_NOTICE,
   REQUIRED_AGENT_PRESET_RUNTIME_ENTRIES,
   REQUIRED_DSH_CLI_RUNTIME_ENTRIES,
   REQUIRED_PACKAGED_RUNTIME_ENTRIES,
@@ -36,6 +38,7 @@ import {
   resolvePackagedUnpackedRoot,
   resolveRuntimePackageRoot,
   smokePackagedElectronRuntime,
+  STAGED_PRESET_SEED_MANIFEST,
   summarizeUnpackedRuntime,
   UNPACKED_PRESET_PREFIX,
   verifyPackagedRuntime,
@@ -288,6 +291,57 @@ describe('packaged desktop runtime verification', () => {
       '/build/resources/app.asar.unpacked',
       partial,
     )).toThrow(`missing required OmniMux preset seed entries: ${dropped}`)
+  })
+
+  it('requires the preset seed only while the desktop package staged one', () => {
+    const unpackedRoot = '/build/resources/app.asar.unpacked'
+    const staged = [...PRESET_SEED_FILES, { path: 'build/app-icon.png', bytes: 1 }]
+    const unStaged = [{ path: 'build/app-icon.png', bytes: 1 }]
+    const stagedIndex = asarIndex(staged.map(file => file.path))
+    const unStagedIndex = asarIndex(unStaged.map(file => file.path))
+
+    // A staged seed is verified for strict and lenient callers alike.
+    for (const requirePreset of [true, false]) {
+      expect(() => verifySelectiveUnpackedRuntime(
+        stagedIndex,
+        unpackedRoot,
+        staged,
+        undefined,
+        requirePreset,
+      )).not.toThrow()
+    }
+
+    // An un-staged seed fails loud for every direct caller, which defaults strict.
+    expect(() => verifySelectiveUnpackedRuntime(unStagedIndex, unpackedRoot, unStaged))
+      .toThrow(`missing required OmniMux preset seed entries: ${REQUIRED_PRESET_RUNTIME_ENTRIES[0]}`)
+    expect(() => verifySelectiveUnpackedRuntime(unStagedIndex, unpackedRoot, unStaged, undefined, true))
+      .toThrow('missing required OmniMux preset seed entries')
+
+    // The un-staged caller opts out and discloses the skipped check on one line.
+    const notice = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    try {
+      expect(() => verifySelectiveUnpackedRuntime(
+        unStagedIndex,
+        unpackedRoot,
+        unStaged,
+        undefined,
+        false,
+      )).not.toThrow()
+      expect(notice).toHaveBeenCalledTimes(1)
+      const line = String(notice.mock.calls[0]?.[0] ?? '')
+      expect(line).toBe(`${PRESET_SEED_NOT_STAGED_NOTICE}\n`)
+      expect(line.trimEnd()).not.toContain('\n')
+    } finally {
+      notice.mockRestore()
+    }
+  })
+
+  it('probes the staged preset seed inside the desktop package root', () => {
+    expect(STAGED_PRESET_SEED_MANIFEST).toBe(REQUIRED_PRESET_RUNTIME_ENTRIES[2])
+    const present = vi.fn(() => true)
+    expect(isPresetSeedStaged(present, '/desktop')).toBe(true)
+    expect(present).toHaveBeenCalledWith(join('/desktop', STAGED_PRESET_SEED_MANIFEST))
+    expect(isPresetSeedStaged(() => false, '/desktop')).toBe(false)
   })
 
   it('recursively derives every non-map desktop runtime file from the completed build', () => {

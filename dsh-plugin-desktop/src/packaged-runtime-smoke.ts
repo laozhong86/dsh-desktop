@@ -26,7 +26,7 @@ function assert(condition: unknown, message: string): asserts condition {
 
 const installAnchor = new URL('../package.json', import.meta.url)
 assert(
-  /([\\/])app\.asar\.unpacked\1/u.test(installAnchor.pathname),
+  /([\\/])app\.asar\1/u.test(installAnchor.pathname),
   `did not start from app.asar: ${installAnchor.pathname}`,
 )
 assert(
@@ -79,7 +79,7 @@ async function smokeSessionMigration(): Promise<void> {
   }
 }
 
-/** Exercise the production Worker entry through Electron's physical unpacked path. */
+/** Exercise the production Worker entry through Electron's logical ASAR path. */
 async function smokeDiagnosticExportWorker(): Promise<void> {
   const root = mkdtempSync(join(tmpdir(), 'dsh-packaged-diagnostics-'))
   const logsDir = join(root, 'logs')
@@ -193,7 +193,7 @@ try {
     assert(typeof consumer.yamlUtil?.createNode === 'function', 'did not resolve an exact conditional subpath')
     assert(
       typeof consumer.frontend === 'string'
-        && /([\\/])app\.asar\.unpacked\1/u.test(consumer.frontend)
+        && /([\\/])app\.asar\1/u.test(consumer.frontend)
         && consumer.frontend.endsWith(join('dist', 'index.html')),
       `did not resolve a wildcard export inside app.asar: ${String(consumer.frontend)}`,
     )

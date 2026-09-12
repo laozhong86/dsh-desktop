@@ -127,6 +127,20 @@ export const REQUIRED_PRESET_RUNTIME_ENTRIES = [
   'preset/plugins/omnimux/package.json',
 ] as const
 
+/**
+ * Package-relative manifest of the staged OmniMux preset seed.
+ *
+ * `stage-preset-profile` is the only writer, so its presence in the desktop
+ * package is what separates a release package (which must ship the seed) from
+ * an un-staged smoke build (which has no plugins source to stage at all).
+ */
+export const STAGED_PRESET_SEED_MANIFEST = 'preset/plugins/omnimux/package.json'
+
+/** Single-line disclosure for a package verified while the preset seed was not staged. */
+export const PRESET_SEED_NOT_STAGED_NOTICE =
+  `dsh-plugin-desktop: the OmniMux preset seed ${STAGED_PRESET_SEED_MANIFEST} was not staged, `
+  + 'so the unpacked preset entries were not verified; run stage-preset-profile before a release package'
+
 /** AfterPack fields consumed without importing Electron Builder's incomplete declaration graph. */
 export interface PackagedRuntimeContext {
   /** Completed platform application directory. */
@@ -629,12 +643,18 @@ export function formatUnpackedRuntimeSummary(summary: UnpackedRuntimeSummary): s
  * Reject a regression back to the old full app.asar mirror. Header unpacked
  * leaves and physical file/symlink leaves must match exactly before the native
  * allowlist and payload budgets are applied.
+ *
+ * `requirePreset` keeps the release preset-seed guarantee strict for every
+ * direct caller. A caller that already knows the seed was never staged — an
+ * un-staged CI smoke, which has no plugins source at all — passes false; the
+ * skipped check is then disclosed on stderr instead of failing the build.
  */
 export function verifySelectiveUnpackedRuntime(
   archive: PackagedAsarIndex,
   unpackedRoot: string,
   files: readonly UnpackedRuntimeFile[],
   allowedDesktopEntries: readonly string[] = REQUIRED_UNPACKED_RUNTIME_ENTRIES,
+  requirePreset: boolean = true,
 ): UnpackedRuntimeSummary {
   const normalizedFiles = files.map(file => ({
     path: normalizeArchiveEntry(file.path),
@@ -690,9 +710,12 @@ export function verifySelectiveUnpackedRuntime(
   }
   const missingPreset = REQUIRED_PRESET_RUNTIME_ENTRIES.filter(entry => !seen.has(entry))
   if (missingPreset.length > 0) {
-    throw new Error(
-      `dsh-plugin-desktop: unpacked runtime at ${unpackedRoot} is missing required OmniMux preset seed entries: ${missingPreset.join(', ')}; inventory: ${inventory}`,
-    )
+    if (requirePreset) {
+      throw new Error(
+        `dsh-plugin-desktop: unpacked runtime at ${unpackedRoot} is missing required OmniMux preset seed entries: ${missingPreset.join(', ')}; inventory: ${inventory}`,
+      )
+    }
+    process.stderr.write(`${PRESET_SEED_NOT_STAGED_NOTICE}\n`)
   }
   const forbidden = FORBIDDEN_UNPACKED_RUNTIME_ENTRIES
     .filter(entry => seen.has(entry))
@@ -748,6 +771,22 @@ export function verifySelectiveUnpackedRuntime(
     )
   }
   return summary
+}
+
+/**
+ * Report whether this package staged the OmniMux preset seed release packages
+ * must ship. The probe runs against the desktop package root derived from this
+ * script's own location, never the builder's project directory or the caller's
+ * working directory.
+ * @param probe - physical-file probe, injectable for focused tests.
+ * @param desktopRoot - desktop package root holding `preset/`.
+ * @returns true when `stage-preset-profile` materialized the seed manifest.
+ */
+export function isPresetSeedStaged(
+  probe: FileProbe = existsSync,
+  desktopRoot: string = DESKTOP_PACKAGE_ROOT,
+): boolean {
+  return probe(join(desktopRoot, STAGED_PRESET_SEED_MANIFEST))
 }
 
 /**
@@ -828,6 +867,7 @@ export function verifyPackagedRuntime(
     unpackedRoot,
     listUnpacked(unpackedRoot),
     desktopPhysicalEntries,
+    isPresetSeedStaged(),
   )
 }
 

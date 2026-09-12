@@ -16,13 +16,14 @@ import {
   PackageOverlayNotFoundError,
   type PackageOverlayCandidate,
 } from './package-overlay.ts'
-import { unpackedAsarPath } from './packaged-runtime-path.ts'
 import { retainAsarModuleResolver } from './asar-module-resolver-state.ts'
 
 const LOADER_ENTRY_URL = import.meta.resolve('@deepseek-ai/cordis-plugin-loader')
-// Resolve CLI, Worker and Profile dependencies against the same physical tree.
-const DESKTOP_ENTRY_URL = pathToFileURL(unpackedAsarPath(fileURLToPath(new URL('../lib/index.js', import.meta.url)))).href
-const DESKTOP_PACKAGE_URL = pathToFileURL(unpackedAsarPath(fileURLToPath(new URL('../package.json', import.meta.url)))).href
+// Keep installation resolution in Electron's logical ASAR tree. Native
+// payloads are redirected by Electron Builder, while ordinary modules avoid a
+// second physical node_modules tree and its Windows antivirus I/O cost.
+const DESKTOP_ENTRY_URL = pathToFileURL(fileURLToPath(new URL('../lib/index.js', import.meta.url))).href
+const DESKTOP_PACKAGE_URL = pathToFileURL(fileURLToPath(new URL('../package.json', import.meta.url))).href
 const DESKTOP_REQUIRE = createRequire(DESKTOP_ENTRY_URL)
 const PROCESS_RESOLVER = Symbol.for('dsh-plugin-desktop.profile-package-resolver.v1')
 

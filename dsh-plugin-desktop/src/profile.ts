@@ -41,7 +41,6 @@ import FileSettingsProvider, {
   type Config as SettingsFileConfig,
 } from '@deepseek-ai/dsh-settings-file'
 import { parseAllDocuments, parseDocument } from 'yaml'
-import { unpackedAsarPath } from './packaged-runtime-path.ts'
 import { findOverlayPackage, resolveOverlayPackage } from './package-overlay.ts'
 import { DESKTOP_DEFAULT_WEB_PORT, defaultDesktopWebPort } from './desktop-port.ts'
 import { withAsarModuleResolver } from './asar-module-resolver-state.ts'
@@ -93,8 +92,10 @@ const BIN_NAME = DESKTOP_PACKAGE_NAME
 const REQUIRED_BUNDLES = requiredWebBundles()
 const REQUIRED_BUNDLE_SET = new Set(REQUIRED_BUNDLES)
 const OBSOLETE_DESKTOP_BUNDLE_SET = new Set(['@deepseek-ai/dsh-desktop-app'])
-// CLI and Worker processes share the physical installation dependency anchor.
-const INSTALL_ANCHOR = unpackedAsarPath(fileURLToPath(new URL('../package.json', import.meta.url)))
+// CLI and Worker processes share the installation dependency anchor. It stays
+// on the logical ASAR path: only Electron Builder's unpacked native payloads
+// are physical, while every ordinary dependency is read from inside app.asar.
+const INSTALL_ANCHOR = fileURLToPath(new URL('../package.json', import.meta.url))
 const DESKTOP_PATCH_PATH = fileURLToPath(new URL('../cordis.patch.yml', import.meta.url))
 const PWSH_SANDBOX_ROW_ID = 'pwsh-sandbox'
 const UPSTREAM_PWSH_SANDBOX_PACKAGE = '@deepseek-ai/dsh-pwsh-sandbox'
@@ -577,9 +578,9 @@ function loadRecoveryFilteredProfile(
 /** Resolve the agent presets shipped by the matching presets dependency. */
 export function shippedPresetRoot(moduleUrl: string = import.meta.url): string {
   const require = createRequire(moduleUrl)
-  return unpackedAsarPath(
-    join(dirname(require.resolve('@deepseek-ai/dsh-agent-presets/package.json')), 'presets'),
-  )
+  // Preset inputs are archived read-only data, so the root stays logical and
+  // Electron's ASAR filesystem answers the presets plugin's reads.
+  return join(dirname(require.resolve('@deepseek-ai/dsh-agent-presets/package.json')), 'presets')
 }
 
 /** Read a row's object config without trusting arbitrary YAML values. */

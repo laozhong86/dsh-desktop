@@ -138,7 +138,7 @@ describe('packaged dsh bootstrap', () => {
       .toThrow('invalid profile name')
   })
 
-  it('uses the physical unpacked dependency tree only inside an Electron package', () => {
+  it('maps a logical ASAR path to the physical twin reserved for unpacked native payloads', () => {
     expect(unpackedAsarPath('/Applications/DSH Desktop.app/Contents/Resources/app.asar/node_modules/pkg'))
       .toBe('/Applications/DSH Desktop.app/Contents/Resources/app.asar.unpacked/node_modules/pkg')
     expect(unpackedAsarPath('C:\\Program Files\\DSH Desktop\\resources\\app.asar\\node_modules\\pkg'))
@@ -150,7 +150,7 @@ describe('packaged dsh bootstrap', () => {
       .toThrow('relative POSIX path')
   })
 
-  it('resolves JavaScript dependencies in the physical unpacked tree', () => {
+  it('resolves JavaScript dependencies on the logical ASAR path', () => {
     const root = mkdtempSync(join(tmpdir(), 'dsh-desktop-asar-profile-'))
     const desktopLib = join(root, 'app.asar', 'lib')
     const dshPackage = join(root, 'app.asar', 'node_modules', '@deepseek-ai', 'dsh')
@@ -164,9 +164,11 @@ describe('packaged dsh bootstrap', () => {
       writeFileSync(join(dshPackage, 'lib', 'bin.js'), '')
 
       const moduleUrl = pathToFileURL(join(desktopLib, 'desktop-cli.js')).href
+      // Selective packaging keeps every ordinary module inside app.asar, so the
+      // entry must stay logical for Electron's patched loader to execute it.
       expect(packagedDependencyPath(moduleUrl, '@deepseek-ai/dsh/lib/bin.js')).toBe(join(
         realpathSync(root),
-        'app.asar.unpacked',
+        'app.asar',
         'node_modules',
         '@deepseek-ai',
         'dsh',

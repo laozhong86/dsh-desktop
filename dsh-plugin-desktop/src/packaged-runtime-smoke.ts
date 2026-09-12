@@ -16,6 +16,7 @@ import { pathToFileURL } from 'node:url'
 import { rgPath } from '@vscode/ripgrep'
 import AdmZip from 'adm-zip'
 import { exportDiagnosticsZip } from './diagnostic-export.ts'
+import { unpackedAsarPath } from './packaged-runtime-path.ts'
 import { installProfilePackageResolver } from './module-resolution.ts'
 
 const OK_MARKER = 'DSH_PACKAGED_RUNTIME_OK'
@@ -32,15 +33,16 @@ assert(
 // The ripgrep shim stays inside app.asar by contract (see
 // FORBIDDEN_UNPACKED_RUNTIME_ENTRIES in scripts/verify-packaged-runtime.ts), so
 // the logical resolution names app.asar even though the executable itself is
-// unpacked. Resolve the physical twin: ripgrep must exist on disk and run, which
-// is the guarantee that matters.
-const unpackedRgPath = rgPath.replace(/([\\/])app\.asar\1/u, '$1app.asar.unpacked$1')
+// unpacked. Run the physical twin: the OS cannot exec a path that traverses the
+// archive (ENOTDIR), and Electron's child_process ASAR redirect does not cover
+// this ESM caller. Existence and a real `--version` run are the guarantees that
+// matter, on both layouts.
+const executableRgPath = unpackedAsarPath(rgPath)
 assert(
-  /([\\/])app\.asar\.unpacked\1/u.test(unpackedRgPath),
+  /([\\/])app\.asar\.unpacked\1/u.test(executableRgPath),
   `resolved ripgrep outside app.asar.unpacked: ${rgPath}`,
 )
-const executableRgPath = existsSync(rgPath) ? rgPath : unpackedRgPath
-assert(existsSync(executableRgPath), `cannot find ripgrep at ${rgPath}`)
+assert(existsSync(executableRgPath), `cannot find ripgrep at ${executableRgPath}`)
 const rgVersion = execFileSync(executableRgPath, ['--version'], { encoding: 'utf8', windowsHide: true })
 assert(/^ripgrep\s/u.test(rgVersion), `received an invalid ripgrep version: ${JSON.stringify(rgVersion.trim())}`)
 if (process.platform === 'win32') {

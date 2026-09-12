@@ -473,6 +473,39 @@ describe('managed OmniMux Profile rebuild', () => {
     }
   }, 30_000)
 
+  it('drops a legacy Profile-local dependency the staged preset does not own', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'managed-profile-legacy-drop-'))
+    try {
+      const presetDir = createPreset(root)
+      const profileDir = createLegacyProfile(root)
+      // A preset-era Profile keeps every package locally, including the Alpha
+      // packages a production preset excludes.
+      const manifest = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8')) as {
+        dependencies: Record<string, string>
+      }
+      manifest.dependencies['omnimux-accounts'] = 'file:./node_modules/omnimux-accounts'
+      writeJson(join(profileDir, 'package.json'), manifest)
+      writePackage(join(profileDir, 'node_modules'), 'omnimux-accounts', 'legacy-alpha')
+
+      const result = await rebuildManagedProfile({
+        profileDir,
+        presetDir,
+        ownedPackages: OWNED,
+        packedFiles: pnpmPackedFiles,
+        materialize: pnpmMaterialize,
+      })
+
+      const published = JSON.parse(readFileSync(join(profileDir, 'package.json'), 'utf8')) as {
+        dependencies: Record<string, string>
+      }
+      expect(published.dependencies['omnimux-accounts']).toBeUndefined()
+      expect(result.droppedLegacySources).toEqual(['omnimux-accounts'])
+      expect(existsSync(join(profileDir, 'node_modules', 'omnimux-accounts'))).toBe(false)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  }, 30_000)
+
   it('accepts real pnpm installs with import-only and require-only root exports', async () => {
     const root = mkdtempSync(join(tmpdir(), 'managed-profile-import-only-'))
     try {

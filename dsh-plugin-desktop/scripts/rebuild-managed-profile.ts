@@ -11,13 +11,20 @@ import { assertPhysicalProfileBoundary, rebuildManagedProfile } from '../src/man
 import { materializeProfile } from '../src/profile-materializer.ts'
 import { readOwnedPackages } from '../src/preset-profile.ts'
 
+/** Homes whose managed Profiles this rebuild can establish. */
+const PROFILE_TARGETS = Object.freeze({
+  dev: join(homedir(), '.omnimux-dev'),
+  prod: join(homedir(), '.omnimux'),
+})
+type ProfileTarget = keyof typeof PROFILE_TARGETS
+
 interface Arguments {
-  readonly target: 'dev'
+  readonly target: ProfileTarget
   readonly app: string
 }
 
 function usage(): never {
-  throw new Error('usage: yarn omnimux:profile rebuild --target dev --app <frozen-candidate.app>')
+  throw new Error('usage: yarn omnimux:profile rebuild --target dev|prod --app <frozen-candidate.app>')
 }
 
 function parseArguments(argv: readonly string[]): Arguments {
@@ -32,7 +39,7 @@ function parseArguments(argv: readonly string[]): Arguments {
     else app = value
     index += 1
   }
-  if (target !== 'dev' || app === undefined) usage()
+  if ((target !== 'dev' && target !== 'prod') || app === undefined) usage()
   if (!isAbsolute(app)) throw new Error('--app must be an absolute path to a frozen candidate .app')
   const frozen = realpathSync(app)
   if (!frozen.endsWith('.app')) throw new Error(`--app is not a macOS application bundle: ${frozen}`)
@@ -97,7 +104,7 @@ export async function runManagedProfileRebuild(argv: readonly string[] = process
   if (realpathSync(process.execPath) !== realpathSync(layout.executable)) {
     throw new Error(`profile rebuild is running through ${process.execPath}, not frozen candidate ${layout.executable}`)
   }
-  const homeDir = join(homedir(), '.omnimux-dev')
+  const homeDir = PROFILE_TARGETS[args.target]
   const profileDir = join(homeDir, 'profiles', 'omnimux')
   assertPhysicalProfileBoundary(profileDir)
   const runtimeDir = mkdtempSync(join(tmpdir(), 'omnimux-profile-rebuild-runtime-'))

@@ -32,7 +32,7 @@ const NODE_PTY_DARWIN_HELPERS = [
 ] as const
 
 export const OFFICIAL_PROFILE_REBUILD_REMEDY =
-  'Run: yarn omnimux:profile rebuild --target dev --app <frozen-candidate.app>'
+  'Run: yarn omnimux:profile rebuild --target dev|prod --app <frozen-candidate.app>'
 
 const GRAPH_ENTRIES = [
   'package.json',
@@ -54,6 +54,9 @@ interface PackageManifest {
   readonly [key: string]: unknown
 }
 
+/** Preset-era Profile-local dependency spec, e.g. `file:./node_modules/<name>`. */
+const LEGACY_PROFILE_LOCAL_SPEC = /^file:(?:\.\/)?node_modules\//u
+
 export interface ManagedProfileRebuildOptions {
   readonly profileDir: string
   readonly presetDir: string
@@ -69,6 +72,8 @@ export interface ManagedProfileRebuildResult {
   readonly profileDir: string
   readonly packageCount: number
   readonly preservedManagedSources: readonly string[]
+  /** Legacy Profile-local dependencies the staged preset no longer owns. */
+  readonly droppedLegacySources: readonly string[]
   readonly sourceHash: string
   readonly manifestHash: string
 }
@@ -310,6 +315,22 @@ function setManagedDependencies(manifestPath: string, packageNames: readonly str
   writeFileSync(manifestPath, `${JSON.stringify({ ...manifest, dependencies }, undefined, 2)}\n`)
 }
 
+/**
+ * Remove dependency lines a rebuild deliberately dropped.
+ *
+ * A preset-era Profile declared every package it carried, including the ones the
+ * staged preset no longer owns — the Alpha packages a production preset
+ * excludes, for instance. The candidate manifest is copied from that Profile, so
+ * those lines have to go before pnpm installs the candidate.
+ */
+function dropLegacyDependencies(manifestPath: string, packageNames: readonly string[]): void {
+  if (packageNames.length === 0) return
+  const manifest = readManifest(manifestPath)
+  const dependencies = { ...manifest.dependencies }
+  for (const name of packageNames) delete dependencies[name]
+  writeFileSync(manifestPath, `${JSON.stringify({ ...manifest, dependencies }, undefined, 2)}\n`)
+}
+
 function prepareManagedPackage(packageDir: string, name: string): void {
   normalizeAndValidateManagedBin(packageDir, name)
   if (name === 'node-pty') ensureReviewedNodePtyHelpers(packageDir)
@@ -425,7 +446,7 @@ function chooseRebuildSources(
   profileDir: string,
   presetDir: string,
   ownedPackages: readonly string[],
-): { readonly names: string[]; readonly sources: Map<string, string>; readonly preserved: string[] } {
+): { readonly names: string[]; readonly sources: Map<string, string>; readonly preserved: string[]; readonly dropped: string[] } {
   const manifest = readManifest(join(profileDir, 'package.json'))
   const dependencies = manifest.dependencies ?? {}
   const presetRoot = join(presetDir, 'plugins')
@@ -433,10 +454,20 @@ function chooseRebuildSources(
   const existingRoot = managedSourceRoot(profileDir)
   assertExistingManagedBoundary(profileDir)
   const names = [...ownedPackages]
+  const dropped: string[] = []
   for (const [name, spec] of Object.entries(dependencies)) {
     if (ownedPackages.includes(name)) continue
-    if (spec.startsWith('link:') || spec.startsWith('file:./node_modules/') || spec.startsWith('file:node_modules/')) {
+    if (spec.startsWith('link:')) {
       fail(`non-candidate dependency ${JSON.stringify(name)} has unsupported source ${JSON.stringify(spec)}`)
+    }
+    if (LEGACY_PROFILE_LOCAL_SPEC.test(spec)) {
+      // A Profile seeded before the managed model kept every package as its own
+      // `file:./node_modules/<name>` copy. The staged preset owns the
+      // composition now, so a dependency it does not own — an Alpha package the
+      // production preset excludes, for instance — is dropped rather than
+      // blocking the rebuild.
+      dropped.push(name)
+      continue
     }
     const managedName = managedNameFromSpec(spec)
     if (managedName === undefined) {
@@ -465,7 +496,7 @@ function chooseRebuildSources(
     if (!ownedPackages.includes(name)) fail(`non-candidate managed source ${JSON.stringify(name)} is missing`)
     sources.set(name, join(presetRoot, ...packagePathSegments(name)))
   }
-  return { names, sources, preserved }
+  return { names, sources, preserved, dropped }
 }
 
 function copyRebuildCandidate(
@@ -473,6 +504,7 @@ function copyRebuildCandidate(
   candidateDir: string,
   packageNames: readonly string[],
   sources: ReadonlyMap<string, string>,
+  droppedLegacyNames: readonly string[],
 ): void {
   mkdirSync(candidateDir, { recursive: true })
   for (const name of ['package.json', 'pnpm-workspace.yaml', 'pnpm-lock.yaml'] as const) {
@@ -520,6 +552,7 @@ function copyRebuildCandidate(
     prepareManagedPackage(destination, name)
   }
   setManagedDependencies(join(candidateDir, 'package.json'), packageNames)
+  dropLegacyDependencies(join(candidateDir, 'package.json'), droppedLegacyNames)
   ensureManagedBuildPolicy(candidateDir, packageNames)
   assertManagedSourceGraph(root, packageNames)
 }
@@ -758,7 +791,7 @@ export async function rebuildManagedProfile(options: ManagedProfileRebuildOption
   const plan = chooseRebuildSources(profileDir, presetDir, options.ownedPackages)
   const candidateDir = join(dirname(profileDir), `.omnimux-profile-candidate-${basename(profileDir)}-${randomUUID()}`)
   try {
-    copyRebuildCandidate(profileDir, candidateDir, plan.names, plan.sources)
+    copyRebuildCandidate(profileDir, candidateDir, plan.names, plan.sources, plan.dropped)
     const packedFiles = new Map<string, readonly string[]>()
     for (const name of plan.names) {
       packedFiles.set(name, await options.packedFiles(managedSourcePath(candidateDir, name)))
@@ -777,6 +810,7 @@ export async function rebuildManagedProfile(options: ManagedProfileRebuildOption
       profileDir,
       packageCount: plan.names.length,
       preservedManagedSources: plan.preserved,
+      droppedLegacySources: plan.dropped,
       sourceHash,
       manifestHash,
     }

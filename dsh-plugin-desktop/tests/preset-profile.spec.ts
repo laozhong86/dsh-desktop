@@ -548,7 +548,7 @@ describe('seedOmnimuxProfile managed sources', () => {
       const before = readFileSync(join(profile, 'package.json'))
 
       expect(() => seedOmnimuxProfile({ home, presetDir }))
-        .toThrow('yarn omnimux:profile rebuild --target dev --app <frozen-candidate.app>')
+        .toThrow('yarn omnimux:profile rebuild --target dev|prod --app <frozen-candidate.app>')
       expect(readFileSync(join(profile, 'package.json'))).toEqual(before)
       expect(existsSync(join(home, 'settings.yaml'))).toBe(false)
     } finally {

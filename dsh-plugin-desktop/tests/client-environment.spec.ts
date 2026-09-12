@@ -50,14 +50,34 @@ describe('desktop client environment', () => {
     }
   })
 
-  it('does not activate desktop effects for an ordinary browser URL', () => {
+  it('activates web fallback layout for an ordinary browser URL outside electron', () => {
     vi.stubGlobal('window', { location: { search: '' } })
     const effect = vi.fn()
+    const entries = vi.fn().mockReturnValue([])
+    const register = vi.fn()
+    const provideRoot = vi.fn()
+    const subscribe = vi.fn()
+    const provide = vi.fn()
+    const on = vi.fn()
+    const getTheme = vi.fn().mockReturnValue({})
+    const ctx = {
+      effect,
+      slots: { entries, register, provideRoot, subscribe },
+      reflect: { provide, get: vi.fn() },
+      theme: { getTheme, on },
+      on,
+    } as unknown as ClientContext
 
     try {
       expect(parseDesktopClientEnvironment('')).toBeUndefined()
-      apply({ effect } as unknown as ClientContext)
-      expect(effect).not.toHaveBeenCalled()
+      apply(ctx)
+      // Web fallback mounts window geometry and advanced layout root, without native desktop effects
+      const labels = effect.mock.calls.map(([, label]) => label)
+      expect(labels).toContain('dsh-plugin-desktop: web fallback window geometry service')
+      expect(labels).toContain('desktop: advanced shell styles')
+      expect(labels).toContain('desktop: advanced root slot')
+      expect(labels).not.toContain('dsh-plugin-desktop: renderer boot health report')
+      expect(labels).not.toContain('dsh-plugin-desktop: native titlebar double-click')
     }
     finally {
       vi.unstubAllGlobals()

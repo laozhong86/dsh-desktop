@@ -76,3 +76,12 @@ export function parseDesktopClientEnvironment(search: string): DesktopClientEnvi
     micaSupported,
   }
 }
+
+/** Clean fallback environment for ordinary Web browsers outside Electron. */
+export const FALLBACK_WEB_CLIENT_ENVIRONMENT: DesktopClientEnvironment = Object.freeze({
+  version: '2.0.9',
+  mode: 'advanced',
+  platform: 'linux',
+  material: 'off',
+  micaSupported: false,
+})

@@ -2079,3 +2079,17 @@ index 881a45d..47bc3fe 100644
          return [
            injectTag(pluginId, fileId, code.toString()),
            `export default ${JSON.stringify(classMap)};`,
+
+diff --git a/src/client/service.ts b/src/client/service.ts
+index e37402d..1fc271e 100644
+--- a/src/client/service.ts
++++ b/src/client/service.ts
+@@ -911,7 +911,7 @@ export function createBetterSidebarService(store: SidebarStore): BetterSidebarSe
+         ...(seed.diff === undefined ? {} : { diff: seed.diff }),
+         ...(seed.meta === undefined && minted?.tab.meta === undefined ? {} : { meta: seed.meta ?? minted?.tab.meta }),
+       }
+-      if (seed.path !== undefined) {
++      if (seed.path !== undefined && seed.type === 'editor') {
+         surface.openResource({
+           sessionId: targetSessionId,
+           address: surface.fileAddress(targetSessionId, scope?.cwd, seed.path),

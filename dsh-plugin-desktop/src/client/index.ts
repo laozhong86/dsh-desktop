@@ -12,7 +12,7 @@ import { applyAdvancedShell } from './advanced-shell.ts'
 import { startRendererBootReporter } from './boot-health.ts'
 import { applyDesktopSettings } from './desktop-settings.ts'
 import { installDesktopDirectoryPickerBridge } from './directory-picker.ts'
-import { parseDesktopClientEnvironment } from './environment.ts'
+import { parseDesktopClientEnvironment, FALLBACK_WEB_CLIENT_ENVIRONMENT } from './environment.ts'
 import { applyExtendedShell } from './extended-shell.ts'
 import { installDesktopTitleBarDoubleClick } from './titlebar-double-click.ts'
 import { desktopWindowService, provideDesktopWindow } from './window-service.ts'
@@ -89,7 +89,19 @@ export const inject = [
 /** Register desktop-owned client surfaces for the current BrowserWindow mode. @param ctx - browser Cordis context. */
 export function apply(ctx: ClientContext): void {
   const environment = parseDesktopClientEnvironment(window.location.search)
-  if (!environment) return
+  if (!environment) {
+    // When visited from an ordinary web browser outside the Desktop Electron shell
+    // (such as Chrome / Safari / ego-browser opening the loopback URL), no desktop
+    // query parameters are present. Provide the clean web fallback enhanced layout
+    // so plugins depending on the layout service and root slot resolve properly in Web.
+    const webFallbackEnv = FALLBACK_WEB_CLIENT_ENVIRONMENT
+    ctx.effect(
+      () => provideDesktopWindow(ctx, desktopWindowService(webFallbackEnv)),
+      'dsh-plugin-desktop: web fallback window geometry service',
+    )
+    applyAdvancedShell(ctx, webFallbackEnv)
+    return
+  }
   ctx.effect(
     () => provideDesktopWindow(ctx, desktopWindowService(environment)),
     'dsh-plugin-desktop: native window geometry service',

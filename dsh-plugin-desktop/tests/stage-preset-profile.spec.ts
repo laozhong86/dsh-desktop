@@ -11,7 +11,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, relative, sep } from 'node:path'
+import { dirname, join, relative, sep } from 'node:path'
 import { createRequire } from 'node:module'
 
 const sidebarFixture = vi.hoisted(() => ({
@@ -159,6 +159,9 @@ describe('stagePresetProfile', () => {
 
       sidebarFixture.path = sidebar
       expect(stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' })).toBe(16)
+      const stagedPresets = join(presetDir, 'agent-presets')
+      expect(readdirSync(stagedPresets).sort()).toEqual(['cordis', 'daily-work', 'standard', 'tiktok-agent'])
+      expect(readFileSync(join(stagedPresets, 'cordis', 'preset.yml'), 'utf8')).toBe('name: cordis\n')
 
       rmSync(sourceRoot, { recursive: true, force: true })
       const movedPresetDir = join(fixture, 'moved preset with spaces')
@@ -501,6 +504,18 @@ function createProductPlugins(
   mkdirSync(hubSource)
   writeFileSync(join(hubSource, 'plugin-lifecycle.json'), `${JSON.stringify(LIFECYCLE, undefined, 2)}\n`)
   writeFileSync(join(hubSource, 'release-channel.json'), '{\n  "channel": "development"\n}\n')
+  createProductPresets(pluginsRoot)
+}
+
+/** Product presets live beside the plugin tree in the product workspace. */
+function createProductPresets(pluginsRoot: string): void {
+  const presetsRoot = join(dirname(pluginsRoot), 'presets')
+  for (const id of ['cordis', 'daily-work', 'standard', 'tiktok-agent']) {
+    mkdirSync(join(presetsRoot, id), { recursive: true })
+    writeFileSync(join(presetsRoot, id, 'preset.yml'), `name: ${id}\n`)
+  }
+  mkdirSync(join(presetsRoot, 'fragments'), { recursive: true })
+  writeFileSync(join(presetsRoot, 'fragments', 'shared.yml'), 'name: shared\n')
 }
 
 function createPackage(root: string, name: string, extras: PackageManifestExtras = {}): void {

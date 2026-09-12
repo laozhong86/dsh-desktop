@@ -29,6 +29,7 @@ import {
   readDesktopShellMode,
   removeObsoleteDesktopSharedModuleFallback,
   shippedPresetRoot,
+  stagedPresetRoot,
   validateDshMarketBundlePatches,
 } from '../src/profile.ts'
 import { DESKTOP_MARKET_IDENTITIES } from '../src/desktop-market.ts'
@@ -408,6 +409,7 @@ virtualStoreDirMaxLength: 60
       id: 'agent-presets',
       config: expect.objectContaining({
         roots: [
+          { path: stagedPresetRoot(), trust: 'system' },
           { path: shippedPresetRoot(), trust: 'system' },
           { path: join(home, '.agent-presets'), trust: 'user' },
         ],
@@ -1045,6 +1047,7 @@ virtualStoreDirMaxLength: 60
       name: '@deepseek-ai/dsh-agent-presets',
       config: expect.objectContaining({
         roots: [
+          { path: stagedPresetRoot(), trust: 'system' },
           { path: shippedPresetRoot(), trust: 'system' },
           { path: join(home, '.agent-presets'), trust: 'user' },
         ],

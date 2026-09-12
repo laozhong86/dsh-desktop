@@ -583,6 +583,11 @@ export function shippedPresetRoot(moduleUrl: string = import.meta.url): string {
   return join(dirname(require.resolve('@deepseek-ai/dsh-agent-presets/package.json')), 'presets')
 }
 
+/** Resolve the product presets staged beside the seed, unpacked with `preset/**`. */
+export function stagedPresetRoot(moduleUrl: string = import.meta.url): string {
+  return join(dirname(fileURLToPath(moduleUrl)), '..', 'preset', 'agent-presets')
+}
+
 /** Read a row's object config without trusting arbitrary YAML values. */
 function rowConfig(row: EntryOptions | undefined): Record<string, unknown> {
   const config = row?.config
@@ -1042,6 +1047,9 @@ export function prepareDesktopProfile(
   if (presets !== undefined) {
     const shippedRoot = shippedPresetRoot()
     const roots: Array<{ path: string, trust: 'system' | 'user' }> = [
+      // Staged product presets come first: an id the product ships overrides
+      // the dependency's built-in of the same name.
+      { path: stagedPresetRoot(), trust: 'system' },
       { path: shippedRoot, trust: 'system' },
       { path: join(home, USER_PRESET_DIRNAME), trust: 'user' },
     ]

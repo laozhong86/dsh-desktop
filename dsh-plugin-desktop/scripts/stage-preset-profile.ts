@@ -48,6 +48,12 @@ const CORE_REQUIRED_BUNDLES = [
 ] as const
 const RELEASE_CHANNELS = ['production', 'development'] as const
 type ReleaseChannel = (typeof RELEASE_CHANNELS)[number]
+/** Staged product presets, published beside the plugin seed. */
+const AGENT_PRESETS_DIRNAME = 'agent-presets'
+/** Preset manifest every staged preset directory must carry. */
+const AGENT_PRESET_MANIFEST = 'preset.yml'
+/** Shared preset inputs the repository keeps beside the preset ids. */
+const AGENT_PRESET_EXCLUDED_DIRS: ReadonlySet<string> = new Set(['fragments'])
 
 /**
  * Product-tree plugins staged into the preset. The profile stays on `link:`
@@ -165,6 +171,7 @@ export function stagePresetProfile(options: StagePresetProfileOptions = {}): num
     assertReleaseChannel(candidatePluginsDir, releaseChannel)
     verifyInstalledBetterSidebar(join(candidatePluginsDir, 'dsh-better-sidebar'), sidebar.packedRoot)
     stageSkeleton(targetPresetDir, candidateDir, alphaPlugins, releaseChannel)
+    stageAgentPresets(resolvedPluginsRoot, candidateDir)
     writeFileSync(join(candidateDir, 'owned-packages.json'), `${JSON.stringify(owned, undefined, 2)}\n`)
     const seedVersionPath = join(targetPresetDir, 'seed-version')
     writeFileSync(
@@ -391,6 +398,39 @@ function stageSkeleton(
   }, undefined, 2)}\n`)
 }
 
+/**
+ * Stage the OmniMux agent presets beside the plugin seed.
+ *
+ * The presets used to be patched into the installed application after
+ * packaging (an asar header edit plus an Info.plist integrity rewrite). That
+ * only worked while the presets package was physically unpacked; selective
+ * `asarUnpack` no longer unpacks it, so the injection point vanished and the
+ * product presets silently stopped reaching the shell. Staging them into
+ * `preset/agent-presets` ships them inside the signed bundle instead: the whole
+ * `preset/**` tree is unpacked, and the profile composes this directory as an
+ * additional system root.
+ */
+function stageAgentPresets(pluginsRoot: string, candidateDir: string): number {
+  const source = join(dirname(pluginsRoot), 'presets')
+  if (!existsSync(source)) {
+    throw new Error(`product agent presets are missing: ${source} (set OMNIMUX_PLUGINS_DIR)`)
+  }
+  const ids = readdirSync(source, { withFileTypes: true })
+    .filter(entry => entry.isDirectory() && !entry.name.startsWith('.') && !AGENT_PRESET_EXCLUDED_DIRS.has(entry.name))
+    .map(entry => entry.name)
+    .sort()
+  if (ids.length === 0) throw new Error(`product agent presets are empty: ${source}`)
+  for (const id of ids) {
+    const manifest = join(source, id, AGENT_PRESET_MANIFEST)
+    if (!existsSync(manifest)) throw new Error(`agent preset ${JSON.stringify(id)} has no ${AGENT_PRESET_MANIFEST}: ${manifest}`)
+  }
+  const destination = join(candidateDir, AGENT_PRESETS_DIRNAME)
+  for (const id of ids) {
+    cpSync(join(source, id), join(destination, id), { recursive: true, dereference: true })
+  }
+  return ids.length
+}
+
 function toFileSpec(fromPackageDir: string, targetPackageDir: string): string {
   const path = relative(fromPackageDir, targetPackageDir).split(sep).join('/')
   return `file:${path.startsWith('.') ? path : `./${path}`}`
@@ -469,7 +509,7 @@ export function publishCandidate(
   targetPresetDir: string,
   rename: typeof renameSync = renameSync,
 ): void {
-  const entries = ['plugins', 'skeleton', 'owned-packages.json', 'seed-version'] as const
+  const entries = ['plugins', 'skeleton', 'agent-presets', 'owned-packages.json', 'seed-version'] as const
   const backupRoot = mkdtempSync(join(targetPresetDir, '.preset-backup-'))
   const backedUp: string[] = []
   const published: string[] = []

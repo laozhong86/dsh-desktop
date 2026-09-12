@@ -53,16 +53,19 @@ const PRODUCT_PLUGINS = [
   'omnimux-video',
   'omnimux-analytics',
   'omnimux-publish',
+  'omnimux-forms',
 ] as const
 const ALPHA_PLUGINS = [
   'omnimux-accounts',
   'omnimux-publish',
   'omnimux-analytics',
+  'omnimux-forms',
 ] as const
 const LIFECYCLE = {
   'omnimux-accounts': { stage: 'alpha', toolPrefixes: ['omnimux_accounts_'] },
   'omnimux-publish': { stage: 'alpha', toolPrefixes: ['omnimux_publish_'] },
   'omnimux-analytics': { stage: 'alpha', toolPrefixes: ['omnimux_analytics_'] },
+  'omnimux-forms': { stage: 'alpha', toolPrefixes: ['omnimux_forms_'] },
 } as const
 
 describe('stagePresetProfile', () => {
@@ -155,7 +158,7 @@ describe('stagePresetProfile', () => {
       )
 
       sidebarFixture.path = sidebar
-      expect(stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' })).toBe(15)
+      expect(stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' })).toBe(16)
 
       rmSync(sourceRoot, { recursive: true, force: true })
       const movedPresetDir = join(fixture, 'moved preset with spaces')
@@ -303,7 +306,7 @@ describe('stagePresetProfile', () => {
       })
 
       sidebarFixture.path = sidebar
-      expect(stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' })).toBe(12)
+      expect(stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' })).toBe(13)
       expect(listPackageNames(join(presetDir, 'plugins'))).not.toContain('@fixture/excluded')
       expect(readJson(join(presetDir, 'owned-packages.json'))).not.toContain('@fixture/excluded')
     } finally {
@@ -404,7 +407,7 @@ describe('stagePresetProfile', () => {
       createProductPlugins(pluginsRoot)
       createPresetSkeleton(presetDir)
 
-      expect(stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' })).toBe(12)
+      expect(stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' })).toBe(13)
 
       const output = join(presetDir, 'plugins')
       const owned = readJson(join(presetDir, 'owned-packages.json')) as unknown as string[]

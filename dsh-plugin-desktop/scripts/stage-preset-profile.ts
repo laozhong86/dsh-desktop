@@ -38,6 +38,7 @@ const PRODUCT_PLUGINS = [
   'omnimux-video',
   'omnimux-analytics',
   'omnimux-publish',
+  'omnimux-forms',
 ] as const
 const CORE_REQUIRED_BUNDLES = [
   '@deepseek-ai/dsh-base',

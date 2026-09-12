@@ -173,9 +173,6 @@ function normalizedPreferences(
   const mode = assertMode(value.mode, error)
   if (typeof value.openBrowser !== 'boolean') throw error('openBrowser must be a boolean')
   const networkExposure = assertExposure(value.networkExposure, error)
-  if (value.openBrowser && mode !== 'compatibility') {
-    throw error('openBrowser requires compatibility mode')
-  }
   if (networkExposure === 'lan' && !value.openBrowser) {
     throw error('LAN exposure requires openBrowser')
   }

@@ -41,7 +41,11 @@ dsh-desktop:
   mode: compatibility # compatibility, extended, or advanced
   macosMaterial: transparent # off or transparent
   windowsMaterial: acrylic # off, acrylic, or mica when supported
+  openBrowser: false # browser access is its own switch, independent of the mode
+  networkExposure: loopback # loopback in every mode; lan only in compatibility mode
 ```
+
+Ordinary-browser access follows its own `dsh-desktop.openBrowser` switch rather than the window mode. The Host token still gates every request, loopback stays the only exposure outside compatibility mode, and the LAN listener remains a compatibility-mode capability.
 
 The launcher reads the same file resolved by the active `@deepseek-ai/dsh-settings-file` row before composing a generation. The Host registers the `dsh-desktop` namespace with the standard settings service. There is no parallel mode value in the profile manifest.
 

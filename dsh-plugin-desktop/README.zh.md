@@ -41,7 +41,11 @@ dsh-desktop:
   mode: compatibility # compatibility、extended 或 advanced
   macosMaterial: transparent # off 或 transparent
   windowsMaterial: acrylic # off、acrylic，系统支持时还可用 mica
+  openBrowser: false # 浏览器访问是独立开关，与窗口模式无关
+  networkExposure: loopback # 各模式都用 loopback；lan 仅兼容模式可用
 ```
+
+普通浏览器访问由独立的 `dsh-desktop.openBrowser` 开关决定，与窗口模式无关：每个请求仍需 Host token 鉴权，除兼容模式外只允许 loopback，LAN 监听仍是兼容模式的能力。
 
 Launcher 会在组合一个 generation 之前，读取当前 `@deepseek-ai/dsh-settings-file` row 解析到的同一份文件。Host 通过标准 settings service 注册 `dsh-desktop` namespace。profile manifest 中没有平行的模式值。
 

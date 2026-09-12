@@ -1,11 +1,30 @@
 import { describe, expect, it } from 'vitest'
 import {
   DESKTOP_LAN_HTTPS_AVAILABLE,
+  desktopBrowserAccessEnabled,
   desktopEffectiveNetworkExposure,
+  desktopLanExposureAvailable,
   desktopLanBrowserUrls,
   desktopWebServerHost,
   parseDesktopNetworkExposure,
 } from '../src/desktop-network.ts'
+
+describe('Desktop browser access switch', () => {
+  it('enables browser access from its own switch in every window mode', () => {
+    expect(desktopBrowserAccessEnabled('advanced', true, 'loopback')).toBe(true)
+    expect(desktopBrowserAccessEnabled('extended', true, 'loopback')).toBe(true)
+    expect(desktopBrowserAccessEnabled('compatibility', true, 'loopback')).toBe(true)
+    expect(desktopBrowserAccessEnabled('advanced', false, 'loopback')).toBe(false)
+  })
+
+  it('keeps the LAN listener a compatibility-mode capability', () => {
+    expect(desktopLanExposureAvailable('compatibility')).toBe(true)
+    expect(desktopLanExposureAvailable('extended')).toBe(false)
+    expect(desktopLanExposureAvailable('advanced')).toBe(false)
+    expect(desktopBrowserAccessEnabled('advanced', false, 'lan')).toBe(false)
+    expect(desktopBrowserAccessEnabled('compatibility', false, 'lan')).toBe(true)
+  })
+})
 
 describe('Desktop LAN HTTPS boundary', () => {
   it('keeps the HTTP origin loopback while preserving HTTPS edge intent', () => {

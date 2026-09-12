@@ -366,17 +366,13 @@ describe('desktop Host plugin', () => {
     expect(harness.update).toHaveBeenCalledWith({ mode: 'advanced' })
   })
 
-  it('atomically withdraws browser access when the native tray selects a custom mode', async () => {
+  it('keeps browser access and only withdraws the LAN listener when the native tray selects a custom mode', async () => {
     const harness = createHarness('darwin', true)
     apply(harness.ctx, config)
 
     await harness.shell()?.requestModeChange('advanced')
 
-    expect(harness.update).toHaveBeenCalledWith({
-      mode: 'advanced',
-      openBrowser: false,
-      networkExposure: 'loopback',
-    })
+    expect(harness.update).toHaveBeenCalledWith({ mode: 'advanced' })
   })
 
   it('forwards same-origin renderer boot reports through the Host route', async () => {
@@ -537,7 +533,7 @@ describe('desktop Host plugin', () => {
     expect(harness.restart).toHaveBeenCalledOnce()
   })
 
-  it('hot-applies browser and LAN access but restarts when a custom mode withdraws them', async () => {
+  it('hot-applies browser and LAN access and keeps browser access across a window-mode switch', async () => {
     vi.useFakeTimers()
     const harness = createHarness()
     apply(harness.ctx, config)
@@ -560,7 +556,7 @@ describe('desktop Host plugin', () => {
     )
     await vi.runAllTimersAsync()
     expect(enabledHarness.restart).toHaveBeenCalledOnce()
-    expect(enabledHarness.browserAccess.ordinaryBrowserEnabled).toBe(false)
+    expect(enabledHarness.browserAccess.ordinaryBrowserEnabled).toBe(true)
     expect(enabledHarness.setLanHttpsEnabled).toHaveBeenLastCalledWith(false)
   })
 
@@ -661,15 +657,15 @@ describe('desktop Host plugin', () => {
       ...settings,
       mode: 'advanced',
       openBrowser: true,
-    })).toThrow('browser access requires compatibility mode')
+    })).toThrow('supported on macOS and Windows')
     expect(() => options?.validate?.({
       ...settings,
       mode: 'advanced',
       networkExposure: 'lan',
-    })).toThrow('supported on macOS and Windows')
+    })).toThrow('LAN exposure requires compatibility mode')
   })
 
-  it('accepts a deferred LAN preference independently of browser mode on supported platforms', () => {
+  it('rejects a deferred LAN preference outside the compatibility shell on supported platforms', () => {
     const harness = createHarness('darwin')
     apply(harness.ctx, config)
     const options = vi.mocked(harness.ctx.settings.register).mock.calls[0]?.[2]
@@ -682,6 +678,6 @@ describe('desktop Host plugin', () => {
       openBrowser: false,
       networkExposure: 'lan',
       logLevel: 'info',
-    })).not.toThrow()
+    })).toThrow('LAN exposure requires compatibility mode')
   })
 })

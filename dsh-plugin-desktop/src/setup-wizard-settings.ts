@@ -1,8 +1,8 @@
 /** Pre-Host reader and atomic writer for Desktop Setup Wizard preferences. */
 
 import {
-  desktopBrowserAccessAvailable,
   desktopBrowserAccessEnabled,
+  desktopLanExposureAvailable,
   desktopNetworkExposureForBrowserAccess,
 } from './desktop-network.ts'
 import { defaultDesktopShellMode } from './desktop-mode-default.ts'
@@ -207,7 +207,10 @@ function projectSettings(
     macosMaterial: parseMacosWindowMaterial(desktop.macosMaterial),
     windowsMaterial: parseWindowsWindowMaterial(desktop.windowsMaterial),
     openBrowser,
-    networkExposure: desktopNetworkExposureForBrowserAccess(openBrowser, networkExposure),
+    networkExposure: desktopNetworkExposureForBrowserAccess(
+      openBrowser,
+      desktopLanExposureAvailable(mode) ? networkExposure : 'loopback',
+    ),
     notifications: notificationSettings(notifications),
   })
 }
@@ -226,10 +229,10 @@ function normalizedUpdate(
   if (typeof value.openBrowser !== 'boolean') {
     throw new TypeError(`${BIN_NAME}: Setup Wizard openBrowser must be a boolean`)
   }
-  const openBrowser = desktopBrowserAccessAvailable(requestedMode) && value.openBrowser
+  const openBrowser = value.openBrowser
   const networkExposure = desktopNetworkExposureForBrowserAccess(
     openBrowser,
-    parseExposure(value.networkExposure),
+    desktopLanExposureAvailable(requestedMode) ? parseExposure(value.networkExposure) : 'loopback',
   )
   if (!isRecord(value.notifications)) {
     throw new TypeError(`${BIN_NAME}: Setup Wizard notifications must be a map`)
@@ -363,8 +366,9 @@ export async function updateDesktopSetupWizardSettings(
  * Atomically migrate settings written with the former browser-handoff
  * semantics before the Host reads them. Existing LAN exposure becomes an
  * explicit browser-access grant only for an already-selected compatibility
- * mode. Incompatible modes retain their selection and withdraw browser/LAN
- * access. Returns whether the durable document changed.
+ * mode. Incompatible modes keep browser access on loopback, because the LAN
+ * listener stays a compatibility-shell feature. Returns whether the durable
+ * document changed.
  */
 export async function migrateDesktopBrowserAccessSettings(
   documentPath: string,
@@ -379,7 +383,10 @@ export async function migrateDesktopBrowserAccessSettings(
     const storedOpenBrowser = optionalBoolean(desktop, 'openBrowser', false)
     const storedExposure = parseExposure(desktop.networkExposure)
     const browserAccess = desktopBrowserAccessEnabled(storedMode, storedOpenBrowser, storedExposure)
-    const networkExposure = desktopNetworkExposureForBrowserAccess(browserAccess, storedExposure)
+    const networkExposure = desktopNetworkExposureForBrowserAccess(
+      browserAccess,
+      desktopLanExposureAvailable(storedMode) ? storedExposure : 'loopback',
+    )
     return {
       browserAccess,
       needed: storedOpenBrowser !== browserAccess || storedExposure !== networkExposure,

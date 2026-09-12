@@ -122,7 +122,7 @@ export function decodeDesktopSetupWizardInput(search: string): DesktopSetupWizar
 
 function normalizedSelection(input: DesktopSetupWizardInput): DesktopSetupWizardSelection {
   const mode = input.platform === 'linux' ? 'compatibility' : input.mode
-  const browserAccess = mode === 'compatibility' && (input.openBrowser || input.networkExposure === 'lan')
+  const browserAccess = input.openBrowser || (mode === 'compatibility' && input.networkExposure === 'lan')
   return {
     mode,
     macosMaterial: input.macosMaterial,
@@ -138,7 +138,7 @@ function normalizedSelection(input: DesktopSetupWizardInput): DesktopSetupWizard
 }
 
 function finish(selection: DesktopSetupWizardSelection): void {
-  const browserAccess = selection.mode === 'compatibility' && selection.openBrowser
+  const browserAccess = selection.openBrowser
   const url = new URL(`${SCHEME}//complete`)
   url.searchParams.set('mode', selection.mode)
   url.searchParams.set('macosMaterial', selection.macosMaterial)
@@ -262,7 +262,6 @@ function ModeOptions({
         update({
           ...selection,
           mode: value,
-          openBrowser: value === 'compatibility' ? selection.openBrowser : false,
           networkExposure: value === 'compatibility' ? selection.networkExposure : 'loopback',
         })
       }
@@ -404,7 +403,7 @@ function BrowserOptions({
 }): JSX.Element {
   return <div className="space-y-5">
     <ToggleRow
-      checked={selection.mode === 'compatibility' && selection.openBrowser}
+      checked={selection.openBrowser}
       description={copy.browserCompatibilityNotice}
       id="setup-open-browser"
       label={copy.openBrowser}
@@ -599,35 +598,13 @@ export function SetupWizardLanConfirmation({ copy, confirm, cancel }: {
   </Dialog>
 }
 
-export function SetupWizardBrowserCompatibilityConfirmation({ copy, confirm, cancel }: {
-  readonly copy: DesktopSetupWizardCopy
-  readonly confirm: () => void
-  readonly cancel: () => void
-}): JSX.Element {
-  return <Dialog onOpenChange={open => { if (!open) cancel() }} open>
-    <DialogContent aria-describedby="browser-compatibility-body" aria-labelledby="browser-compatibility-title" aria-modal="true" role="alertdialog" showCloseButton={false}>
-      <DialogHeader>
-        <DialogTitle id="browser-compatibility-title">{copy.browserCompatibilityDialogTitle}</DialogTitle>
-        <DialogDescription className="mt-2 text-foreground" id="browser-compatibility-body">{copy.browserCompatibilityDialogBody}</DialogDescription>
-      </DialogHeader>
-      <DialogFooter>
-        <DialogClose render={<Button autoFocus type="button" variant="outline" />}>{copy.cancelBrowserCompatibility}</DialogClose>
-        <Button onClick={confirm} type="button">{copy.confirmBrowserCompatibility}</Button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
-}
-
 export function resolveDesktopSetupWizardBrowserAccessRequest(
   selection: DesktopSetupWizardSelection,
   enabled: boolean,
-): { readonly action: 'confirm-compatibility' } | {
+): {
   readonly action: 'update'
   readonly selection: DesktopSetupWizardSelection
 } {
-  if (enabled && selection.mode !== 'compatibility') {
-    return Object.freeze({ action: 'confirm-compatibility' as const })
-  }
   return Object.freeze({
     action: 'update' as const,
     selection: {
@@ -636,17 +613,6 @@ export function resolveDesktopSetupWizardBrowserAccessRequest(
       networkExposure: enabled ? selection.networkExposure : 'loopback',
     },
   })
-}
-
-export function confirmDesktopSetupWizardBrowserCompatibility(
-  selection: DesktopSetupWizardSelection,
-): DesktopSetupWizardSelection {
-  return {
-    ...selection,
-    mode: 'compatibility',
-    openBrowser: true,
-    networkExposure: 'loopback',
-  }
 }
 
 type LanConfirmationReason = 'select' | 'advance' | 'start' | 'skip'
@@ -670,7 +636,6 @@ export function SetupWizardApp(): JSX.Element {
   const [step, setStep] = useState<DesktopSetupWizardStep>('welcome')
   const [lanAcknowledged, setLanAcknowledged] = useState(false)
   const [confirmLan, setConfirmLan] = useState<LanConfirmationReason>()
-  const [confirmBrowserCompatibility, setConfirmBrowserCompatibility] = useState(false)
   if (input === undefined || selection === undefined) {
     return <><DesktopFrame /><main className="dshNativeContent flex h-screen items-center justify-center p-6"><div className="w-full max-w-lg space-y-4"><Alert variant="destructive"><AlertTriangle /><AlertTitle>{copy.title}</AlertTitle><AlertDescription>{copy.invalidState}</AlertDescription></Alert><div className="flex justify-end"><SetupWizardSkipDialog copy={copy} onSkip={() => { window.location.assign(`${SCHEME}//skip`) }} outlined /></div></div></main></>
   }
@@ -691,10 +656,6 @@ export function SetupWizardApp(): JSX.Element {
 
   const requestBrowserAccess = (enabled: boolean): void => {
     const result = resolveDesktopSetupWizardBrowserAccessRequest(selection, enabled)
-    if (result.action === 'confirm-compatibility') {
-      setConfirmBrowserCompatibility(true)
-      return
-    }
     if (!enabled) setLanAcknowledged(false)
     setSelection(result.selection)
   }
@@ -772,13 +733,5 @@ export function SetupWizardApp(): JSX.Element {
     }}
     copy={copy}
   />}
-  {confirmBrowserCompatibility ? <SetupWizardBrowserCompatibilityConfirmation
-    cancel={() => { setConfirmBrowserCompatibility(false) }}
-    confirm={() => {
-      setSelection(confirmDesktopSetupWizardBrowserCompatibility(selection))
-      setLanAcknowledged(false)
-      setConfirmBrowserCompatibility(false)
-    }}
-    copy={copy}
-  /> : null}</>
+</>
 }

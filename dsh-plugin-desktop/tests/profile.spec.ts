@@ -810,7 +810,7 @@ virtualStoreDirMaxLength: 60
 
     expect(prepared.mode).toBe('advanced')
     expect(prepared.port).toBe(43_189)
-    expect(prepared.openBrowser).toBe(false)
+    expect(prepared.openBrowser).toBe(true)
     expect(prepared.networkExposure).toBe('loopback')
     expect(rows.find(row => row.id === 'desktop-shell')).toEqual(expect.objectContaining({
       disabled: false,

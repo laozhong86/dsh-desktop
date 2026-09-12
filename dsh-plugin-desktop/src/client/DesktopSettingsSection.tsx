@@ -11,8 +11,8 @@ import type {
 import type { DesktopSettingsLocaleKey } from './desktop-settings-locales.ts'
 import type { DesktopClientPlatform } from './environment.ts'
 import {
-  desktopBrowserAccessAvailable,
   desktopBrowserAccessEnabled,
+  desktopLanExposureAvailable,
 } from '../desktop-network.ts'
 
 /** Browser view of the Host `dsh-desktop` settings namespace. */
@@ -471,7 +471,6 @@ export function DesktopSettingsSection({
   const setBrowserAccess = (checked: boolean): void => {
     void run('web', async () => {
       if (checked) {
-        if (!desktopBrowserAccessAvailable(mode)) return
         await persistDesktopBrowserAccessHot(desktopSettings, true, configuredNetworkExposure, refreshView)
         return
       }
@@ -481,7 +480,7 @@ export function DesktopSettingsSection({
 
   const setNetworkExposure = (exposure: DesktopShellSettings['networkExposure']): void => {
     void run('web', async () => {
-      if (exposure === 'lan' && (!desktopBrowserAccessAvailable(mode) || !browserAccess)) return
+      if (exposure === 'lan' && (!desktopLanExposureAvailable(mode) || !browserAccess)) return
       await persistDesktopNetworkExposureHot(desktopSettings, exposure, refreshView)
     })
   }
@@ -721,7 +720,7 @@ export function DesktopSettingsSection({
         <ToggleRow
           label={t('openBrowser')}
           checked={browserAccess}
-          disabled={!desktopBrowserAccessAvailable(mode) || !settingsWritable || busy !== undefined}
+          disabled={!settingsWritable || busy !== undefined}
           onChange={setBrowserAccess}
         />
         <p className="dshDesktopSettingsNotice">{t('browserCompatibilityNotice')}</p>

@@ -24,9 +24,10 @@ export interface DesktopSettingsClientControl {
 }
 
 /**
- * Persist a native mode choice without leaving browser access in a mode the
- * marker-free client cannot render. Custom modes withdraw browser and LAN
- * access in ordered writes; the Host compares only effective generation state.
+ * Persist a native mode choice. Browser access is its own switch now, so a
+ * custom mode keeps it and only the compatibility-only LAN exposure falls back
+ * to loopback. Withdraw the listener first so every intermediate persisted
+ * state remains valid while compatibility mode is still selected.
  */
 export async function persistDesktopModeSelection(
   desktopSettings: Pick<SettingsScope<DesktopShellSettings>, 'set'>,
@@ -36,13 +37,7 @@ export async function persistDesktopModeSelection(
     await desktopSettings.set('mode', mode)
     return
   }
-  // The titlebar is interactive before the settings mirror necessarily reaches
-  // ready. Always withdraw both browser capabilities for a custom mode instead
-  // of treating an unavailable or stale snapshot as browser access being off.
-  // Withdraw the listener first so every intermediate persisted state remains
-  // valid while compatibility mode is still selected.
   await desktopSettings.set('networkExposure', 'loopback')
-  await desktopSettings.set('openBrowser', false)
   await desktopSettings.set('mode', mode)
 }
 

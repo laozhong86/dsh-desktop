@@ -242,12 +242,12 @@ describe('Desktop Setup Wizard settings document', () => {
     const incompatible = values({ mode: 'advanced', openBrowser: true, networkExposure: 'lan' })
     await expect(updateDesktopSetupWizardSettings(path, incompatible)).resolves.toMatchObject({
       mode: 'advanced',
-      openBrowser: false,
+      openBrowser: true,
       networkExposure: 'loopback',
     })
     expect(readDesktopSetupWizardSettings(path)).toMatchObject({
       mode: 'advanced',
-      openBrowser: false,
+      openBrowser: true,
       networkExposure: 'loopback',
     })
   })
@@ -269,7 +269,7 @@ describe('Desktop Setup Wizard settings document', () => {
     })
   })
 
-  it('atomically withdraws legacy browser handoff and LAN from custom modes', async () => {
+  it('keeps legacy browser access in custom modes and withdraws only their LAN intent', async () => {
     const root = temporaryDirectory()
     const yamlPath = join(root, 'legacy.yaml')
     writeFileSync(yamlPath, [
@@ -304,11 +304,12 @@ describe('Desktop Setup Wizard settings document', () => {
       },
       untouched: { value: 1 },
     })}\n`)
-    await expect(migrateDesktopBrowserAccessSettings(jsonPath)).resolves.toBe(true)
+    // A custom mode with the browser switch on is already the current shape.
+    await expect(migrateDesktopBrowserAccessSettings(jsonPath)).resolves.toBe(false)
     expect(JSON.parse(readFileSync(jsonPath, 'utf8'))).toMatchObject({
       'dsh-desktop': {
         mode: 'extended',
-        openBrowser: false,
+        openBrowser: true,
         networkExposure: 'loopback',
       },
       untouched: { value: 1 },
@@ -385,7 +386,7 @@ describe('Desktop Setup Wizard settings document', () => {
     const root = temporaryDirectory()
     const path = join(root, 'settings.yaml')
     const lockPath = `${path}.lock`
-    const contents = 'dsh-desktop:\n  mode: advanced\n  openBrowser: true\n'
+    const contents = 'dsh-desktop:\n  mode: advanced\n  openBrowser: true\n  networkExposure: lan\n'
     writeFileSync(path, contents)
     writeFileSync(lockPath, 'owner\n')
 
@@ -394,7 +395,7 @@ describe('Desktop Setup Wizard settings document', () => {
     expect(readFileSync(lockPath, 'utf8')).toBe('owner\n')
     expect(readDesktopSetupWizardSettings(path)).toMatchObject({
       mode: 'advanced',
-      openBrowser: false,
+      openBrowser: true,
       networkExposure: 'loopback',
     })
   })

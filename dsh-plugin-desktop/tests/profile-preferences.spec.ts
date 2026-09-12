@@ -181,10 +181,6 @@ describe('Desktop Profile preferences', () => {
     } as DesktopProfilePreferences, RECORDED_AT)).rejects.toThrow('exactly the supported fields')
     await expect(writeDesktopProfilePreferences(userData, profile, {
       ...PREFERENCES,
-      mode: 'advanced',
-    }, RECORDED_AT)).rejects.toThrow('openBrowser requires compatibility mode')
-    await expect(writeDesktopProfilePreferences(userData, profile, {
-      ...PREFERENCES,
       openBrowser: false,
     }, RECORDED_AT)).rejects.toThrow('LAN exposure requires openBrowser')
     await expect(writeDesktopProfilePreferences(userData, profile, {
@@ -198,6 +194,12 @@ describe('Desktop Profile preferences', () => {
       .rejects.toThrow('recordedAt')
 
     expect(readDesktopProfilePreferences(userData, profile)).toBeUndefined()
+
+    // Browser access is its own switch now: a custom mode may keep it.
+    await expect(writeDesktopProfilePreferences(userData, profile, {
+      ...PREFERENCES,
+      mode: 'advanced',
+    }, RECORDED_AT)).resolves.toMatchObject({ mode: 'advanced', openBrowser: true })
   })
 
   it('rejects malformed, mismatched, and oversized existing state', async () => {

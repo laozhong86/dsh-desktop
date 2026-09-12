@@ -63,7 +63,7 @@ import type {} from './runtime.ts'
 import { DESKTOP_DEFAULT_WEB_PORT } from './desktop-port.ts'
 import {
   desktopBrowserAccessEnabled,
-  desktopBrowserAccessAvailable,
+  desktopLanExposureAvailable,
   desktopNetworkExposureForBrowserAccess,
   desktopWebServerHost,
   type DesktopNetworkExposure,
@@ -250,8 +250,8 @@ export function apply(ctx: Context, config: Config): void {
     {
       applies: 'restart',
       validate: (value) => {
-        if (!desktopBrowserAccessAvailable(value.mode) && value.openBrowser) {
-          throw new Error('dsh-plugin-desktop: browser access requires compatibility mode')
+        if (value.networkExposure === 'lan' && !desktopLanExposureAvailable(value.mode)) {
+          throw new Error('dsh-plugin-desktop: LAN exposure requires compatibility mode')
         }
         if (value.mode !== 'compatibility' && runtime.platform === 'linux') {
           throw new Error('dsh-plugin-desktop: custom desktop shell modes are supported on macOS and Windows')
@@ -506,9 +506,10 @@ export function apply(ctx: Context, config: Config): void {
         requestQuit: appExit,
         requestModeChange: async mode => {
           const current = settings.get()
-          const storedBrowserCapability = current.openBrowser || current.networkExposure === 'lan'
-          await settings.update(mode !== 'compatibility' && storedBrowserCapability
-            ? { mode, openBrowser: false, networkExposure: 'loopback' }
+          // Browser access survives a window-mode switch; only the compatibility-only
+          // LAN exposure has to fall back to loopback.
+          await settings.update(!desktopLanExposureAvailable(mode) && current.networkExposure === 'lan'
+            ? { mode, networkExposure: 'loopback' }
             : { mode })
         },
       })

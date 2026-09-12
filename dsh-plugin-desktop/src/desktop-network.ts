@@ -21,21 +21,25 @@ export function parseDesktopOpenBrowser(value: unknown): boolean {
   throw new Error('dsh-plugin-desktop: dsh-desktop.openBrowser must be a boolean')
 }
 
-/** Browser access can only be granted by an explicitly selected compatibility shell. */
-export function desktopBrowserAccessAvailable(mode: DesktopShellMode): boolean {
+/**
+ * LAN (beta) exposure stays a compatibility-mode feature; loopback access does
+ * not, so an enhanced window keeps its ordinary-browser entry point.
+ */
+export function desktopLanExposureAvailable(mode: DesktopShellMode): boolean {
   return mode === 'compatibility'
 }
 
 /**
- * Resolve browser access while preserving already-exposed legacy LAN setups
- * only when the selected shell is compatible with an ordinary browser.
+ * Resolve browser access from its own switch, independent of the window mode.
+ * Access is loopback-only unless the selected shell is the compatibility one,
+ * and it always stays behind the Host token.
  */
 export function desktopBrowserAccessEnabled(
   mode: DesktopShellMode,
   storedOpenBrowser: boolean,
   exposure: DesktopNetworkExposure,
 ): boolean {
-  return desktopBrowserAccessAvailable(mode) && (storedOpenBrowser || exposure === 'lan')
+  return storedOpenBrowser || (exposure === 'lan' && desktopLanExposureAvailable(mode))
 }
 
 /** LAN exposure is meaningful only while ordinary-browser access is enabled. */

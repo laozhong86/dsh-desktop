@@ -40,10 +40,6 @@ export interface DesktopSetupWizardCopy {
   readonly browserBody: string
   readonly openBrowser: string
   readonly browserCompatibilityNotice: string
-  readonly browserCompatibilityDialogTitle: string
-  readonly browserCompatibilityDialogBody: string
-  readonly confirmBrowserCompatibility: string
-  readonly cancelBrowserCompatibility: string
   readonly networkExposure: string
   readonly networkExposureBody: string
   readonly loopback: string
@@ -121,11 +117,7 @@ const COPY: Record<DesktopLocale, DesktopSetupWizardCopy> = {
     browserTitle: 'Set up browser access',
     browserBody: 'Allow browser access to the current Profile and choose which devices can reach it.',
     openBrowser: 'Allow opening this Profile in a browser',
-    browserCompatibilityNotice: 'Browser access is only available in compatibility mode.',
-    browserCompatibilityDialogTitle: 'Switch to compatibility mode?',
-    browserCompatibilityDialogBody: 'Opening this Profile in a browser requires compatibility mode. Continue to switch the window mode and enable browser access.',
-    confirmBrowserCompatibility: 'Switch and enable',
-    cancelBrowserCompatibility: 'Cancel',
+    browserCompatibilityNotice: 'Browser access works in every window mode on this computer. Access from other devices on the local network still requires compatibility mode.',
     networkExposure: 'Network access',
     networkExposureBody: 'Allow access from this computer only, or from other devices on the same local network over HTTPS.',
     loopback: 'This computer only',
@@ -201,11 +193,7 @@ const COPY: Record<DesktopLocale, DesktopSetupWizardCopy> = {
     browserTitle: '设置浏览器访问',
     browserBody: '允许在浏览器中打开当前 Profile，并选择可访问的设备范围。',
     openBrowser: '允许在浏览器中打开',
-    browserCompatibilityNotice: '浏览器访问仅在兼容模式下可用。',
-    browserCompatibilityDialogTitle: '切换到兼容模式？',
-    browserCompatibilityDialogBody: '在浏览器中打开只能使用兼容模式。继续将把这个 Profile 的窗口模式切换为兼容模式，并开启浏览器访问。',
-    confirmBrowserCompatibility: '切换并开启',
-    cancelBrowserCompatibility: '取消',
+    browserCompatibilityNotice: '浏览器访问在所有窗口模式下都可用（仅限这台电脑）。局域网内其他设备的访问仍需要兼容模式。',
     networkExposure: '网络访问范围',
     networkExposureBody: '选择仅允许这台电脑访问，或允许同一局域网中的其他设备通过 HTTPS 访问。',
     loopback: '仅这台电脑',

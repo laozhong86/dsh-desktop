@@ -46,6 +46,7 @@ import { DESKTOP_DEFAULT_WEB_PORT, defaultDesktopWebPort } from './desktop-port.
 import { withAsarModuleResolver } from './asar-module-resolver-state.ts'
 import {
   desktopBrowserAccessEnabled,
+  desktopLanExposureAvailable,
   desktopNetworkExposureForBrowserAccess,
   desktopWebServerHost,
   parseDesktopNetworkExposure,
@@ -200,7 +201,10 @@ export function desktopStartupSettingsFromSettings(document: unknown): DesktopSt
     macosMaterial: parseMacosWindowMaterial(values.macosMaterial),
     windowsMaterial: parseWindowsWindowMaterial(values.windowsMaterial),
     openBrowser,
-    networkExposure: desktopNetworkExposureForBrowserAccess(openBrowser, networkExposure),
+    networkExposure: desktopNetworkExposureForBrowserAccess(
+      openBrowser,
+      desktopLanExposureAvailable(mode) ? networkExposure : 'loopback',
+    ),
   }
 }
 

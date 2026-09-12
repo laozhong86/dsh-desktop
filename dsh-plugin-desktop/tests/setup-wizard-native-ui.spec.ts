@@ -7,14 +7,12 @@ import type {
   DesktopSetupWizardSelection,
 } from '../src/setup-wizard-contract.ts'
 import {
-  confirmDesktopSetupWizardBrowserCompatibility,
   decodeDesktopSetupWizardInput,
   DESKTOP_SETUP_WIZARD_STEPS,
   desktopSetupWizardSkipRequiresLanAcknowledgement,
   nextDesktopSetupWizardStep,
   previousDesktopSetupWizardStep,
   resolveDesktopSetupWizardBrowserAccessRequest,
-  SetupWizardBrowserCompatibilityConfirmation,
   SetupWizardLanConfirmation,
   SetupWizardNavigation,
   SetupWizardStepPage,
@@ -265,7 +263,7 @@ describe('Setup Wizard setting pages', () => {
     expect(browser).toContain('HTTPS')
   })
 
-  it('describes browser access as an opt-in capability limited to compatibility mode', () => {
+  it('describes browser access as an opt-in capability in every window mode', () => {
     const browser = renderStep('browser')
     expect(browser).toContain(copy.openBrowser)
     expect(browser).toContain(copy.browserCompatibilityNotice)
@@ -273,7 +271,7 @@ describe('Setup Wizard setting pages', () => {
     expect(copy.openBrowser).not.toContain('启动后')
     expect(copy.openBrowser).not.toContain('自动')
     expect(copy.browserCompatibilityNotice).toContain('兼容模式')
-    expect(copy.browserCompatibilityNotice).toContain('仅在')
+    expect(copy.browserCompatibilityNotice).toContain('所有窗口模式')
     expect(browser).not.toMatch(/<button[^>]*disabled=""[^>]*aria-label="允许在浏览器中打开"/u)
   })
 
@@ -372,43 +370,15 @@ describe('Setup Wizard native UI boundaries', () => {
     }, false)).toBe(false)
   })
 
-  it('asks before switching a custom mode to compatibility for browser access', () => {
+  it('enables browser access in a custom mode without switching the window mode', () => {
     expect(resolveDesktopSetupWizardBrowserAccessRequest(selection, true)).toEqual({
-      action: 'confirm-compatibility',
+      action: 'update',
+      selection: { ...selection, openBrowser: true, networkExposure: 'loopback' },
     })
     expect(resolveDesktopSetupWizardBrowserAccessRequest(selection, false)).toEqual({
       action: 'update',
       selection: { ...selection, openBrowser: false, networkExposure: 'loopback' },
     })
-    expect(confirmDesktopSetupWizardBrowserCompatibility({
-      ...selection,
-      networkExposure: 'lan',
-    })).toEqual({
-      ...selection,
-      mode: 'compatibility',
-      openBrowser: true,
-      networkExposure: 'loopback',
-    })
-
-    const dialog = SetupWizardBrowserCompatibilityConfirmation({
-      copy,
-      confirm: () => {},
-      cancel: () => {},
-    })
-    const dialogProps = dialog.props as { readonly children?: ReactNode; readonly open?: boolean }
-    const content = Children.toArray(dialogProps.children).find(isValidElement) as ReactElement | undefined
-    expect(dialogProps.open).toBe(true)
-    expect(content?.props).toMatchObject({
-      'aria-describedby': 'browser-compatibility-body',
-      'aria-labelledby': 'browser-compatibility-title',
-      'aria-modal': 'true',
-      role: 'alertdialog',
-      showCloseButton: false,
-    })
-    const text = elementText(content)
-    expect(text).toContain('在浏览器中打开只能使用兼容模式')
-    expect(text).toContain(copy.confirmBrowserCompatibility)
-    expect(text).toContain(copy.cancelBrowserCompatibility)
   })
 
   it('renders the LAN warning as an in-window alert dialog with explicit choices', () => {

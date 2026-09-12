@@ -187,14 +187,13 @@ describe('Desktop settings API', () => {
     expect(zh.openBrowser).not.toMatch(/启动后|自动/u)
     expect(zh.webIntro).not.toMatch(/启动后|自动/u)
     expect(zh.browserCompatibilityNotice).toContain('兼容模式')
-    expect(zh.browserCompatibilityNotice).toContain('仅在')
-    expect(zh.browserCompatibilityNotice).toContain('先选择')
+    expect(zh.browserCompatibilityNotice).toContain('所有窗口模式')
     expect(zh.browserCompatibilityNotice).not.toContain('切换到兼容模式')
     expect(en.openBrowser).toMatch(/allow.+(?:open|opening).+browser/iu)
     expect(en.openBrowser).not.toMatch(/after startup|automatically/iu)
     expect(en.webIntro).not.toMatch(/after startup|automatically/iu)
-    expect(en.browserCompatibilityNotice).toMatch(/only.+compatibility mode/iu)
-    expect(en.browserCompatibilityNotice).toMatch(/select compatibility mode first/iu)
+    expect(en.browserCompatibilityNotice).toMatch(/every window mode/iu)
+    expect(en.browserCompatibilityNotice).toMatch(/local-network.+compatibility mode/iu)
     expect(en.browserCompatibilityNotice).not.toMatch(/switch(?:es|ing)?.+profile/iu)
     expect(zh.lanTrustNotice).toContain('安装并信任')
     expect(zh.lanTrustNotice).toContain('不能保证')
@@ -301,7 +300,7 @@ describe('Desktop settings API', () => {
     expect(enableLan).toHaveBeenCalledOnce()
   })
 
-  it('withdraws browser and LAN access before selecting a custom Desktop mode', async () => {
+  it('keeps browser access and withdraws only the LAN listener before selecting a custom Desktop mode', async () => {
     const set = vi.fn(async () => {})
     const scope = {
       getSnapshot: () => ({
@@ -327,12 +326,11 @@ describe('Desktop settings API', () => {
     await persistDesktopModeSelection(scope, 'advanced')
     expect(set.mock.calls).toEqual([
       ['networkExposure', 'loopback'],
-      ['openBrowser', false],
       ['mode', 'advanced'],
     ])
   })
 
-  it('withdraws browser and LAN access while the settings mirror is still loading', async () => {
+  it('keeps browser access and withdraws only the LAN listener while the settings mirror is still loading', async () => {
     const set = vi.fn(async () => {})
     const scope = {
       getSnapshot: () => ({
@@ -351,7 +349,6 @@ describe('Desktop settings API', () => {
 
     expect(set.mock.calls).toEqual([
       ['networkExposure', 'loopback'],
-      ['openBrowser', false],
       ['mode', 'extended'],
     ])
   })

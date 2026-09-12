@@ -34,7 +34,7 @@ rpc.handle('boot', async args => {
   if (starting || stopping) throw new Error('DSH Host generation already started or stopped')
   starting = true
   const runtime = createHostRuntime(rpc, snapshot)
-  const browser = createDesktopBrowserAccess(options.prepared.mode === 'compatibility' && options.prepared.openBrowser, token)
+  const browser = createDesktopBrowserAccess(options.prepared.openBrowser, token)
   lan = new DesktopLanHttpsRuntime({
     addresses: options.prepared.lanAddresses, requestedPort: 0,
     prepareCertificate: () => rpc.call('certificate'),

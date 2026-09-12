@@ -125,6 +125,7 @@ import {
   prepareDesktopProfile,
   type SkippedOptionalEntry,
 } from './profile.ts'
+import { desktopFirstRunSetupSuppressed, defaultDesktopFirstRunSettings } from './desktop-first-run.ts'
 import { DesktopProfileCheckpoint } from './profile-checkpoint.ts'
 import {
   completeOrSkipDesktopSetupWizard,
@@ -1211,6 +1212,40 @@ async function start(l2: ReturnType<typeof resolveDesktopL2Launch>): Promise<voi
       ? readDesktopSetupWizardState(marketUserDataDir, prepared.profile.dir)
       : undefined
     if (safeModePaths === undefined && desktopSetupWizardRequired(setupWizardState, setupWizardVersions)
+      && desktopFirstRunSetupSuppressed(process.env.OMNIMUX_CHANNEL)) {
+      // A release build ships working defaults instead of asking: browser access
+      // is on, the window mode is the platform default, and Setup is recorded as
+      // settled so no first-run window ever appears.
+      const firstRunSettings = defaultDesktopFirstRunSettings()
+      profilePreferences = await writeDesktopProfilePreferences(
+        marketUserDataDir,
+        prepared.profile.dir,
+        {
+          ...desktopProfilePreferencesFromSettings(
+            firstRunSettings,
+            firstRunSettings.notifications,
+            marketSelection.requested,
+          ),
+          aaEnabled: false,
+        },
+      )
+      await mirrorDesktopProfilePreferences(prepared.settingsDocument, profilePreferences)
+      prepared = prepareDesktopProfile(
+        process.env.DSH_TELEMETRY_DISABLED,
+        homeDir,
+        process.platform,
+        activeProfileName,
+        pluginManagementStatePath,
+        marketSelection,
+        preparationHooks,
+      )
+      await completeOrSkipDesktopSetupWizard(
+        marketUserDataDir,
+        prepared.profile.dir,
+        'skipped',
+        setupWizardVersions,
+      )
+    } else if (safeModePaths === undefined && desktopSetupWizardRequired(setupWizardState, setupWizardVersions)
       && !hasDesktopProfileUsageHistory(releaseUserDataLocations, prepared.profile.dir, activeProfileName)) {
       const setupSettings = readDesktopSetupWizardSettings(prepared.settingsDocument)
       setupWizardWindow = new DesktopSetupWizardWindow({

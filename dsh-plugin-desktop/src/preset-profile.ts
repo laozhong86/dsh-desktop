@@ -1,5 +1,7 @@
 /** First-run seed of the OmniMux desktop profile. Never calls pnpm. */
 
+import { defaultDesktopShellMode } from './desktop-mode-default.ts'
+
 import {
   cpSync,
   existsSync,
@@ -183,16 +185,19 @@ export function seedOmnimuxSettings(homeDir: string): void {
       try {
         const raw = readFileSync(globalSettingsFile, 'utf8')
         const doc = parseDocument(raw)
-        // Ensure dsh-desktop is configured with compatibility mode
+        // A fresh OmniMux home starts from the shipped defaults: the platform's
+        // window mode with loopback browser access already on.
         const desktop = doc.get('dsh-desktop')
         if (desktop && typeof (desktop as any).set === 'function') {
-          ;(desktop as any).set('mode', 'compatibility')
+          ;(desktop as any).set('mode', defaultDesktopShellMode())
+          ;(desktop as any).set('openBrowser', true)
+          ;(desktop as any).set('networkExposure', 'loopback')
         } else {
           doc.set('dsh-desktop', {
-            mode: 'compatibility',
+            mode: defaultDesktopShellMode(),
             macosMaterial: 'transparent',
             windowsMaterial: 'acrylic',
-            openBrowser: false,
+            openBrowser: true,
             networkExposure: 'loopback',
           })
         }
@@ -222,10 +227,10 @@ export function seedOmnimuxSettings(homeDir: string): void {
         }
         writeFileSync(settingsFile, doc.toString())
       } catch {
-        writeCleanCompatibilitySettings(settingsFile)
+        writeDefaultSettings(settingsFile)
       }
     } else {
-      writeCleanCompatibilitySettings(settingsFile)
+      writeDefaultSettings(settingsFile)
     }
   }
 
@@ -239,7 +244,7 @@ export function seedOmnimuxSettings(homeDir: string): void {
   }
 }
 
-function writeCleanCompatibilitySettings(settingsFile: string): void {
+function writeDefaultSettings(settingsFile: string): void {
   const initial = [
     'ui-onboarding:',
     '  welcomeNoticeVersion: 2026-08-13.1',
@@ -248,10 +253,10 @@ function writeCleanCompatibilitySettings(settingsFile: string): void {
     'permission:',
     '  defaultPreset: danger-full-access',
     'dsh-desktop:',
-    '  mode: compatibility',
+    `  mode: ${defaultDesktopShellMode()}`,
     '  macosMaterial: transparent',
     '  windowsMaterial: acrylic',
-    '  openBrowser: false',
+    '  openBrowser: true',
     '  networkExposure: loopback',
     'dsh-better-sidebar:',
     '  agentOpenTools: true',

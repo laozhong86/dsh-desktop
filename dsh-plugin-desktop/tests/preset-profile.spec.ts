@@ -204,7 +204,7 @@ describe('resolveDesktopHarnessHome', () => {
 })
 
 describe('seedOmnimuxSettings', () => {
-  it('creates clean compatibility settings when target home is fresh', () => {
+  it('creates shipped default settings when target home is fresh', () => {
     const tempHome = mkdtempSync(join(tmpdir(), 'omnimux-home-'))
     try {
       seedOmnimuxSettings(tempHome)
@@ -214,7 +214,9 @@ describe('seedOmnimuxSettings', () => {
       const doc = parseDocument(readFileSync(settingsFile, 'utf8'))
       const js = doc.toJS() as Record<string, any>
       expect(js['dsh-desktop']).toBeDefined()
-      expect(js['dsh-desktop'].mode).toBe('compatibility')
+      expect(js['dsh-desktop'].mode).toBe(process.platform === 'linux' ? 'compatibility' : 'advanced')
+      expect(js['dsh-desktop'].openBrowser).toBe(true)
+      expect(js['dsh-desktop'].networkExposure).toBe('loopback')
       expect(js['dsh-better-sidebar']).toBeDefined()
       expect(js['dsh-better-sidebar'].agentOpenTools).toBe(true)
       expect(js['dsh-better-sidebar'].browserAllowedLoopback).toBe('127.0.0.1, localhost')

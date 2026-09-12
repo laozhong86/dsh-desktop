@@ -137,7 +137,11 @@ export function DesktopOwnedFrame({
     >
       {mode === 'advanced' && platform === 'darwin' && <div className="dshDesktopMacCaptionRow" aria-hidden="true" />}
       <aside className="dshDesktopSidebarSurface">
-        <div className="dshDesktopUpstreamSidebar">
+        {/* The official layout marks its sidebar column with `data-pane="sidebar"`,
+            and third-party rows (the OmniMux hub coordinator among them) anchor to
+            that marker. This frame replaces the official column, so it carries the
+            same marker for the slot content it hosts. */}
+        <div className="dshDesktopUpstreamSidebar" data-pane="sidebar">
           {renderSlot('sidebar', { collapsed, width: sidebarOwnerWidth })}
         </div>
       </aside>

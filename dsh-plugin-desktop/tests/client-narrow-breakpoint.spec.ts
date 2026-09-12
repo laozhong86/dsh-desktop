@@ -123,6 +123,9 @@ describe('narrow measurement is window width, not squeezed frame width', () => {
       vi.stubGlobal('window', { innerWidth: 1440 })
       const wide = renderToStaticMarkup(createElement(AdvancedFrame, props))
       expect(wide).not.toContain('data-sidebar-collapsed')
+      // Third-party sidebar rows anchor to the official column marker, which this
+      // frame has to carry for the slot content it hosts.
+      expect(wide).toContain('data-pane="sidebar"')
 
       vi.stubGlobal('window', { innerWidth: 900 })
       const narrowMarkup = renderToStaticMarkup(createElement(AdvancedFrame, {

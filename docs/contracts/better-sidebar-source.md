@@ -28,6 +28,8 @@ The entire published `src/` tree was compared byte for byte with that Git revisi
 
 The upstream frozen lockfile (SHA-256 `f8e2934ca6ba60682610ff64cacd4e1ea53317a385d1bd5ead8cd724dd95da64`) and `pnpm@11.8.0` define the build dependency graph. Checkout disables line-ending conversion in its own temporary repository. The upstream CSS bundler emits absolute virtual-module paths and its native CSS export map has nondeterministic key order, so the desktop patch series normalizes build paths and sorts CSS export keys. Rebuilding in two independent directories must produce the same packaged sidebar files. Runtime and platform metadata belong in provenance, outside any timestamped claim of byte equality.
 
+A patch series may extend that dependency graph: a feature patch adds its build dependencies to `package.json` and the frozen lockfile together, and `pnpm install --frozen-lockfile` still gates the build. The pinned-lock anchor is validated on the freshly fetched source BEFORE any patch is applied, so it keeps proving where the source came from; `omnimux-build.json` records that pinned lock rather than the patched one, while `patchSha256` covers everything the series changed — lockfile included.
+
 This guarantee covers the rebuilt sidebar package. Product plugin source snapshots and the full preset runtime dependency graph retain their own materialization contracts; this pipeline does not claim that arbitrary product sources produce an identical complete desktop application.
 
 ## Entry points

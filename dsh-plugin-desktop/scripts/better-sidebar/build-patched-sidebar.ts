@@ -44,12 +44,17 @@ export function buildPatchedBetterSidebar(workRoot: string): BuiltBetterSidebar 
   if (sha256(join(sourceRoot, 'pnpm-lock.yaml')) !== BETTER_SIDEBAR_LOCK_SHA256) {
     throw new Error('dsh-better-sidebar lockfile differs from the pinned commit contract')
   }
+  // The patch series may update the lockfile (a feature patch can add build
+  // dependencies), so the manifest records the PINNED lock — the anchor
+  // validated directly above — while `patchSha256` covers whatever the series
+  // changed, lockfile included.
+  const pinnedLockSha256 = BETTER_SIDEBAR_LOCK_SHA256
   const expectedPatchSha256 = sha256(patchPath)
   run('git', ['apply', '--check', patchPath], sourceRoot)
   run('git', ['apply', patchPath], sourceRoot)
   runCorepackPnpm(['install', '--frozen-lockfile', '--ignore-scripts'], sourceRoot)
   runCorepackPnpm(['run', 'build'], sourceRoot)
-  writeBuildManifest(sourceRoot, expectedPatchSha256)
+  writeBuildManifest(sourceRoot, expectedPatchSha256, pinnedLockSha256)
   runCorepackPnpm(['pack', '--config.ignore-scripts=true', '--pack-destination', '../packed'], sourceRoot)
 
   const tarballs = readdirSync(packRoot).filter(name => name.endsWith('.tgz'))
@@ -105,7 +110,7 @@ interface BuildManifest {
   readonly files: Readonly<Record<string, string>>
 }
 
-function writeBuildManifest(sourceRoot: string, expectedPatchSha256: string): void {
+function writeBuildManifest(sourceRoot: string, expectedPatchSha256: string, lockfileSha256: string): void {
   if (sha256(patchPath) !== expectedPatchSha256) {
     throw new Error('dsh-better-sidebar patch changed while the source was building')
   }
@@ -117,7 +122,7 @@ function writeBuildManifest(sourceRoot: string, expectedPatchSha256: string): vo
     repository: BETTER_SIDEBAR_REPOSITORY,
     commit: BETTER_SIDEBAR_COMMIT,
     patchSha256: expectedPatchSha256,
-    lockfileSha256: sha256(join(sourceRoot, 'pnpm-lock.yaml')),
+    lockfileSha256,
     packageManager: `pnpm@${BETTER_SIDEBAR_PNPM_VERSION}`,
     node: process.version,
     files,

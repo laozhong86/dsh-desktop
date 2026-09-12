@@ -29,12 +29,19 @@ assert(
   /([\\/])app\.asar\1/u.test(installAnchor.pathname),
   `did not start from app.asar: ${installAnchor.pathname}`,
 )
+// The ripgrep shim stays inside app.asar by contract (see
+// FORBIDDEN_UNPACKED_RUNTIME_ENTRIES in scripts/verify-packaged-runtime.ts), so
+// the logical resolution names app.asar even though the executable itself is
+// unpacked. Resolve the physical twin: ripgrep must exist on disk and run, which
+// is the guarantee that matters.
+const unpackedRgPath = rgPath.replace(/([\\/])app\.asar\1/u, '$1app.asar.unpacked$1')
 assert(
-  /([\\/])app\.asar\.unpacked\1/u.test(rgPath),
+  /([\\/])app\.asar\.unpacked\1/u.test(unpackedRgPath),
   `resolved ripgrep outside app.asar.unpacked: ${rgPath}`,
 )
-assert(existsSync(rgPath), `cannot find ripgrep at ${rgPath}`)
-const rgVersion = execFileSync(rgPath, ['--version'], { encoding: 'utf8', windowsHide: true })
+const executableRgPath = existsSync(rgPath) ? rgPath : unpackedRgPath
+assert(existsSync(executableRgPath), `cannot find ripgrep at ${rgPath}`)
+const rgVersion = execFileSync(executableRgPath, ['--version'], { encoding: 'utf8', windowsHide: true })
 assert(/^ripgrep\s/u.test(rgVersion), `received an invalid ripgrep version: ${JSON.stringify(rgVersion.trim())}`)
 if (process.platform === 'win32') {
   const sessionBackend = await import('@deepseek-ai/dsh-session-persistence-jsonl')

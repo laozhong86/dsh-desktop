@@ -156,7 +156,6 @@ export const REQUIRED_PACKAGED_RUNTIME_ENTRIES = [
   'node_modules/@deepseek-ai/dsh-web-frontend/dist/index.html',
   'node_modules/@deepseek-ai/dsh-app-boot/lib/index.js',
   ...REQUIRED_AGENT_PRESET_RUNTIME_ENTRIES,
-  ...REQUIRED_PRESET_RUNTIME_ENTRIES,
   'node_modules/open/index.js',
   'node_modules/pnpm/bin/pnpm.mjs',
 ] as const
@@ -687,6 +686,12 @@ export function verifySelectiveUnpackedRuntime(
   if (desktopCode.length > 0) {
     throw new Error(
       `dsh-plugin-desktop: unpacked runtime at ${unpackedRoot} contains desktop code/data that must stay in app.asar: ${desktopCode.join(', ')}; inventory: ${inventory}`,
+    )
+  }
+  const missingPreset = REQUIRED_PRESET_RUNTIME_ENTRIES.filter(entry => !seen.has(entry))
+  if (missingPreset.length > 0) {
+    throw new Error(
+      `dsh-plugin-desktop: unpacked runtime at ${unpackedRoot} is missing required OmniMux preset seed entries: ${missingPreset.join(', ')}; inventory: ${inventory}`,
     )
   }
   const forbidden = FORBIDDEN_UNPACKED_RUNTIME_ENTRIES

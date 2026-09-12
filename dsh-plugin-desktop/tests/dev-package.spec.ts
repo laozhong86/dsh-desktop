@@ -25,6 +25,9 @@ describe('development app packaging', () => {
       [process.execPath, [join(packageRoot, 'scripts', 'stage-preset-profile.ts'), '--channel', 'development']],
       [process.execPath, [join(packageRoot, 'scripts', 'package-dir.mjs')]],
       [process.execPath, [stampScript, appPath]],
+      // Stamping rewrites Info.plist after electron-builder signed the bundle,
+      // so the ad-hoc signature is re-applied to the stamped output.
+      ['codesign', ['--force', '--deep', '--sign', '-', appPath]],
     ])
     for (const call of run.mock.calls) {
       expect(call[2]).toMatchObject({ cwd: packageRoot, stdio: 'inherit' })
@@ -36,7 +39,7 @@ describe('development app packaging', () => {
     expect(desktop.scripts['package:dir']).toBe('yarn run build && yarn run prepare:electron-native && yarn run stage:preset && node scripts/package-dir.mjs')
   })
 
-  it.each([1, 2, 3])('stops before identity stamping when packaging step %i fails', failedStep => {
+  it.each([1, 2, 3, 4, 5])('stops at the first failing packaging step %i', failedStep => {
     const run = vi.fn<Run>().mockImplementation(() => ({
       status: run.mock.calls.length === failedStep ? 1 : 0,
     }))

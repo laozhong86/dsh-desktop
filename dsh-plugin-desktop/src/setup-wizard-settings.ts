@@ -5,6 +5,7 @@ import {
   desktopBrowserAccessEnabled,
   desktopNetworkExposureForBrowserAccess,
 } from './desktop-network.ts'
+import { defaultDesktopShellMode } from './desktop-mode-default.ts'
 import {
   closeSync,
   constants,
@@ -168,7 +169,7 @@ function optionalBoolean(values: Record<string, unknown>, key: string, fallback:
 }
 
 function parseMode(value: unknown): DesktopSetupWizardMode {
-  if (value === undefined) return 'compatibility'
+  if (value === undefined) return defaultDesktopShellMode()
   if (value === 'compatibility' || value === 'extended' || value === 'advanced') return value
   throw invalid('dsh-desktop.mode must be compatibility, extended, or advanced')
 }
@@ -459,7 +460,7 @@ export async function migrateDesktopWindowMaterialSettings(
 export function defaultDesktopSetupWizardSettings(
 ): DesktopSetupWizardSettings {
   return Object.freeze({
-    mode: 'compatibility',
+    mode: defaultDesktopShellMode(),
     macosMaterial: DEFAULT_MACOS_WINDOW_MATERIAL,
     windowsMaterial: DEFAULT_WINDOWS_WINDOW_MATERIAL,
     openBrowser: false,

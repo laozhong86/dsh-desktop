@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { parseDocument } from 'yaml'
 import { afterEach, describe, expect, it } from 'vitest'
+import { defaultDesktopShellMode } from '../src/desktop-mode-default.ts'
 import {
   defaultDesktopSetupWizardSettings,
   migrateDesktopBrowserAccessSettings,
@@ -75,7 +76,7 @@ describe('Desktop Setup Wizard settings document', () => {
     expect(readDesktopSetupWizardSettings(join(root, 'settings.json')))
       .toEqual(defaultDesktopSetupWizardSettings())
     expect(defaultDesktopSetupWizardSettings()).toMatchObject({
-      mode: 'compatibility',
+      mode: defaultDesktopShellMode(),
       macosMaterial: 'transparent',
       windowsMaterial: 'off',
       openBrowser: false,
@@ -255,6 +256,7 @@ describe('Desktop Setup Wizard settings document', () => {
     const path = join(temporaryDirectory(), 'settings.yaml')
     writeFileSync(path, [
       'dsh-desktop:',
+      '  mode: compatibility',
       '  openBrowser: false',
       '  networkExposure: lan',
       '',
@@ -355,8 +357,9 @@ describe('Desktop Setup Wizard settings document', () => {
     writeFileSync(path, contents)
     writeFileSync(lockPath, 'owner\n')
 
-    await expect(updateDesktopSetupWizardSettings(path, defaultDesktopSetupWizardSettings()))
-      .resolves.toEqual(defaultDesktopSetupWizardSettings())
+    const selection = readDesktopSetupWizardSettings(path)
+    await expect(updateDesktopSetupWizardSettings(path, selection))
+      .resolves.toEqual(selection)
     expect(readFileSync(path, 'utf8')).toBe(contents)
     expect(readFileSync(lockPath, 'utf8')).toBe('owner\n')
   })

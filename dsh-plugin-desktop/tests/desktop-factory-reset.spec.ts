@@ -7,6 +7,7 @@ import {
   assertDesktopFactoryResetTarget,
   resetDesktopDataDirectory,
 } from '../src/desktop-factory-reset.ts'
+import { defaultDesktopShellMode } from '../src/desktop-mode-default.ts'
 import { readDesktopProfilePreferences, writeDesktopProfilePreferences } from '../src/profile-preferences.ts'
 import { completeOrSkipDesktopSetupWizard, readDesktopSetupWizardState } from '../src/setup-wizard-state.ts'
 import { readDesktopMarketStateForUserData, selectDesktopMarketProvider } from '../src/desktop-market.ts'
@@ -83,7 +84,7 @@ describe('Desktop factory reset', () => {
       expect(readDesktopSetupWizardState(locations.other.userDataDir, profile)).toBeUndefined()
       const settings = join(profile, 'settings.yaml')
       const defaults = readDesktopSetupWizardSettings(settings)
-      expect(defaults.mode).toBe('compatibility')
+      expect(defaults.mode).toBe(defaultDesktopShellMode())
       expect(defaults.notifications.enabled).toBe(true)
       await completeOrSkipDesktopSetupWizard(userDataDir, profile, 'skipped', versions)
       expect(readDesktopSetupWizardSettings(settings)).toEqual(defaults)

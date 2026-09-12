@@ -77,7 +77,7 @@ Custom-window material is independent from mode. macOS offers **Off** and **Tran
 
 ## Enhanced mode
 
-Enhanced mode is the default for a profile that persists no explicit `dsh-desktop.mode`, and it is an explicitly composed desktop presentation for macOS and Windows. After all user patches have been read, the launcher disables the official `ui-layout` Loader row, keeps the official `ui-sidebar` and `ui-conversation` rows enabled, and applies the selected mode to `desktop-shell`.
+Enhanced mode is the default for a profile that persists no explicit `dsh-desktop.mode`, and the Setup Wizard offers it as the preselected choice on first run. It is an explicitly composed desktop presentation for macOS and Windows. After all user patches have been read, the launcher disables the official `ui-layout` Loader row, keeps the official `ui-sidebar` and `ui-conversation` rows enabled, and applies the selected mode to `desktop-shell`.
 
 The desktop Client provides the immutable `desktopWindow` native-geometry service in all presentation modes. Enhanced mode has its own Cordis effects, `layout` service, and `root` slot registration; it does not install the independent compatibility/extended frame. Its root declares seats for the unchanged upstream sidebar, conversation, details, and overlay contributions. The official sidebar remains the `sidebar` occupant and continues to declare the workspace browser, settings shell, and additive footer-action seats. This preserves its component behavior, collapse animation, and third-party extension points while the desktop package owns only its compact internal-caption geometry and native material.
 

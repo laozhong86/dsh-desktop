@@ -10,7 +10,11 @@
         "dsh-better-sidebar",
         "omnimux",
         "omnimux-assets",
-        "omnimux-workflow"
+        "omnimux-workflow",
+        "omnimux-accounts",
+        "omnimux-publish",
+        "omnimux-analytics",
+        "omnimux-forms"
       ]
     }
   }

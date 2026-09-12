@@ -104,7 +104,19 @@ const DESKTOP_WINDOWS_PWSH_SANDBOX_PACKAGE = `${DESKTOP_PACKAGE_NAME}/windows-pw
 const AGENT_PRESETS_ROW_ID = 'agent-presets'
 /** Harness-home directory holding locally authored presets (`agent-presets/discovery`). */
 const USER_PRESET_DIRNAME = '.agent-presets'
-const DEFAULT_DESKTOP_SHELL_MODE: DesktopShellMode = 'compatibility'
+/**
+ * Default presentation mode for a fresh profile.
+ *
+ * Enhanced mode owns the layout, sidebar, and conversation rows, which is the
+ * presentation this product ships by default. Linux cannot present it — the
+ * desktop Client rejects enhanced mode there instead of silently falling back
+ * to a different window — so Linux keeps the compatibility presentation.
+ * @param platform - Electron platform the desktop runs on.
+ * @returns the mode used when settings persist no explicit choice.
+ */
+export function defaultDesktopShellMode(platform: NodeJS.Platform = process.platform): DesktopShellMode {
+  return platform === 'linux' ? 'compatibility' : 'advanced'
+}
 const DEFAULT_DESKTOP_PORT = DESKTOP_DEFAULT_WEB_PORT
 const DESKTOP_WEB_SERVER_ROW_ID = 'desktop-webserver'
 const DESKTOP_WEB_SERVER_PACKAGE = `${DESKTOP_PACKAGE_NAME}/webserver`
@@ -134,7 +146,7 @@ const MARKET_PACKAGE_NAMES: ReadonlySet<string> = new Set([
  * @returns a supported desktop shell mode.
  */
 export function parseDesktopShellMode(value: unknown): DesktopShellMode {
-  if (value === undefined) return DEFAULT_DESKTOP_SHELL_MODE
+  if (value === undefined) return defaultDesktopShellMode()
   if (value === 'compatibility' || value === 'extended' || value === 'advanced') return value
   throw new Error(`${BIN_NAME}: ${DESKTOP_SETTINGS_NAMESPACE}.mode must be "compatibility", "extended", or "advanced"`)
 }
@@ -157,14 +169,17 @@ export interface DesktopStartupSettings {
   networkExposure: DesktopNetworkExposure
 }
 
-const DEFAULT_DESKTOP_STARTUP_SETTINGS: DesktopStartupSettings = Object.freeze({
-  mode: DEFAULT_DESKTOP_SHELL_MODE,
-  port: DEFAULT_DESKTOP_PORT,
-  macosMaterial: DEFAULT_MACOS_WINDOW_MATERIAL,
-  windowsMaterial: DEFAULT_WINDOWS_WINDOW_MATERIAL,
-  openBrowser: false,
-  networkExposure: 'loopback',
-})
+/** Fallback startup settings for a document that persists no Desktop section. */
+function defaultDesktopStartupSettings(): DesktopStartupSettings {
+  return Object.freeze({
+    mode: defaultDesktopShellMode(),
+    port: DEFAULT_DESKTOP_PORT,
+    macosMaterial: DEFAULT_MACOS_WINDOW_MATERIAL,
+    windowsMaterial: DEFAULT_WINDOWS_WINDOW_MATERIAL,
+    openBrowser: false,
+    networkExposure: 'loopback',
+  })
+}
 
 /**
  * Read Desktop startup settings from one parsed settings document.
@@ -177,7 +192,7 @@ export function desktopStartupSettingsFromSettings(document: unknown): DesktopSt
   }
   const section = (document as Record<string, unknown>)[DESKTOP_SETTINGS_NAMESPACE]
   if (section === undefined) {
-    return { ...DEFAULT_DESKTOP_STARTUP_SETTINGS }
+    return { ...defaultDesktopStartupSettings() }
   }
   if (typeof section !== 'object' || section === null || Array.isArray(section)) {
     throw new Error(`${BIN_NAME}: ${DESKTOP_SETTINGS_NAMESPACE} settings must be a map`)
@@ -217,7 +232,7 @@ export function readDesktopStartupSettings(config: SettingsFileConfig): DesktopS
     text = readFileSync(spec.filename, 'utf8')
   } catch (cause) {
     if ((cause as NodeJS.ErrnoException).code === 'ENOENT') {
-      return { ...DEFAULT_DESKTOP_STARTUP_SETTINGS }
+      return { ...defaultDesktopStartupSettings() }
     }
     throw cause
   }

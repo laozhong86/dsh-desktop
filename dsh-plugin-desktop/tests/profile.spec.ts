@@ -23,6 +23,7 @@ import {
   DESKTOP_PACKAGE_NAME,
   desktopShellModeFromSettings,
   desktopStartupSettingsFromSettings,
+  defaultDesktopShellMode,
   desktopBundleList,
   ensureDesktopProfile,
   prepareDesktopProfile,
@@ -33,6 +34,9 @@ import {
   validateDshMarketBundlePatches,
 } from '../src/profile.ts'
 import { DESKTOP_MARKET_IDENTITIES } from '../src/desktop-market.ts'
+
+/** Presentation a fresh profile gets on the platform running this suite. */
+const DEFAULT_DESKTOP_MODE = process.platform === 'linux' ? 'compatibility' : 'advanced'
 
 const homes: string[] = []
 
@@ -383,18 +387,23 @@ virtualStoreDirMaxLength: 60
     expect(() => ensureDesktopProfile(home)).toThrow('dsh.profile.bundles must be an array')
   })
 
-  it('assembles the Host shell without replacing the upstream client shell', () => {
+  it('assembles the Host shell without replacing the upstream client shell in compatibility mode', () => {
     const home = temporaryHome()
+    writeFileSync(join(home, 'settings.yaml'), 'dsh-desktop:\n  mode: compatibility\n')
     const prepared = prepareDesktopProfile(undefined, home, 'darwin')
     const patches = prepared.patches as Array<Record<string, unknown>>
     const inserted = patches.flatMap((patch) => {
       const rows = patch.insert
       return Array.isArray(rows) ? rows as Array<Record<string, unknown>> : []
     })
-    expect(inserted).toContainEqual(expect.objectContaining({
-      name: DESKTOP_PACKAGE_NAME,
-      config: { mode: 'compatibility' },
-    }))
+    // The static patch file carries the startup placeholder; the composed row
+    // must carry the mode the profile resolved.
+    expect(composeEntries([prepared.patches]).find(row => row.id === 'desktop-shell')).toEqual(
+      expect.objectContaining({
+        name: DESKTOP_PACKAGE_NAME,
+        config: expect.objectContaining({ mode: 'compatibility' }),
+      }),
+    )
     expect(patches).toContainEqual(expect.objectContaining({
       id: 'webserver',
       name: '@deepseek-ai/dsh-host-webserver',
@@ -751,7 +760,7 @@ virtualStoreDirMaxLength: 60
     }])).toThrow('must insert exactly the canonical dsh-market row')
   })
 
-  it('boots a selected Web profile without overriding its compatibility UI rows', () => {
+  it('boots a selected Web profile without overriding its UI rows', () => {
     const home = temporaryHome()
     const webDir = join(home, 'profiles', 'web')
     const template = PROFILE_TEMPLATES.web
@@ -781,7 +790,7 @@ virtualStoreDirMaxLength: 60
     })
     expect(rows.find(row => row.id === 'desktop-shell')).toEqual(expect.objectContaining({
       name: 'dsh-plugin-desktop',
-      config: expect.objectContaining({ mode: 'compatibility' }),
+      config: expect.objectContaining({ mode: DEFAULT_DESKTOP_MODE }),
     }))
   })
 
@@ -883,7 +892,13 @@ virtualStoreDirMaxLength: 60
     }))
   })
 
-  it('reads JSON settings and defaults an absent desktop namespace to compatibility', () => {
+  it('defaults a fresh profile to enhanced mode, except on Linux', () => {
+    expect(defaultDesktopShellMode('darwin')).toBe('advanced')
+    expect(defaultDesktopShellMode('win32')).toBe('advanced')
+    expect(defaultDesktopShellMode('linux')).toBe('compatibility')
+  })
+
+  it('reads JSON settings and defaults an absent desktop namespace to the platform default', () => {
     const home = temporaryHome()
     const path = join(home, 'desktop-settings.json')
     writeFileSync(path, JSON.stringify({ 'dsh-desktop': { mode: 'advanced' } }))
@@ -905,7 +920,7 @@ virtualStoreDirMaxLength: 60
       openBrowser: false,
       networkExposure: 'loopback',
     })
-    expect(desktopShellModeFromSettings({ unrelated: { enabled: true } })).toBe('compatibility')
+    expect(desktopShellModeFromSettings({ unrelated: { enabled: true } })).toBe(DEFAULT_DESKTOP_MODE)
   })
 
   it('treats legacy LAN exposure as browser access only in compatibility mode', () => {

@@ -51,7 +51,7 @@ Linux supports compatibility mode only. Its tray mode command is disabled, and c
 
 ## Compatibility mode
 
-`dsh-desktop.mode` defaults to `compatibility`. On macOS and Windows it creates an independent 36 CSS-pixel Desktop frame, with native traffic lights or caption controls, above the official Web surface from the active DSH profile. The centered identity, mode pill, drag region, and icon actions belong only to that frame. The complete official page begins below it and does not participate in its layout or safe-area calculation. Linux keeps the ordinary native-frame fallback.
+Compatibility mode is the fallback presentation: a profile selects it explicitly, and Linux uses it unconditionally. On macOS and Windows it creates an independent 36 CSS-pixel Desktop frame, with native traffic lights or caption controls, above the official Web surface from the active DSH profile. The centered identity, mode pill, drag region, and icon actions belong only to that frame. The complete official page begins below it and does not participate in its layout or safe-area calculation. Linux keeps the ordinary native-frame fallback.
 
 The desktop Client module validates the mode and platform markers, registers only the independent frame overlay and its fixed launcher actions, and performs no official presentation replacement in compatibility mode. It does not provide or replace the `layout` service, register a `root` or `sidebar` occupant, or change the conversation surface. Desktop-owned boot-health reporting is a capability effect; compatibility mode still preserves the selected profile's own layout, sidebar, and conversation composition, so the ordinary `desktop` and `web` profiles keep the official rows unchanged. Upstream dialogs remain content overlays and are bounded below the Desktop frame.
 
@@ -77,7 +77,7 @@ Custom-window material is independent from mode. macOS offers **Off** and **Tran
 
 ## Enhanced mode
 
-Enhanced mode is an explicitly composed desktop presentation for macOS and Windows. After all user patches have been read, the launcher disables the official `ui-layout` Loader row, keeps the official `ui-sidebar` and `ui-conversation` rows enabled, and applies the selected mode to `desktop-shell`.
+Enhanced mode is the default for a profile that persists no explicit `dsh-desktop.mode`, and it is an explicitly composed desktop presentation for macOS and Windows. After all user patches have been read, the launcher disables the official `ui-layout` Loader row, keeps the official `ui-sidebar` and `ui-conversation` rows enabled, and applies the selected mode to `desktop-shell`.
 
 The desktop Client provides the immutable `desktopWindow` native-geometry service in all presentation modes. Enhanced mode has its own Cordis effects, `layout` service, and `root` slot registration; it does not install the independent compatibility/extended frame. Its root declares seats for the unchanged upstream sidebar, conversation, details, and overlay contributions. The official sidebar remains the `sidebar` occupant and continues to declare the workspace browser, settings shell, and additive footer-action seats. This preserves its component behavior, collapse animation, and third-party extension points while the desktop package owns only its compact internal-caption geometry and native material.
 

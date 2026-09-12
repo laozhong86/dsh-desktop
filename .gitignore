@@ -23,6 +23,7 @@ dsh-plugin-desktop/dist/
 /index.js
 .workbuddy/
 dsh-plugin-desktop/preset/plugins/
+dsh-plugin-desktop/preset/agent-presets/
 
 # Agent parallel worktrees (one branch per checkout)
 .worktrees/

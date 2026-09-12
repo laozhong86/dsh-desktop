@@ -761,6 +761,7 @@ describe('published package surface', () => {
       'build/tray-iconTemplate.png',
       'build/tray-iconTemplate@2x.png',
       'node_modules/@agents-anywhere/dsh-bridge-next/lib/bundled-connector/**',
+      'node_modules/pnpm/**',
       'preset/**',
     ])
     const windowsAndLinuxIcons = [
@@ -770,8 +771,8 @@ describe('published package surface', () => {
       'build/tray-icon-blue@1.5x.png',
       'build/tray-icon-blue@2x.png',
     ]
-    expect(manifest.build?.win?.asarUnpack).toEqual([...windowsAndLinuxIcons, 'node_modules/@agents-anywhere/dsh-bridge-next/lib/bundled-connector/**', 'preset/**'])
-    expect(manifest.build?.linux?.asarUnpack).toEqual([...windowsAndLinuxIcons, 'node_modules/@agents-anywhere/dsh-bridge-next/lib/bundled-connector/**', 'preset/**'])
+    expect(manifest.build?.win?.asarUnpack).toEqual([...windowsAndLinuxIcons, 'node_modules/@agents-anywhere/dsh-bridge-next/lib/bundled-connector/**', 'node_modules/pnpm/**', 'preset/**'])
+    expect(manifest.build?.linux?.asarUnpack).toEqual([...windowsAndLinuxIcons, 'node_modules/@agents-anywhere/dsh-bridge-next/lib/bundled-connector/**', 'node_modules/pnpm/**', 'preset/**'])
     expect(manifest.build?.electronFuses).toEqual({
       enableEmbeddedAsarIntegrityValidation: true,
       onlyLoadAppFromAsar: true,

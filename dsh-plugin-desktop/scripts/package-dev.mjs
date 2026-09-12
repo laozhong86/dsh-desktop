@@ -26,6 +26,10 @@ export function packageDev({ platform = process.platform, arch = process.arch, r
     [process.execPath, [join(packageRoot, 'scripts', 'stage-preset-profile.ts'), '--channel', 'development']],
     [process.execPath, [join(packageRoot, 'scripts', 'package-dir.mjs')]],
     [process.execPath, [join(packageRoot, 'scripts', 'stamp-dev-app.mjs'), appPath]],
+    // stamp-dev-app rewrites Info.plist after electron-builder signed the bundle,
+    // which invalidates that signature and makes LaunchServices refuse to open the
+    // app (error -54). Re-apply the ad-hoc signature over the stamped bundle.
+    ['codesign', ['--force', '--deep', '--sign', '-', appPath]],
   ]
   for (const [command, args] of steps) {
     const result = run(command, args, { cwd: packageRoot, env: process.env, stdio: 'inherit' })

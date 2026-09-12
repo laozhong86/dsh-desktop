@@ -63,7 +63,11 @@ function candidateLayout(app: string): {
 function listPackedFiles(pnpmCommand: string, sourceDir: string): string[] {
   const result = spawnSync(
     pnpmCommand,
-    ['--config.ignore-scripts=true', 'pack', '--dry-run', '--json'],
+    // A managed plugin may pin its own pnpm release (devEngines/packageManager).
+    // The pack runs under the app's bundled pnpm, and its only purpose here is to
+    // enumerate the files a package would ship, so a version mismatch must not
+    // abort the rebuild (it did for omnimux-studio, pinned to pnpm 11.7.0).
+    ['--config.ignore-scripts=true', '--pm-on-fail=ignore', 'pack', '--dry-run', '--json'],
     { cwd: sourceDir, env: { ...process.env, CI: 'true' }, encoding: 'utf8', timeout: 30_000 },
   )
   if (result.status !== 0) {

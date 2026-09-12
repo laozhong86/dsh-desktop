@@ -377,6 +377,7 @@
         "build/tray-iconTemplate.png",
         "build/tray-iconTemplate@2x.png",
         "node_modules/@agents-anywhere/dsh-bridge-next/lib/bundled-connector/**",
+        "node_modules/@vscode/ripgrep/**",
         "preset/**"
       ],
       "target": [
@@ -408,6 +409,7 @@
         "build/tray-icon-blue@1.5x.png",
         "build/tray-icon-blue@2x.png",
         "node_modules/@agents-anywhere/dsh-bridge-next/lib/bundled-connector/**",
+        "node_modules/@vscode/ripgrep/**",
         "preset/**"
       ],
       "target": [
@@ -445,6 +447,7 @@
         "build/tray-icon-blue@1.5x.png",
         "build/tray-icon-blue@2x.png",
         "node_modules/@agents-anywhere/dsh-bridge-next/lib/bundled-connector/**",
+        "node_modules/@vscode/ripgrep/**",
         "preset/**"
       ],
       "target": [

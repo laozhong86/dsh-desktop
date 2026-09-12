@@ -1,10 +1,16 @@
-import { ipcMain, systemPreferences, type BrowserWindow, type IpcMainEvent } from 'electron'
+import { ipcMain, systemPreferences, type BrowserWindow, type IpcMainEvent, type WebContents } from 'electron'
 import { TITLEBAR_DOUBLE_CLICK_IPC_CHANNEL } from './window-actions-bridge-contract.ts'
 import type { DesktopPlatform } from './runtime.ts'
 
 export interface TitleBarDoubleClickHandlerOptions {
   readonly window: BrowserWindow
   readonly platform: DesktopPlatform
+  /**
+   * WebContents that hosts the client renderer. The isolated compatibility shell
+   * puts the renderer in its own `WebContentsView`, so `window.webContents` is
+   * not the surface that sends the double-click IPC.
+   */
+  readonly rendererWebContents?: WebContents
   readonly systemPreferencesApi?: Pick<typeof systemPreferences, 'getUserDefault'>
   readonly ipcMainApi?: Pick<typeof ipcMain, 'on' | 'off'>
 }
@@ -82,7 +88,7 @@ export function attachTitleBarDoubleClickListener(
 
   const handler = (event: IpcMainEvent): void => {
     if (options.window.isDestroyed()) return
-    if (event.sender.id !== options.window.webContents.id) return
+    if (event.sender.id !== (options.rendererWebContents ?? options.window.webContents).id) return
 
     executeTitleBarDoubleClickAction(
       options.window,

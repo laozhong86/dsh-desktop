@@ -4,6 +4,38 @@
 
 ---
 
+## 2026-09-12 · 上游 2.0.9 全量同步（106 提交，C 级双项已获老板确认）
+
+- **上游范围**：`91b12fcd60fe85a39c6aa21dcd3056d89d0b69a4`（fork base 已含的上游 merge parent）→ `63e160ab43`（origin/master HEAD），共 106 个提交；fork base `6a8e66a35e`（fork/omnimux tip）。上游产品 2.0.5 → 2.0.9，DSH 运行时 `0.1.2-rc.1` → `0.1.5-rc.1`。
+- **前置事故与纠正**：首次尝试误用**本地陈旧分支** `omnimux`（`947a5b2c57`）作为 ours；该分支落后 `fork/omnimux` 161 个提交（缺 PR #75 双击缩放、PR #71 部分上游融合）。已把该次尝试存为孤立提交 `7c918df2df` 供参考，并以 `fork/omnimux` 重做本次 merge。教训：同步前必须校验 ours 与远端 fork 分支的领先/落后关系。
+- **C 级决策（老板确认）**：
+  1. **不引入上游 `dsh-plugin-desktop-beta/` 变体包**（fork 此前已自行移除，上游在本区间继续维护它）。本次整体删除该包及其根 workspace/脚本/CI 矩阵/`check:desktop-variants` 门禁引用，保持单产品线 OmniMux；仓库内仅保留 `BLOCKED_PACKAGES` 之类「禁止安装为插件」的字符串。
+  2. **采用上游集中化品牌源** `src/product-identity.ts`（`DESKTOP_PRODUCT_NAME` / `DESKTOP_APP_ID` / `DESKTOP_PACKAGE_NAME` 常量）并把值设为 OmniMux：`OmniMux` / `ai.omnimux.desktop` / `dsh-plugin-desktop`；第二身份位映射本仓 Dev 版（`OmniMux Dev`），非上游 Beta。
+- **版本与品牌（B 级模板）**：根与 `dsh-plugin-desktop` 版本取 `2.0.9`；`description` 保 OmniMux；electron-builder `appId=ai.omnimux.desktop`、`productName=OmniMux`、Windows/Linux 产物名 `OmniMux-*`、NSIS `shortcutName=OmniMux`；bin 保 `omnimux`；桌面默认端口保 **44120**（Dev **45120**）；更新端点保本仓契约 `https://updates.omnimux.local/...`（既有占位域名，见 deploy-infrastructure-audit）；`DEFAULT_PROFILE_NAME='omnimux'`；preset 种子机制（`preset-profile.ts` / `stage-preset-profile.ts` / `preset/**` 打入并解包）完整保留。
+- **冲突分类与解法**：
+  - 接受上游删除：`_deprecated/patches/runtime-0.1.2-alpha.1/**`、`patches/*@0.1.2-rc.1.patch`、`patches/*@0.1.3-alpha.1.patch`、`patches/dsh-web-app@0.1.1-rc.2.patch`。
+  - 运行时与补丁：整套换上游 `0.1.5-rc.1`（16 个 patch + `vendor/dsh-runtime/0.1.5-rc.1` 265 包）；submodule gitlink 钉 `183f08e9c6`（`dsh-v0.1.5-rc.1`）；`upstream.json` 采上游 channel 结构、单 `stable` channel；`scripts/sync-vendored-runtime.mjs` 采上游实现并去掉 beta/other-channel 分支。
+  - 门禁与脚本：`scripts/verify-layout.mjs` 保留 fork 的 3 workspace/子模块检查并改读 channel 形态，删除 beta 断言；删 `scripts/verify-desktop-variants.mjs`；`scripts/prepare-agents-anywhere-release.mjs` 单包化；`.github/workflows` 去掉 beta 矩阵；`.yarnrc.yml` 保 `npmMinimalAgeGate: 0` 并并入上游 `npmPreapprovedPackages`。
+  - 品牌集中化后，`bin.ts`、`profile.ts`、`main.ts`、`index.ts` 等处的字面 `DSH Desktop` 改为复用 `product-identity.ts` 常量；`dsh-plugin-desktop/README*`、`README.md`、`docs/architecture*`、`docs/user-guide*`、`AGENTS.md` 去 beta 并改 OmniMux 口径（i18n 侧车 hash 按门禁命令重算）。
+  - 桌面壳源码：以上游 2.0.9 为基线（隔离 Host、layout ownership、LAN HTTPS、profile-preferences、safe mode、认证会话等上游均已原生实现），逐文件仅回填 OmniMux 独有增量——Dev/Prod 身份与 CDP 端口、44120/45120 端口选择、L2 启动与 seed 调用点、身份优先的 harness home、`DEFAULT_PROFILE_NAME='omnimux'`、窄屏 64px 滞回、双击缩放 IPC。
+  - 测试：按合并后清单（根/桌面 workspace 与脚本、OmniMux 品牌与产物名、更新端点、身份常量）重写断言。
+- **上游新架构带来的适配修复**：上游 2.0.9 在 compatibility 模式使用**隔离 Host**（renderer 落在独立 `WebContentsView`，`window.webContents` 不再是应用渲染器），导致 PR #75 双击缩放的 `event.sender` 守卫会拒绝全部事件。已在 `titlebar-double-click.ts` 增加可选 `rendererWebContents` 覆盖并在 `electron-shell-generation.ts` 传入真实 renderer WebContents（无行为回归，旧签名仍兼容）。
+- **分级记录**：A 级自动合并；B 级 6 项（版本/品牌/端口/bin/产物名/端点）按模板解；**C 级 2 项**（beta 变体取舍、品牌集中化）由老板于 2026-09-12 显式确认；D 级 0 项。
+- **验证（逐项实测）**：
+  - `corepack yarn install` 通过；期间修复 `dsh-plugin-desktop/node_modules` 陈旧链接（`dshmarket` 实为 1.17.1 应为 1.38.1+patch、`pnpm` 未应用 `patches/pnpm@11.8.0.patch`）——`yarn install --immutable` 报 Done 却不会重建，需移走陈旧目录后重装。
+  - `check:vendored-runtime`：stable 265 包全部校验通过；`verify-layout`：通过（单 channel + 3 workspace）。
+  - `workspace dsh-plugin-desktop typecheck`：exit 0（含 client / native-ui / tests 五套 tsconfig）。
+  - `workspace dsh-plugin-desktop build`：exit 0。
+  - `workspace dsh-plugin-desktop test`（vitest）：**145 文件 / 1474 通过 / 9 跳过 / 0 失败**。
+  - `verify:closure` / `verify:cli` / `verify:loader` / `verify:profile` / `verify:licenses` / `verify:notices` / `verify:operations` / `verify:aa`：全部 exit 0。
+  - 根 `check:bilingual-docs`、`check:architecture`：exit 0；`workspace dsh-community-fabric check`、`workspace dsh-community-market check`：exit 0。
+  - 说明：`yarn check` 由上述同一组子门禁组成，已逐项等价验证。
+- **复核发现（已处理 / 待跟进）**：
+  - 已修：`host-runtime-bridge.ts` 未转发本仓 `pickFiles`；`AdvancedFrame.tsx` 的 `PropsRuntime<'root'>` 在 0.1.5-rc.1 已无此 SlotMap 键（改用 `GlobalStandardProps`）；`product-identity.ts` 第二身份 productName 需为 `OmniMux-Dev` 以匹配 Dev.app 真实 userData 目录；隔离兼容壳使 `window.webContents` 不再是应用渲染器（双击缩放增加 `rendererWebContents`）。
+  - 已清：`.github/workflows/ci.yml` 的 beta workspace 循环；全仓已无 `claimDesktopLayout` / `resolveRequiredBundle` / `DETAILS_*` / `stageShippedAgentPresets` 引用。
+  - 待跟进（非本次合并引入）：`dsh-plugin-desktop/dist/mac-release/**` 与 `dist/OmniMux.app-2.0.2-bak/**` 内打包的 `pnpm` 仍是未打补丁的旧副本，若作为候选发布物需重新 stage/打包。
+- **测试断言对账**：20 个失败用例全部为「断言仍描述合并前世界」，逐项以合并后实现为准：`package.spec`（窗口安全策略/Profile checkpoint/compat 选择器列表已随 fork 的移除而更新；托盘色 `#7961f2`、iOS 图标 sha256、macOS 图标 8-bit sRGB 按实际产物重算）、`updates.spec`（取消 Beta 双频道，改单 stable 且保留「旧版本永不安装、安装必经显式动作」）、`dev-package.spec`（`package:dir` 链补 `prepare:electron-native`）、`desktop-data-directory.spec`（profile 名 `omnimux`）、`plugin.spec`（productName `OmniMux`）、`client-narrow-breakpoint.spec`（SSR 用例改 `GlobalStandardProps`，窄屏契约断言原样保留）；`dshmarket-compat` / `profile` / `pnpm` 三个文件零改动（失败全部源于陈旧 node_modules）。无删除用例、无放水断言。
+
 ## 2026-09-07 · #59 上游桌面壳稳定线融合（验证中）
 
 - 范围：merge-base `681ba66091fc5b1e827650137f69b3ee4c435922` 至冻结上游 `91b12fcd60fe85a39c6aa21dcd3056d89d0b69a4`（153 个上游提交）；fork base `2b72c8b13d0a73954286d09dccf14a359d31754f`。

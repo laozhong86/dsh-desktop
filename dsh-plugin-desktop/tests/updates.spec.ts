@@ -14,7 +14,11 @@ import type {
   DesktopRuntime,
   DesktopTrayItem,
 } from '../src/runtime.ts'
-import type { UpdateCheckResult } from '../src/update-checker.ts'
+import {
+  DESKTOP_CURRENT_VERSION_HEADER,
+  DESKTOP_RELEASE_CHANNEL_HEADER,
+  type UpdateCheckResult,
+} from '../src/update-checker.ts'
 import { apply, Config, inject, type Config as UpdateConfig } from '../src/updates.ts'
 
 const testConfig: UpdateConfig = {
@@ -31,6 +35,7 @@ function versionResponse(version: unknown): Response {
 interface Harness {
   readonly statePath: string
   readonly tray: DesktopTrayItem
+  readonly trays: readonly DesktopTrayItem[]
   readonly notifications: DesktopNotification[]
   readonly warnings: unknown[][]
   readonly confirmDownload: ReturnType<typeof vi.fn>
@@ -50,9 +55,11 @@ async function createHarness(options: {
   readonly canDownload?: boolean
   readonly config?: UpdateConfig
   readonly request?: DesktopRuntime['updates']['request']
-  readonly confirmDownload?: (version: string) => Promise<boolean>
+  readonly releaseChannel?: 'stable' | 'beta'
+  readonly currentVersion?: string
+  readonly confirmDownload?: (version: string, channel?: 'stable' | 'beta') => Promise<boolean>
   readonly showManualCheckResult?: (result: UpdateCheckResult | null) => Promise<void>
-  readonly downloadAndOpen?: (version: string, signal: AbortSignal) => Promise<void>
+  readonly downloadAndOpen?: (version: string, signal: AbortSignal, channel?: 'stable' | 'beta') => Promise<void>
   readonly notify?: (notification: DesktopNotification) => void
   readonly locale?: DesktopRuntime['locale']
   readonly state?: string
@@ -74,13 +81,15 @@ async function createHarness(options: {
     request: ConnectionTrustRequest,
   ) => ConnectionRequestRejection>(() => undefined)
   let tray: DesktopTrayItem | undefined
+  const trays: DesktopTrayItem[] = []
   let route: WebRoute | undefined
   let disposer: (() => void | Promise<void>) | undefined
   const runtime = {
     locale: options.locale ?? 'en',
     updates: {
       isPackaged: options.packaged ?? true,
-      currentVersion: '2.0.0',
+      currentVersion: options.currentVersion ?? '2.0.0',
+      ...(options.releaseChannel === undefined ? {} : { releaseChannel: options.releaseChannel }),
       statePath,
       canDownload: options.canDownload ?? true,
       request: options.request ?? (async () => versionResponse('2.0.0')),
@@ -90,7 +99,8 @@ async function createHarness(options: {
       notify: options.notify ?? ((notification: DesktopNotification) => { notifications.push(notification) }),
     },
     registerTrayItem: (item: DesktopTrayItem) => {
-      tray = item
+      tray ??= item
+      trays.push(item)
       return { refresh, dispose: registrationDispose }
     },
   } as unknown as DesktopRuntime
@@ -117,6 +127,7 @@ async function createHarness(options: {
   return {
     statePath,
     tray,
+    trays,
     notifications,
     warnings,
     confirmDownload,
@@ -135,6 +146,63 @@ afterEach(() => {
 })
 
 describe('desktop update Host plugin', () => {
+  it('serves the single stable channel and installs an older release only through the explicit action', async () => {
+    const request = vi.fn(async (_url: string, init: RequestInit) => {
+      const current = new Headers(init.headers).get(DESKTOP_CURRENT_VERSION_HEADER)
+      return Response.json({
+        version: current === '2.0.6' ? '2.0.4' : '2.0.8',
+        channel: 'stable',
+      })
+    })
+
+    // The fork ships one release channel: no Beta auto-check and no separate
+    // "install stable" command. An older release stays uninstalled even when
+    // the explicit tray action runs.
+    const older = await createHarness({
+      packaged: false,
+      releaseChannel: 'stable',
+      currentVersion: '2.0.6',
+      request,
+      confirmDownload: async () => true,
+    })
+    expect(older.trays).toHaveLength(1)
+    expect(older.trays[0]?.id).toBe('check-for-updates')
+    await older.trays[0]!.invoke()
+    expect(older.confirmDownload).not.toHaveBeenCalled()
+    expect(older.downloadAndOpen).not.toHaveBeenCalled()
+    expect(older.showManualCheckResult).toHaveBeenCalledWith({
+      status: 'up-to-date',
+      currentVersion: '2.0.6',
+      latestVersion: '2.0.4',
+    })
+    expect(request.mock.calls.map(([, init]) =>
+      new Headers(init.headers).get(DESKTOP_RELEASE_CHANNEL_HEADER))).toEqual(['stable'])
+    await older.dispose()
+
+    // Installing still requires the explicit tray action: the passive
+    // background check only announces the available release.
+    vi.useFakeTimers()
+    const newer = await createHarness({
+      releaseChannel: 'stable',
+      currentVersion: '2.0.4',
+      request,
+      confirmDownload: async () => true,
+    })
+    expect(newer.trays).toHaveLength(1)
+    await vi.advanceTimersByTimeAsync(testConfig.initialDelayMs)
+    await vi.waitFor(() => { expect(newer.notifications).toHaveLength(1) })
+    expect(newer.confirmDownload).not.toHaveBeenCalled()
+    expect(newer.downloadAndOpen).not.toHaveBeenCalled()
+
+    await newer.trays[0]!.invoke()
+    expect(newer.confirmDownload).toHaveBeenCalledWith('2.0.8')
+    expect(newer.downloadAndOpen).toHaveBeenCalledWith(
+      '2.0.8',
+      expect.any(AbortSignal),
+    )
+    await newer.dispose()
+  })
+
   it('exposes the packaged 60-second and six-hour background policy', () => {
     expect(inject).toEqual(['desktopRuntime', 'webServer', 'connection'])
     expect(Config({} as UpdateConfig)).toEqual({

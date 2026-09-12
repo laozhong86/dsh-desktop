@@ -12,7 +12,10 @@ const run = (command, args, cwd = root) => execFileSync(command, args, {
 const fail = message => { throw new Error(`verify-layout: ${message}`) }
 
 const workspace = readJson('package.json')
-const upstream = readJson('upstream.json')
+const upstreamDocument = readJson('upstream.json')
+if (upstreamDocument.activeChannel !== 'stable') fail('the pinned upstream checkout must follow the single stable release channel')
+const upstream = upstreamDocument.channels?.[upstreamDocument.activeChannel]
+if (upstream === undefined) fail('the active upstream channel is missing')
 const plugin = readJson('dsh-plugin-desktop/package.json')
 const fabric = readJson('dsh-community-fabric/package.json')
 const market = readJson('dsh-community-market/package.json')
@@ -62,7 +65,7 @@ for (const legacyFile of [
 if (run('git', ['config', '-f', '.gitmodules', '--get', 'submodule.deepseek-harness.path']) !== 'deepseek-harness') {
   fail('the upstream submodule path must be deepseek-harness')
 }
-if (run('git', ['config', '-f', '.gitmodules', '--get', 'submodule.deepseek-harness.url']) !== upstream.repository) {
+if (run('git', ['config', '-f', '.gitmodules', '--get', 'submodule.deepseek-harness.url']) !== upstreamDocument.repository) {
   fail('the upstream submodule URL differs from upstream.json')
 }
 if (typeof upstreamPackage.packageManager !== 'string' || !upstreamPackage.packageManager.startsWith('pnpm@')) {
@@ -97,7 +100,7 @@ if (run('git', ['rev-parse', 'HEAD'], upstreamDir) !== upstream.commit) {
 if (run('git', ['status', '--porcelain'], upstreamDir) !== '') {
   fail('deepseek-harness contains local changes')
 }
-if (run('git', ['remote', 'get-url', 'origin'], upstreamDir) !== upstream.repository) {
+if (run('git', ['remote', 'get-url', 'origin'], upstreamDir) !== upstreamDocument.repository) {
   fail('deepseek-harness origin differs from upstream.json')
 }
 if (upstreamPackage.version !== upstream.sourceVersion) {

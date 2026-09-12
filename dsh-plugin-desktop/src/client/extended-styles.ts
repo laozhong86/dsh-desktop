@@ -16,7 +16,7 @@ body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extende
   height: 100%;
 }
 body:is([data-dsh-desktop-mode="compatibility"], [data-dsh-desktop-mode="extended"]) {
-  --dsh-desktop-frame-height: ${DESKTOP_FRAME_HEIGHT}px;
+  --dsh-desktop-frame-height: 0px;
   margin: 0;
   overflow: hidden;
   background: transparent !important;

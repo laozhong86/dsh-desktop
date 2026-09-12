@@ -8,6 +8,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -161,7 +162,8 @@ describe('desktop Host pnpm runtime', () => {
     expect(result.error).toBeUndefined()
     expect(result.status).toBe(0)
     expect(JSON.parse(result.stdout)).toEqual({
-      execPath: fs.realpathSync(installation.nodeShimPath),
+      // Node resolves the preload's __dirname through symlinks (macOS /var -> /private/var).
+      execPath: realpathSync(installation.nodeShimPath),
       runAsNode: [],
     })
     installation.dispose()
@@ -237,7 +239,7 @@ describe('desktop Host pnpm runtime', () => {
       expect(result.error).toBeUndefined()
       expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0)
       expect(JSON.parse(readFileSync(probeOutput, 'utf8'))).toEqual({
-        execPath: fs.realpathSync(installation.nodeShimPath),
+        execPath: realpathSync(installation.nodeShimPath),
         runAsNode: [],
         inherited: {
           status: 23,

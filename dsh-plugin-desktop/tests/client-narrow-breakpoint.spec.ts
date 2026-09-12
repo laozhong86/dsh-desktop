@@ -1,4 +1,4 @@
-import { createElement, type ReactNode } from 'react'
+import { createElement } from 'react'
 import { readFileSync } from 'node:fs'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
@@ -115,9 +115,8 @@ describe('narrow measurement is window width, not squeezed frame width', () => {
       platform: 'darwin',
       useSessions: (select: (state: { current?: string; byId: Record<string, { blank: boolean }> }) => unknown) =>
         select({ byId: {} }),
+      usePanelInfo: (select: (state: { activePanelId?: string }) => unknown) => select({}),
       renderSlot: (name: string) => createElement('span', { 'data-slot': name }),
-      SessionProvider: ({ children }: { children: ReactNode }) =>
-        createElement('section', { 'data-session-provider': '' }, children),
     } as unknown as AdvancedFrameProps
 
     try {

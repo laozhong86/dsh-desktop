@@ -14,7 +14,7 @@ import { DesktopThemePresenter } from './theme-presenter.ts'
 
 /** Own the extended root/sidebar surface selected by Profile composition. */
 function applyExtendedOwnedShell(ctx: ClientContext, environment: DesktopClientEnvironment): void {
-  const desktopLayout = new DesktopLayoutState()
+  const desktopLayout = new DesktopLayoutState(id => ctx.slots.entries('main').some(entry => entry.options.key === id))
   installDesktopLayout(ctx, desktopLayout)
 
   ctx.effect(
@@ -36,8 +36,8 @@ function applyExtendedOwnedShell(ctx: ClientContext, environment: DesktopClientE
     name: 'root',
     children: {
       'sidebar': { kind: 'single', scope: 'root' },
-      'conversation': { kind: 'single', scope: 'session-maybe' },
-      'details': { kind: 'single', scope: 'session' },
+      'main': { kind: 'keyed', scope: 'root' },
+      'rightbar': { kind: 'single', scope: 'root' },
       'shell.overlay': { kind: 'list', scope: 'root' },
     },
     inject: () => ({ layout: desktopLayout, platform: environment.platform }),
@@ -53,7 +53,6 @@ export function applyFramedShell(
   if (environment.mode !== 'compatibility' && environment.mode !== 'extended') {
     throw new Error(`dsh-plugin-desktop: framed shell received mode ${JSON.stringify(environment.mode)}`)
   }
-
   ctx.effect(() => {
     const contentViewport = document.getElementById('root')
     if (contentViewport === null) {

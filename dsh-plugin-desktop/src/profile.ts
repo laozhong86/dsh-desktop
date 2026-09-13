@@ -1053,12 +1053,9 @@ export function prepareDesktopProfile(
   }
   const presets = rows.get(AGENT_PRESETS_ROW_ID)
   if (presets !== undefined) {
-    const shippedRoot = shippedPresetRoot()
     const roots: Array<{ path: string, trust: 'system' | 'user' }> = [
-      // Staged product presets come first: an id the product ships overrides
-      // the dependency's built-in of the same name.
+      // Staged product presets define the product's official preset set.
       { path: stagedPresetRoot(), trust: 'system' },
-      { path: shippedRoot, trust: 'system' },
       { path: join(home, USER_PRESET_DIRNAME), trust: 'user' },
     ]
     patches.push({

@@ -419,7 +419,6 @@ virtualStoreDirMaxLength: 60
       config: expect.objectContaining({
         roots: [
           { path: stagedPresetRoot(), trust: 'system' },
-          { path: shippedPresetRoot(), trust: 'system' },
           { path: join(home, '.agent-presets'), trust: 'user' },
         ],
         includeUserRoot: false,
@@ -1063,7 +1062,6 @@ virtualStoreDirMaxLength: 60
       config: expect.objectContaining({
         roots: [
           { path: stagedPresetRoot(), trust: 'system' },
-          { path: shippedPresetRoot(), trust: 'system' },
           { path: join(home, '.agent-presets'), trust: 'user' },
         ],
         includeUserRoot: false,

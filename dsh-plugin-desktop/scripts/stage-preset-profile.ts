@@ -14,10 +14,10 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { hashDirectory } from '../src/managed-profile.ts'
-import { DISTRIBUTION_FILENAME, listPackageNames, packageDirSegments } from '../src/preset-profile.ts'
+import { DISTRIBUTION_FILENAME, SKILLS_DIRNAME, SKILL_ORIGIN_FILENAME, listPackageNames, packageDirSegments } from '../src/preset-profile.ts'
 import {
   BETTER_SIDEBAR_PNPM_VERSION,
   buildPatchedBetterSidebar,
@@ -55,6 +55,8 @@ const AGENT_PRESETS_DIRNAME = 'agent-presets'
 const AGENT_PRESET_MANIFEST = 'preset.yml'
 /** Shared preset inputs the repository keeps beside the preset ids. */
 const AGENT_PRESET_EXCLUDED_DIRS: ReadonlySet<string> = new Set(['fragments'])
+/** Directory-bundle entry file every staged skill must carry. */
+const SKILL_MANIFEST = 'SKILL.md'
 /** Version of the distribution record's own shape. */
 const DISTRIBUTION_SCHEMA = 1
 
@@ -178,10 +180,11 @@ export function stagePresetProfile(options: StagePresetProfileOptions = {}): num
     verifyInstalledBetterSidebar(join(candidatePluginsDir, 'dsh-better-sidebar'), sidebar.packedRoot)
     stageSkeleton(targetPresetDir, candidateDir, alphaPlugins, releaseChannel)
     stageAgentPresets(resolvedPluginsRoot, candidateDir)
+    const skills = stageSkills(resolvedPluginsRoot, candidateDir, productPlugins)
     writeFileSync(join(candidateDir, 'owned-packages.json'), `${JSON.stringify(owned, undefined, 2)}\n`)
     writeFileSync(
       join(candidateDir, DISTRIBUTION_FILENAME),
-      `${JSON.stringify(distributionManifest(owned, candidatePluginsDir, releaseChannel, alphaPlugins), undefined, 2)}\n`,
+      `${JSON.stringify(distributionManifest(owned, skills, candidateDir, releaseChannel, alphaPlugins), undefined, 2)}\n`,
     )
     const seedVersionPath = join(targetPresetDir, 'seed-version')
     writeFileSync(
@@ -408,6 +411,80 @@ function stageSkeleton(
   }, undefined, 2)}\n`)
 }
 
+/** A skill staged from a product plugin, recorded so the seed can own its copy. */
+interface StagedSkill {
+  readonly id: string
+  readonly origin: string
+}
+
+/** Read one JSON object, rejecting anything that is not a plain object. */
+function readJsonObject(path: string, label: string): Record<string, unknown> {
+  let value: unknown
+  try {
+    value = JSON.parse(readFileSync(path, 'utf8'))
+  } catch (error) {
+    throw new Error(`${label} is unreadable (${path}): ${String(error)}`)
+  }
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error(`${label} must be an object: ${path}`)
+  }
+  return value as Record<string, unknown>
+}
+
+/**
+ * Collect the skills the staged product plugins declare.
+ *
+ * A plugin advertises skills in its `dsh.manifest.json`. Shipping the file
+ * inside the plugin package is not enough: nothing registers a plugin package
+ * as a skill root, so the skill is present on disk and invisible to the model.
+ * Staging them under `preset/skills/` puts them where the seed can install them
+ * into the Harness Home, which *is* a discovered root.
+ *
+ * Each staged skill keeps a marker naming the plugin it came from, so a later
+ * seed can refresh its own copy without touching a skill the user owns.
+ */
+function stageSkills(pluginsRoot: string, candidateDir: string, productPlugins: readonly string[]): StagedSkill[] {
+  const destinationRoot = join(candidateDir, SKILLS_DIRNAME)
+  const staged: StagedSkill[] = []
+  for (const name of productPlugins) {
+    const manifestPath = join(pluginsRoot, name, 'dsh.manifest.json')
+    if (!existsSync(manifestPath)) continue
+    const manifest = readJsonObject(manifestPath, `plugin manifest for ${name}`)
+    const declared = manifest.skills
+    if (declared === undefined) continue
+    if (!Array.isArray(declared) || declared.some(entry => typeof entry !== 'string')) {
+      throw new Error(`plugin ${JSON.stringify(name)} declares an invalid skills list: ${manifestPath}`)
+    }
+    for (const relativeManifest of declared as string[]) {
+      if (!relativeManifest.endsWith(`/${SKILL_MANIFEST}`)) {
+        throw new Error(`plugin ${JSON.stringify(name)} skill ${JSON.stringify(relativeManifest)} is not a ${SKILL_MANIFEST} path`)
+      }
+      const pluginDir = join(pluginsRoot, name)
+      const manifestFile = resolve(pluginDir, relativeManifest)
+      if (!isInside(pluginDir, manifestFile)) {
+        throw new Error(`plugin ${JSON.stringify(name)} skill ${JSON.stringify(relativeManifest)} escapes the plugin`)
+      }
+      if (!existsSync(manifestFile)) {
+        throw new Error(`plugin ${JSON.stringify(name)} declares a missing skill: ${relativeManifest}`)
+      }
+      const skillDir = dirname(manifestFile)
+      const id = basename(skillDir)
+      if (staged.some(entry => entry.id === id)) {
+        throw new Error(`two product plugins declare the same skill ${JSON.stringify(id)}`)
+      }
+      const destination = join(destinationRoot, id)
+      mkdirSync(destination, { recursive: true })
+      cpSync(skillDir, destination, { recursive: true, dereference: true })
+      writeFileSync(join(destination, SKILL_ORIGIN_FILENAME), `${JSON.stringify({
+        id,
+        origin: `plugin:${name}`,
+      }, undefined, 2)}\n`)
+      staged.push({ id, origin: `plugin:${name}` })
+    }
+  }
+  return staged.sort((left, right) => left.id.localeCompare(right.id))
+}
+
 /**
  * Stage the OmniMux agent presets beside the plugin seed.
  *
@@ -618,11 +695,13 @@ function removeDanglingBinLinks(packageDir: string): void {
 
 /** One preinstalled entry in a staged preset's distribution record. */
 interface DistributionItem {
-  readonly kind: 'plugin'
+  readonly kind: 'plugin' | 'skill'
   readonly id: string
   readonly tier: 'core' | 'product' | 'beta'
   readonly version: string | null
   readonly digest: string
+  /** Skill only: the product surface the skill came from. */
+  readonly origin?: string
 }
 
 /** The staged preset's own account of what it ships. */
@@ -643,15 +722,20 @@ interface DistributionManifest {
  *
  * `tier` restates the release-channel decision as data: `beta` entries are the
  * lifecycle-registry Alpha plugins, which a production channel never stages.
+ *
+ * Skills are recorded beside packages because the seed installs both: a skill a
+ * plugin declares is invisible until it reaches the Harness Home's skill root.
  */
 function distributionManifest(
   owned: readonly string[],
-  pluginsDir: string,
+  skills: readonly StagedSkill[],
+  candidateDir: string,
   releaseChannel: ReleaseChannel,
   alphaPlugins: ReadonlySet<string>,
 ): DistributionManifest {
+  const pluginsDir = join(candidateDir, 'plugins')
   const core = new Set<string>(CORE_REQUIRED_BUNDLES)
-  const items: DistributionItem[] = owned.map((id) => {
+  const pluginItems: DistributionItem[] = owned.map((id) => {
     const packageDir = join(pluginsDir, ...packageDirSegments(id))
     const manifest = readManifest(join(packageDir, 'package.json'))
     return {
@@ -662,11 +746,19 @@ function distributionManifest(
       digest: hashDirectory(packageDir),
     }
   })
+  const skillItems: DistributionItem[] = skills.map(skill => ({
+    kind: 'skill',
+    id: skill.id,
+    tier: 'product',
+    version: null,
+    digest: hashDirectory(join(candidateDir, SKILLS_DIRNAME, skill.id)),
+    origin: skill.origin,
+  }))
   return {
     schema: DISTRIBUTION_SCHEMA,
     channel: releaseChannel,
     generatedFrom: { appVersion: desktopPackageVersion(), desktopCommit: desktopCommit() },
-    items,
+    items: [...pluginItems, ...skillItems],
   }
 }
 
@@ -696,6 +788,7 @@ export function publishCandidate(
     'plugins',
     'skeleton',
     'agent-presets',
+    SKILLS_DIRNAME,
     'owned-packages.json',
     DISTRIBUTION_FILENAME,
     'seed-version',

@@ -38,6 +38,12 @@ export const OWNED_PACKAGES_FILENAME = 'owned-packages.json'
 /** Generated account of what the preset ships, written beside the seed. */
 export const DISTRIBUTION_FILENAME = 'distribution.json'
 
+/** Staged skills, installed into the Harness Home's discovered user skill root. */
+export const SKILLS_DIRNAME = 'skills'
+
+/** Marker a seeded skill carries, naming the product surface it came from. */
+export const SKILL_ORIGIN_FILENAME = 'omnimux-skill.json'
+
 /** Stamp written inside the user profile after a successful seed or refresh. */
 export const PROFILE_SEED_STAMP = '.omnimux-seed-version'
 
@@ -316,6 +322,7 @@ export function seedOmnimuxProfile(options: SeedOmnimuxProfileOptions): SeedOmni
       version,
     )
     seedOmnimuxSettings(options.home)
+    seedPresetSkills(options.home, presetDir)
     return {
       profileDir,
       created: false,
@@ -338,6 +345,7 @@ export function seedOmnimuxProfile(options: SeedOmnimuxProfileOptions): SeedOmni
     writeFileSync(join(candidateDir, PROFILE_SEED_STAMP), `${String(version)}\n`)
     writeFileSync(join(candidateDir, PROFILE_MATERIALIZATION_PENDING), `${String(version)}\n`)
     seedOmnimuxSettings(options.home)
+    seedPresetSkills(options.home, presetDir)
     publishFreshCandidate(candidateDir, profileDir, owned)
   } finally {
     rmSync(candidateDir, { recursive: true, force: true })
@@ -543,26 +551,83 @@ function assertDistributionRecordAgrees(presetDir: string, owned: readonly strin
   if (!Array.isArray(items)) {
     throw new Error(`desktop preset distribution record has no items array: ${path}`)
   }
-  const recorded = items.map((entry) => {
+  const recordedPlugins: string[] = []
+  const recordedSkills: string[] = []
+  for (const entry of items) {
     if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
       throw new Error(`desktop preset distribution item must be an object: ${path}`)
     }
-    const id = (entry as { id?: unknown }).id
-    if (typeof id !== 'string' || id === '') {
+    const item = entry as { id?: unknown; kind?: unknown }
+    if (typeof item.id !== 'string' || item.id === '') {
       throw new Error(`desktop preset distribution item has no id: ${path}`)
     }
-    return id
-  })
+    if (item.kind === 'plugin') recordedPlugins.push(item.id)
+    else if (item.kind === 'skill') recordedSkills.push(item.id)
+    else throw new Error(`desktop preset distribution item ${item.id} has unsupported kind ${JSON.stringify(item.kind)}`)
+  }
+
   const installed = new Set(owned)
-  const unknown = recorded.filter(id => !installed.has(id))
+  const unknown = recordedPlugins.filter(id => !installed.has(id))
   if (unknown.length > 0) {
     throw new Error(`desktop preset distribution record names packages the preset does not own: ${unknown.join(', ')}`)
   }
-  if (recorded.length !== owned.length) {
+  if (recordedPlugins.length !== owned.length) {
     throw new Error(
-      `desktop preset distribution record lists ${String(recorded.length)} packages, the preset owns ${String(owned.length)}; run scripts/stage-preset-profile.ts`,
+      `desktop preset distribution record lists ${String(recordedPlugins.length)} packages, the preset owns ${String(owned.length)}; run scripts/stage-preset-profile.ts`,
     )
   }
+
+  const stagedSkills = listStagedSkills(presetDir)
+  const unknownSkills = recordedSkills.filter(id => !stagedSkills.includes(id))
+  if (unknownSkills.length > 0) {
+    throw new Error(`desktop preset distribution record names skills the preset does not stage: ${unknownSkills.join(', ')}`)
+  }
+  if (recordedSkills.length !== stagedSkills.length) {
+    throw new Error(
+      `desktop preset distribution record lists ${String(recordedSkills.length)} skills, the preset stages ${String(stagedSkills.length)}; run scripts/stage-preset-profile.ts`,
+    )
+  }
+}
+
+/** Skill directory ids directly under `<root>/skills`, in directory order. */
+export function listStagedSkills(root: string): string[] {
+  const skillsRoot = join(root, SKILLS_DIRNAME)
+  if (!existsSync(skillsRoot)) return []
+  return readdirSync(skillsRoot, { withFileTypes: true })
+    .filter(entry => entry.isDirectory() && !entry.name.startsWith('.'))
+    .map(entry => entry.name)
+    .sort()
+}
+
+/**
+ * Install the preset's staged skills into the Harness Home's user skill root.
+ *
+ * `<home>/skills` is a root the skill provider discovers; a skill shipped inside
+ * a plugin package is not. A skill the user already owns at the same name is
+ * left untouched — only a directory carrying this product's marker is replaced,
+ * so an app upgrade refreshes its own skills without clobbering the user's.
+ * @param home - Harness home directory (`$DSH_HOME` or the app's own home).
+ * @param presetDir - Packaged or checkout preset directory.
+ * @returns the skill ids this call installed or refreshed.
+ */
+export function seedPresetSkills(home: string, presetDir: string): string[] {
+  const sourceRoot = join(presetDir, SKILLS_DIRNAME)
+  if (!existsSync(sourceRoot)) return []
+  const destinationRoot = join(resolve(home), SKILLS_DIRNAME)
+  const installed: string[] = []
+  for (const id of listStagedSkills(presetDir)) {
+    const source = join(sourceRoot, id)
+    if (!existsSync(join(source, SKILL_ORIGIN_FILENAME))) {
+      throw new Error(`desktop preset skill ${JSON.stringify(id)} has no origin marker: ${source}`)
+    }
+    const destination = join(destinationRoot, id)
+    if (existsSync(destination) && !existsSync(join(destination, SKILL_ORIGIN_FILENAME))) continue
+    mkdirSync(destinationRoot, { recursive: true })
+    rmSync(destination, { recursive: true, force: true })
+    cpSync(source, destination, { recursive: true, dereference: true })
+    installed.push(id)
+  }
+  return installed
 }
 
 function readJsonObject(path: string, label: string): Record<string, unknown> {

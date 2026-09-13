@@ -24,6 +24,7 @@ dsh-plugin-desktop/dist/
 .workbuddy/
 dsh-plugin-desktop/preset/plugins/
 dsh-plugin-desktop/preset/agent-presets/
+dsh-plugin-desktop/preset/skills/
 # Derived per stage run: one digest per staged package. It travels inside the
 # built package, where `verify-distribution` reads it back; a committed copy
 # would only churn on every plugin edit.

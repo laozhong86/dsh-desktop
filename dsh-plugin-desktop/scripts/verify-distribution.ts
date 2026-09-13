@@ -2,18 +2,27 @@
 /** Verify a staged OmniMux preset — or an installed Profile — against its own distribution record. */
 
 import { existsSync, readFileSync, lstatSync } from 'node:fs'
-import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { hashDirectory } from '../src/managed-profile.ts'
-import { DISTRIBUTION_FILENAME, listPackageNames, packageDirSegments } from '../src/preset-profile.ts'
+import {
+  DISTRIBUTION_FILENAME,
+  SKILLS_DIRNAME,
+  SKILL_ORIGIN_FILENAME,
+  listPackageNames,
+  listStagedSkills,
+  packageDirSegments,
+} from '../src/preset-profile.ts'
 
 /** One recorded preinstalled entry. Unknown shapes are rejected, not ignored. */
 interface DistributionItem {
-  readonly kind: 'plugin'
+  readonly kind: 'plugin' | 'skill'
   readonly id: string
   readonly tier: 'core' | 'product' | 'beta'
   readonly version: string | null
   readonly digest: string
+  /** Skill only: the product surface the skill came from. */
+  readonly origin?: string
 }
 
 /** A staged preset's account of what it ships. */
@@ -86,8 +95,16 @@ export function readDistribution(path: string): DistributionManifest {
       fail(`distribution item ${String(index)} must be an object: ${path}`)
     }
     const item = entry as Record<string, unknown>
-    if (item.kind !== 'plugin') fail(`distribution item ${String(index)} has unsupported kind ${JSON.stringify(item.kind)}`)
+    if (item.kind !== 'plugin' && item.kind !== 'skill') {
+      fail(`distribution item ${String(index)} has unsupported kind ${JSON.stringify(item.kind)}`)
+    }
     if (typeof item.id !== 'string' || item.id === '') fail(`distribution item ${String(index)} needs an id`)
+    if (item.kind === 'skill') {
+      if (typeof item.origin !== 'string' || item.origin === '') {
+        fail(`distribution skill ${item.id} has invalid origin ${JSON.stringify(item.origin)}`)
+      }
+      if (item.version !== null) fail(`distribution skill ${item.id} must not carry a version`)
+    }
     if (item.tier !== 'core' && item.tier !== 'product' && item.tier !== 'beta') {
       fail(`distribution item ${item.id} has invalid tier ${JSON.stringify(item.tier)}`)
     }
@@ -169,6 +186,30 @@ function assertRecordedBytes(packageDir: string, item: DistributionItem): void {
   }
 }
 
+/**
+ * Compare one seeded skill directory against its recorded digest.
+ *
+ * The origin marker is checked as well: it is what lets a later seed tell this
+ * product's copy from a skill the user authored under the same name.
+ */
+function assertRecordedSkill(skillDir: string, item: DistributionItem): void {
+  if (!existsSync(skillDir)) fail(`skill ${item.id} has no directory: ${skillDir}`)
+  const stat = lstatSync(skillDir)
+  if (stat.isSymbolicLink() || !stat.isDirectory()) {
+    fail(`skill ${item.id} is not a physical directory: ${skillDir}`)
+  }
+  if (!existsSync(join(skillDir, 'SKILL.md'))) fail(`skill ${item.id} has no SKILL.md: ${skillDir}`)
+  const marker = readJson(join(skillDir, SKILL_ORIGIN_FILENAME), `origin marker for ${item.id}`)
+  if (marker.id !== item.id) fail(`skill ${item.id} marker names ${JSON.stringify(marker.id)}`)
+  if (item.origin !== undefined && marker.origin !== item.origin) {
+    fail(`skill ${item.id} origin is ${JSON.stringify(marker.origin)}, the record says ${JSON.stringify(item.origin)}`)
+  }
+  const digest = hashDirectory(skillDir)
+  if (digest !== item.digest) {
+    fail(`skill ${item.id} digest is ${digest}, the record says ${item.digest}`)
+  }
+}
+
 /** Compare installed names against recorded names and report both directions. */
 function partitionInstalled(
   installed: readonly string[],
@@ -195,8 +236,10 @@ export function verifyPreset(presetDir: string, manifestPath?: string): VerifyDi
   const manifest = readDistribution(recordPath)
   const pluginsDir = join(presetDir, 'plugins')
   if (!existsSync(pluginsDir)) fail(`staged preset has no plugins directory: ${pluginsDir}`)
+  const plugins = manifest.items.filter(item => item.kind === 'plugin')
+  const skills = manifest.items.filter(item => item.kind === 'skill')
   const installed = listPackageNames(pluginsDir)
-  const { missing, extra } = partitionInstalled(installed, manifest.items)
+  const { missing, extra } = partitionInstalled(installed, plugins)
   if (missing.length > 0) fail(`preset is missing ${String(missing.length)} recorded package(s): ${missing.join(', ')}`)
   if (extra.length > 0) fail(`preset ships ${String(extra.length)} package(s) the record does not list: ${extra.join(', ')}`)
 
@@ -211,8 +254,21 @@ export function verifyPreset(presetDir: string, manifestPath?: string): VerifyDi
     fail(`owned-packages.json and preset/plugins disagree: ${ownedPath}`)
   }
 
-  for (const item of manifest.items) assertRecordedBytes(join(pluginsDir, ...packageDirSegments(item.id)), item)
+  for (const item of plugins) assertRecordedBytes(join(pluginsDir, ...packageDirSegments(item.id)), item)
   assertManifestsRelocatable(pluginsDir, installed)
+
+  const stagedSkills = listStagedSkills(presetDir)
+  const recordedSkillIds = skills.map(item => item.id)
+  const missingSkills = recordedSkillIds.filter(id => !stagedSkills.includes(id))
+  const extraSkills = stagedSkills.filter(id => !recordedSkillIds.includes(id))
+  if (missingSkills.length > 0) {
+    fail(`preset is missing ${String(missingSkills.length)} recorded skill(s): ${missingSkills.join(', ')}`)
+  }
+  if (extraSkills.length > 0) {
+    fail(`preset stages ${String(extraSkills.length)} skill(s) the record does not list: ${extraSkills.join(', ')}`)
+  }
+  for (const item of skills) assertRecordedSkill(join(presetDir, SKILLS_DIRNAME, item.id), item)
+
   return { target: 'preset', directory: presetDir, channel: manifest.channel, verified: manifest.items.length, extra: [] }
 }
 
@@ -229,10 +285,12 @@ export function verifyPreset(presetDir: string, manifestPath?: string): VerifyDi
  */
 export function verifyProfile(profileDir: string, manifestPath: string, strict = false): VerifyDistributionResult {
   const manifest = readDistribution(manifestPath)
+  const plugins = manifest.items.filter(item => item.kind === 'plugin')
+  const skills = manifest.items.filter(item => item.kind === 'skill')
   const snapshots = join(profileDir, SNAPSHOT_DIRECTORY)
   if (!existsSync(snapshots)) fail(`Profile has no managed source root: ${snapshots}`)
   const installed = listPackageNames(snapshots)
-  const { missing, extra } = partitionInstalled(installed, manifest.items)
+  const { missing, extra } = partitionInstalled(installed, plugins)
   if (missing.length > 0) fail(`Profile is missing ${String(missing.length)} recorded package(s): ${missing.join(', ')}`)
   if (strict && extra.length > 0) {
     fail(`Profile holds ${String(extra.length)} package(s) the record does not list: ${extra.join(', ')}`)
@@ -240,16 +298,35 @@ export function verifyProfile(profileDir: string, manifestPath: string, strict =
 
   const profileManifest = readJson(join(profileDir, 'package.json'), 'Profile manifest')
   const dependencies = (profileManifest.dependencies ?? {}) as Record<string, string>
-  for (const item of manifest.items) {
+  for (const item of plugins) {
     const expected = `file:${SNAPSHOT_DIRECTORY}/${item.id}`
     if (dependencies[item.id] !== expected) {
       fail(`Profile dependency ${item.id} must be ${expected}, found ${JSON.stringify(dependencies[item.id])}`)
     }
   }
 
-  for (const item of manifest.items) assertRecordedBytes(join(snapshots, ...packageDirSegments(item.id)), item)
+  for (const item of plugins) assertRecordedBytes(join(snapshots, ...packageDirSegments(item.id)), item)
   assertManifestsRelocatable(snapshots, installed)
-  return { target: 'profile', directory: profileDir, channel: manifest.channel, verified: manifest.items.length, extra }
+
+  // Skills live in the Harness Home beside `profiles/`, not inside one Profile:
+  // that is the root the skill provider discovers.
+  const skillRoot = join(dirname(dirname(resolve(profileDir))), SKILLS_DIRNAME)
+  const installedSkills = listStagedSkills(dirname(skillRoot))
+  const recordedSkillIds = skills.map(item => item.id)
+  const missingSkills = recordedSkillIds.filter(id => !installedSkills.includes(id))
+  if (missingSkills.length > 0) {
+    fail(`Harness Home is missing ${String(missingSkills.length)} recorded skill(s): ${missingSkills.join(', ')}`)
+  }
+  for (const item of skills) assertRecordedSkill(join(skillRoot, item.id), item)
+
+  const unrecordedSkills = installedSkills.filter(id => !recordedSkillIds.includes(id))
+  return {
+    target: 'profile',
+    directory: profileDir,
+    channel: manifest.channel,
+    verified: manifest.items.length,
+    extra: [...extra, ...unrecordedSkills],
+  }
 }
 
 /**

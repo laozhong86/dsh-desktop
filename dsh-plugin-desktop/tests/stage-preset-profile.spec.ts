@@ -45,6 +45,7 @@ import {
   publishCandidate,
   stagePresetProfile,
 } from '../scripts/stage-preset-profile.ts'
+import { verifyPreset } from '../scripts/verify-distribution.ts'
 import { listPackageNames } from '../src/preset-profile.ts'
 
 const PRODUCT_PLUGINS = [
@@ -482,6 +483,87 @@ describe('stagePresetProfile', () => {
       expect(() => stagePresetProfile({ pluginsRoot, presetDir }))
         .toThrowError('production plugin "omnimux-assets" depends on Alpha plugin "omnimux-publish"')
       expectExistingPreset(presetDir)
+    } finally {
+      rmSync(fixture, { recursive: true, force: true })
+    }
+  })
+
+  it('stages the skills a product plugin declares and records them', () => {
+    const fixture = mkdtempSync(join(tmpdir(), 'omnimux stage skills '))
+    try {
+      const pluginsRoot = join(fixture, 'product plugins')
+      const presetDir = join(fixture, 'preset')
+      createProductPlugins(pluginsRoot)
+      createPresetSkeleton(presetDir)
+      const host = join(pluginsRoot, 'omnimux-video')
+      mkdirSync(join(host, 'skills', 'clip-craft'), { recursive: true })
+      writeFileSync(
+        join(host, 'skills', 'clip-craft', 'SKILL.md'),
+        '---\nname: clip-craft\ndescription: fixture skill\n---\n',
+      )
+      writeFileSync(
+        join(host, 'dsh.manifest.json'),
+        `${JSON.stringify({ id: 'omnimux-video', skills: ['skills/clip-craft/SKILL.md'] }, undefined, 2)}\n`,
+      )
+
+      stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' })
+
+      expect(readdirSync(join(presetDir, 'skills'))).toEqual(['clip-craft'])
+      expect(existsSync(join(presetDir, 'skills', 'clip-craft', 'omnimux-skill.json'))).toBe(true)
+      const record = readJson(join(presetDir, 'distribution.json'))
+      const skills = (record.items as { kind: string }[]).filter(item => item.kind === 'skill')
+      expect(skills).toEqual([{
+        kind: 'skill',
+        id: 'clip-craft',
+        tier: 'product',
+        version: null,
+        origin: 'plugin:omnimux-video',
+        digest: expect.any(String) as unknown as string,
+      }])
+      // The producer's own output must satisfy the verifier it ships with.
+      expect(() => verifyPreset(presetDir)).not.toThrow()
+    } finally {
+      rmSync(fixture, { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  it('refuses a plugin that declares a skill it does not carry', () => {
+    const fixture = mkdtempSync(join(tmpdir(), 'omnimux stage missing skill '))
+    try {
+      const pluginsRoot = join(fixture, 'product plugins')
+      const presetDir = join(fixture, 'preset')
+      createProductPlugins(pluginsRoot)
+      createPresetSkeleton(presetDir)
+      writeFileSync(
+        join(pluginsRoot, 'omnimux-video', 'dsh.manifest.json'),
+        `${JSON.stringify({ id: 'omnimux-video', skills: ['skills/ghost/SKILL.md'] })}\n`,
+      )
+
+      expect(() => stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' }))
+        .toThrowError('plugin "omnimux-video" declares a missing skill: skills/ghost/SKILL.md')
+    } finally {
+      rmSync(fixture, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses two plugins that declare the same skill id', () => {
+    const fixture = mkdtempSync(join(tmpdir(), 'omnimux stage duplicate skill '))
+    try {
+      const pluginsRoot = join(fixture, 'product plugins')
+      const presetDir = join(fixture, 'preset')
+      createProductPlugins(pluginsRoot)
+      createPresetSkeleton(presetDir)
+      for (const name of ['omnimux-video', 'omnimux-clip']) {
+        mkdirSync(join(pluginsRoot, name, 'skills', 'shared'), { recursive: true })
+        writeFileSync(join(pluginsRoot, name, 'skills', 'shared', 'SKILL.md'), '---\nname: shared\n---\n')
+        writeFileSync(
+          join(pluginsRoot, name, 'dsh.manifest.json'),
+          `${JSON.stringify({ id: name, skills: ['skills/shared/SKILL.md'] })}\n`,
+        )
+      }
+
+      expect(() => stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' }))
+        .toThrowError('two product plugins declare the same skill "shared"')
     } finally {
       rmSync(fixture, { recursive: true, force: true })
     }

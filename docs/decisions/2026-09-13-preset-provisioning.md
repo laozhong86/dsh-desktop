@@ -1,7 +1,7 @@
 # Decision: OmniMux 预安装统一方案（插件套件 + Skill/Agent 基础设施）
 
 Date: 2026-09-13
-Status: 已批准实施（P0 落地中；P1–P3 待做）
+Status: 已批准实施（P0/P1/P2 已落地；P3 待做）
 Scope: 发行侧 `dsh-plugin-desktop/`（producer + settler + verifier）；清单源 `dsh-plugin/product/omnimux-dsh/`
 
 ## 问题（为什么改）
@@ -135,13 +135,39 @@ Scope: 发行侧 `dsh-plugin-desktop/`（producer + settler + verifier）；清�
   退出码 1。
 - 对开发环境跑同一份记录 → 退出码 1，并指出与发行记录不一致的包 —— 这正是 P3 要消除的漂移现场。
 
+## P2 实施记录（2026-09-13）
+
+落地在 `agent/preset-skills`（叠在 P1 之上）：
+
+- **技能来源＝产品插件自己声明的技能。** 插件在 `dsh.manifest.json` 里用 `skills: ["skills/<id>/SKILL.md"]`
+  声明技能；`omnimux-clip` 已经这么声明了 `clip-craft`，但**没有任何东西把插件包注册成技能根**，所以文件在磁盘上、
+  模型看不见。stage 阶段新增 `stageSkills()`：按声明把技能复制到 `preset/skills/<id>/`，并写入
+  `omnimux-skill.json` 记录 `{id, origin}`；声明了却不存在的技能、两个插件抢同一个技能 id，都在 stage 阶段失败。
+- **清单新增 `kind: "skill"` 条目**（`{id, tier: 'product', version: null, origin, digest}`），
+  `publishCandidate` 收录 `preset/skills`，`verify-distribution` 对 preset 校验技能集合双向相等、
+  逐技能 digest、`SKILL.md` 与来源标记一致。
+- **seed 侧新增 `seedPresetSkills()`**：把 `preset/skills/<id>` 装进 `<harness-home>/skills/<id>`
+  —— 那才是技能提供方真正会发现的根。带本产品标记的同名目录会被刷新；**用户自己写的同名技能一律不动**。
+  profile 模式下 `verify-distribution` 也校验 Home 里的技能集合。
+- 技能条目与包条目共用同一份记录，因此 P3 的升级协调天然覆盖技能。
+
+实测（真实产品树 + 干净 HOME）：
+
+| 项 | 结果 |
+| --- | --- |
+| `yarn omnimux:stage` | 296 包 + **1 个技能**（`clip-craft`，`origin: plugin:omnimux-clip`） |
+| `verify --preset` | `verified 297 preset package(s) against production` |
+| 干净 HOME 执行 seed | 记录 `["clip-craft"]` == Home 实际技能 `["clip-craft"]`，`SKILL.md` 就位 |
+| 再次 seed（模拟升级） | 带标记的副本被刷新，用户自建技能不受影响 |
+| 单元测试 | stage 侧 +3、seed 侧 +1、verifier 侧 +8 |
+
 ## 落地顺序
 
 | 阶段 | 内容 | 验收 |
 | --- | --- | --- |
 | P0 止血（已落地） | preset 产物自包含，消灭 `workspace:*`；`omnimux:profile rebuild` 可用 | dev 上 rebuild 成功且 app 正常启动 ✓ |
 | P1 清单化 | 生成 `distribution.json`；`omnimux:verify` 接入 CI | 故意删 preset 里一个包，verify 必须报错 |
-| P2 Skill/Agent 进清单 | skill 有产品级预装与协调通道 | 干净机器上的技能列表 == 清单 |
+| P2 Skill/Agent 进清单（已落地） | skill 有产品级预装与协调通道 | 干净机器上的技能列表 == 清单 ✓ |
 | P3 升级协调 | 替换"已有 profile 不刷新" | 装 v1 → 手改一个插件 → 装 v2 → 只有该插件保留旧值 |
 
 ## 防回滚红线

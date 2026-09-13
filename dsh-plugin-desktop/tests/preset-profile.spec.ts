@@ -13,6 +13,7 @@ import {
   replaceManagedHub,
   seedOmnimuxProfile,
   seedOmnimuxSettings,
+  seedPresetSkills,
 } from '../src/preset-profile.ts'
 import { managedDependencySpec, managedSourcePath } from '../src/managed-profile.ts'
 import { materializeProfile } from '../src/profile-materializer.ts'
@@ -23,6 +24,14 @@ function writeJson(path: string, value: unknown): void {
 
 function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, 'utf8')) as unknown
+}
+
+/** Write one directory-bundle skill; only a seeded copy carries the marker. */
+function writeSkillDir(root: string, id: string, seeded = true): void {
+  const directory = join(root, id)
+  mkdirSync(directory, { recursive: true })
+  writeFileSync(join(directory, 'SKILL.md'), `---\nname: ${id}\ndescription: fixture skill\n---\n`)
+  if (seeded) writeFileSync(join(directory, 'omnimux-skill.json'), `${JSON.stringify({ id, origin: 'plugin:fixture' })}\n`)
 }
 
 const LIFECYCLE = {
@@ -588,6 +597,25 @@ describe('seedOmnimuxProfile managed sources', () => {
       expect(() => seedOmnimuxProfile({ home, presetDir }))
         .toThrow('desktop preset distribution record names packages the preset does not own: omnimux-ghost')
       expect(existsSync(join(home, 'profiles', 'omnimux'))).toBe(false)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('installs staged skills into the Harness Home and leaves user skills alone', () => {
+    const root = mkdtempSync(join(tmpdir(), 'omnimux-skill-seed-'))
+    try {
+      const presetDir = createPreset(root)
+      writeSkillDir(join(presetDir, 'skills'), 'clip-craft')
+      writeSkillDir(join(presetDir, 'skills'), 'known-skill')
+      const home = join(root, 'home')
+      writeSkillDir(join(home, 'skills'), 'known-skill', false)
+
+      expect(seedPresetSkills(home, presetDir)).toEqual(['clip-craft'])
+      expect(existsSync(join(home, 'skills', 'clip-craft', 'SKILL.md'))).toBe(true)
+      expect(existsSync(join(home, 'skills', 'clip-craft', 'omnimux-skill.json'))).toBe(true)
+      // A skill the user authored under the same name is never replaced.
+      expect(existsSync(join(home, 'skills', 'known-skill', 'omnimux-skill.json'))).toBe(false)
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

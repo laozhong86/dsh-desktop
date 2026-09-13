@@ -184,6 +184,112 @@ describe('verify-distribution', () => {
     }
   })
 
+  it('accepts a preset whose recorded skills match the staged ones', () => {
+    const root = fixture()
+    try {
+      const presetDir = createPreset(root, ITEMS, ['clip-craft'])
+      expect(verifyPreset(presetDir).verified).toBe(3)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('fails when a recorded skill was not staged', () => {
+    const root = fixture()
+    try {
+      const presetDir = createPreset(root, ITEMS, ['clip-craft'])
+      rmSync(join(presetDir, 'skills', 'clip-craft'), { recursive: true, force: true })
+      expect(() => verifyPreset(presetDir))
+        .toThrowError('preset is missing 1 recorded skill(s): clip-craft')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('fails when the preset stages a skill the record never listed', () => {
+    const root = fixture()
+    try {
+      const presetDir = createPreset(root, ITEMS)
+      writeSkill(join(presetDir, 'skills'), 'ghost', 'plugin:fixture')
+      expect(() => verifyPreset(presetDir))
+        .toThrowError('preset stages 1 skill(s) the record does not list: ghost')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('fails when a staged skill no longer matches its recorded bytes', () => {
+    const root = fixture()
+    try {
+      const presetDir = createPreset(root, ITEMS, ['clip-craft'])
+      writeFileSync(join(presetDir, 'skills', 'clip-craft', 'SKILL.md'), '---\nname: clip-craft\n---\ntampered\n')
+      expect(() => verifyPreset(presetDir)).toThrowError(/^verify-distribution: skill clip-craft digest is /u)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects a skill whose origin marker disagrees with the record', () => {
+    const root = fixture()
+    try {
+      const presetDir = createPreset(root, ITEMS, ['clip-craft'])
+      writeSkill(join(presetDir, 'skills'), 'clip-craft', 'plugin:somewhere-else')
+      writeRecord(presetDir, ITEMS, ['clip-craft'])
+      expect(() => verifyPreset(presetDir))
+        .toThrowError('skill clip-craft origin is "plugin:somewhere-else", the record says "plugin:fixture"')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('accepts a Harness Home that carries every recorded skill, and reports user skills', () => {
+    const root = fixture()
+    try {
+      const presetDir = createPreset(root, ITEMS, ['clip-craft'])
+      const profileDir = createProfile(root, ITEMS, [], ['clip-craft'], ['user-skill'])
+      const result = verifyProfile(profileDir, join(presetDir, 'distribution.json'))
+      expect(result.verified).toBe(3)
+      expect(result.extra).toContain('user-skill')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('fails when the Harness Home is missing a recorded skill', () => {
+    const root = fixture()
+    try {
+      const presetDir = createPreset(root, ITEMS, ['clip-craft'])
+      const profileDir = createProfile(root, ITEMS)
+      expect(() => verifyProfile(profileDir, join(presetDir, 'distribution.json')))
+        .toThrowError('Harness Home is missing 1 recorded skill(s): clip-craft')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects a recorded skill that carries a version', () => {
+    const root = fixture()
+    try {
+      const presetDir = createPreset(root, ITEMS)
+      writeFileSync(join(presetDir, 'distribution.json'), `${JSON.stringify({
+        schema: 1,
+        channel: 'development',
+        items: [{
+          kind: 'skill',
+          id: 'a',
+          tier: 'product',
+          version: '1.0.0',
+          origin: 'plugin:a',
+          digest: 'a'.repeat(64),
+        }],
+      })}\n`)
+      expect(() => readDistribution(join(presetDir, 'distribution.json')))
+        .toThrowError('distribution skill a must not carry a version')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   it('rejects records whose own shape cannot be trusted', () => {
     const root = fixture()
     try {
@@ -244,40 +350,67 @@ function writePackage(pluginsDir: string, name: string, extra: Record<string, un
 }
 
 /** Build a staged preset shaped exactly like the producer's output. */
-function createPreset(root: string, names: readonly string[]): string {
+function createPreset(root: string, names: readonly string[], skills: readonly string[] = []): string {
   const presetDir = join(root, 'preset')
   const pluginsDir = join(presetDir, 'plugins')
   mkdirSync(pluginsDir, { recursive: true })
   for (const name of names) writePackage(pluginsDir, name)
+  for (const id of skills) writeSkill(join(presetDir, 'skills'), id, 'plugin:fixture')
   writeFileSync(join(presetDir, 'owned-packages.json'), `${JSON.stringify(names, undefined, 2)}\n`)
   writeFileSync(join(presetDir, 'seed-version'), '4\n')
-  writeRecord(presetDir, names)
+  writeRecord(presetDir, names, skills)
   return presetDir
 }
 
 /** Record the preset's current bytes, the way the producer does after staging. */
-function writeRecord(presetDir: string, names: readonly string[]): void {
+function writeRecord(presetDir: string, names: readonly string[], skills: readonly string[] = []): void {
   const pluginsDir = join(presetDir, 'plugins')
   writeFileSync(join(presetDir, 'distribution.json'), `${JSON.stringify({
     schema: 1,
     channel: 'development',
     generatedFrom: { appVersion: '2.0.9', desktopCommit: null },
-    items: names.map(id => ({
-      kind: 'plugin',
-      id,
-      tier: 'product',
-      version: '1.0.0',
-      digest: hashDirectory(join(pluginsDir, ...id.split('/'))),
-    })),
+    items: [
+      ...names.map(id => ({
+        kind: 'plugin',
+        id,
+        tier: 'product',
+        version: '1.0.0',
+        digest: hashDirectory(join(pluginsDir, ...id.split('/'))),
+      })),
+      ...skills.map(id => ({
+        kind: 'skill',
+        id,
+        tier: 'product',
+        version: null,
+        origin: 'plugin:fixture',
+        digest: hashDirectory(join(presetDir, 'skills', id)),
+      })),
+    ],
   }, undefined, 2)}\n`)
 }
 
-/** Build an installed Profile whose managed sources carry the recorded bytes. */
-function createProfile(root: string, names: readonly string[], extra: readonly string[] = []): string {
-  const profileDir = join(root, 'profile')
+/** Write one directory-bundle skill with the origin marker the producer adds. */
+function writeSkill(root: string, id: string, origin: string): void {
+  const directory = join(root, id)
+  mkdirSync(directory, { recursive: true })
+  writeFileSync(join(directory, 'SKILL.md'), `---\nname: ${id}\ndescription: fixture skill\n---\n`)
+  writeFileSync(join(directory, 'omnimux-skill.json'), `${JSON.stringify({ id, origin }, undefined, 2)}\n`)
+}
+
+/** Build an installed Profile (and its Harness Home) carrying the recorded bytes. */
+function createProfile(
+  root: string,
+  names: readonly string[],
+  extra: readonly string[] = [],
+  skills: readonly string[] = [],
+  extraSkills: readonly string[] = [],
+): string {
+  const profileDir = join(root, 'home', 'profiles', 'omnimux')
   const snapshots = join(profileDir, '.materialize-snapshots', 'plugins')
   mkdirSync(snapshots, { recursive: true })
   for (const name of [...names, ...extra]) writePackage(snapshots, name)
+  for (const id of skills) writeSkill(join(root, 'home', 'skills'), id, 'plugin:fixture')
+  for (const id of extraSkills) writeSkill(join(root, 'home', 'skills'), id, 'plugin:other')
   writeFileSync(join(profileDir, 'package.json'), `${JSON.stringify({
     name: 'dsh-profile-omnimux',
     private: true,

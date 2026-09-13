@@ -38,7 +38,13 @@ vi.mock('../scripts/better-sidebar/build-patched-sidebar.ts', async () => {
     },
   }
 })
-import { parseReleaseChannel, publishCandidate, stagePresetProfile } from '../scripts/stage-preset-profile.ts'
+import {
+  assertStagedSelfContained,
+  normalizeStagedManifest,
+  parseReleaseChannel,
+  publishCandidate,
+  stagePresetProfile,
+} from '../scripts/stage-preset-profile.ts'
 import { listPackageNames } from '../src/preset-profile.ts'
 
 const PRODUCT_PLUGINS = [
@@ -487,11 +493,151 @@ describe('stagePresetProfile', () => {
     expect(() => parseReleaseChannel(['development'])).toThrow('usage:')
     expect(() => parseReleaseChannel(['--channel', 'preview'])).toThrow('usage:')
   })
+
+  it('drops build-only dev dependencies before a package enters the preset', () => {
+    const fixture = mkdtempSync(join(tmpdir(), 'omnimux staged manifest '))
+    try {
+      const stagedRoot = join(fixture, 'packages')
+      const packageDir = join(stagedRoot, 'omnimux-forms')
+      createPackage(join(stagedRoot, 'omnimux-hub'), 'omnimux-hub')
+      createPackage(packageDir, 'omnimux-forms', {
+        dependencies: { 'omnimux-hub': 'file:../omnimux-hub' },
+        devDependencies: {
+          'dsh-ui-kit': 'file:../../../../personal/dsh-ui-kit',
+          '@omnimux/form-contract': 'file:../../packages/form-contract',
+        },
+      })
+
+      normalizeStagedManifest('omnimux-forms', packageDir, stagedRoot)
+
+      const manifest = readJson(join(packageDir, 'package.json'))
+      expect(manifest.devDependencies).toBeUndefined()
+      expect(manifest.dependencies).toEqual({ 'omnimux-hub': 'file:../omnimux-hub' })
+    } finally {
+      rmSync(fixture, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects a workspace-only dependency spec at stage time', () => {
+    const fixture = mkdtempSync(join(tmpdir(), 'omnimux staged workspace '))
+    try {
+      const stagedRoot = join(fixture, 'packages')
+      const packageDir = join(stagedRoot, 'omnimux-forms')
+      createPackage(packageDir, 'omnimux-forms', {
+        dependencies: { '@omnimux/form-contract': 'workspace:*' },
+      })
+
+      expect(() => normalizeStagedManifest('omnimux-forms', packageDir, stagedRoot))
+        .toThrowError('a workspace-only spec cannot resolve after the preset is relocated')
+    } finally {
+      rmSync(fixture, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects a symbolic-link dependency spec at stage time', () => {
+    const fixture = mkdtempSync(join(tmpdir(), 'omnimux staged link '))
+    try {
+      const stagedRoot = join(fixture, 'packages')
+      const packageDir = join(stagedRoot, 'omnimux-forms')
+      createPackage(packageDir, 'omnimux-forms', {
+        dependencies: { 'omnimux-hub': 'link:../omnimux-hub' },
+      })
+
+      expect(() => normalizeStagedManifest('omnimux-forms', packageDir, stagedRoot))
+        .toThrowError('symbolic links are forbidden in the preset')
+    } finally {
+      rmSync(fixture, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects a local dependency that escapes the staged root', () => {
+    const fixture = mkdtempSync(join(tmpdir(), 'omnimux staged escape '))
+    try {
+      const stagedRoot = join(fixture, 'packages')
+      const packageDir = join(stagedRoot, 'omnimux-forms')
+      createPackage(packageDir, 'omnimux-forms', {
+        dependencies: { outside: 'file:../../../outside' },
+      })
+
+      expect(() => normalizeStagedManifest('omnimux-forms', packageDir, stagedRoot))
+        .toThrowError('escapes the staged root')
+    } finally {
+      rmSync(fixture, { recursive: true, force: true })
+    }
+  })
+
+  it('accepts a staged preset whose local edges stay inside it', () => {
+    const fixture = mkdtempSync(join(tmpdir(), 'omnimux staged self contained '))
+    try {
+      const pluginsDir = join(fixture, 'plugins')
+      createPackage(join(pluginsDir, 'omnimux-hub'), 'omnimux-hub')
+      createPackage(join(pluginsDir, 'omnimux-forms'), 'omnimux-forms', {
+        dependencies: { 'omnimux-hub': 'file:../omnimux-hub' },
+      })
+
+      expect(() => assertStagedSelfContained(pluginsDir)).not.toThrow()
+    } finally {
+      rmSync(fixture, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects a staged preset that still carries a workspace spec', () => {
+    const fixture = mkdtempSync(join(tmpdir(), 'omnimux preset workspace '))
+    try {
+      const pluginsDir = join(fixture, 'plugins')
+      createPackage(join(pluginsDir, 'omnimux-forms'), 'omnimux-forms', {
+        dependencies: { '@omnimux/form-contract': 'workspace:*' },
+      })
+
+      expect(() => assertStagedSelfContained(pluginsDir))
+        .toThrowError('declares "@omnimux/form-contract" as "workspace:*"')
+    } finally {
+      rmSync(fixture, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects a staged preset whose local edge has no staged source', () => {
+    const fixture = mkdtempSync(join(tmpdir(), 'omnimux preset dangling '))
+    try {
+      const pluginsDir = join(fixture, 'plugins')
+      createPackage(join(pluginsDir, 'omnimux-forms'), 'omnimux-forms', {
+        dependencies: { 'omnimux-hub': 'file:../omnimux-hub' },
+      })
+
+      expect(() => assertStagedSelfContained(pluginsDir))
+        .toThrowError('has no staged source at "file:../omnimux-hub"')
+    } finally {
+      rmSync(fixture, { recursive: true, force: true })
+    }
+  })
+
+  it('tolerates a shadowed dependency spec and an absent optional edge', () => {
+    const fixture = mkdtempSync(join(tmpdir(), 'omnimux optional edge '))
+    try {
+      const stagedRoot = join(fixture, 'packages')
+      const packageDir = join(stagedRoot, 'omnimux-assets')
+      createPackage(packageDir, 'omnimux-assets', {
+        dependencies: { 'omnimux-hub': 'file:../../missing omnimux-hub' },
+        optionalDependencies: { 'omnimux-hub': 'file:../omnimux-hub' },
+      })
+
+      // pnpm gives optionalDependencies precedence, so the shadowed edge is not
+      // an effective spec; the optional one has no staged source because the
+      // platform excluded its package. Neither may fail the gate.
+      expect(() => normalizeStagedManifest('omnimux-assets', packageDir, stagedRoot)).not.toThrow()
+      expect(() => assertStagedSelfContained(stagedRoot)).not.toThrow()
+      expect(readJson(join(packageDir, 'package.json')).dependencies)
+        .toEqual({ 'omnimux-hub': 'file:../../missing omnimux-hub' })
+    } finally {
+      rmSync(fixture, { recursive: true, force: true })
+    }
+  })
 })
 
 interface PackageManifestExtras {
   readonly dependencies?: Readonly<Record<string, string>>
   readonly optionalDependencies?: Readonly<Record<string, string>>
+  readonly devDependencies?: Readonly<Record<string, string>>
   readonly os?: readonly string[]
 }
 

@@ -211,6 +211,29 @@ describe('managed OmniMux Profile rebuild', () => {
     }
   })
 
+  it('rejects a workspace-only dependency in a packaged managed source', () => {
+    const root = mkdtempSync(join(tmpdir(), 'managed-profile-workspace-'))
+    try {
+      const preset = createPreset(root)
+      const manifestPath = join(preset, 'plugins', 'plugin-a', 'package.json')
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+        dependencies?: Record<string, string>
+      }
+      writeJson(manifestPath, {
+        ...manifest,
+        dependencies: { ...manifest.dependencies, '@fixture/shared': 'workspace:*' },
+      })
+
+      // A relocated managed source cannot resolve a workspace spec, so the
+      // seed must fail next to the packaged source rather than let pnpm abort
+      // inside the user Profile.
+      expect(() => assertManagedSourceGraph(join(preset, 'plugins'), OWNED))
+        .toThrow('uses forbidden workspace:*')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
   it('allows only a physically absent effective optional local source', () => {
     const root = mkdtempSync(join(tmpdir(), 'managed-profile-optional-missing-'))
     try {

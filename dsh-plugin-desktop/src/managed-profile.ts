@@ -206,6 +206,12 @@ function assertManagedPackage(root: string, name: string, allowMissingTargets = 
   if (manifest.name !== name) fail(`managed source ${JSON.stringify(name)} declares name ${JSON.stringify(manifest.name)}`)
   for (const { dependency, spec, optional } of localDependencySpecs(manifest)) {
     if (spec.startsWith('link:')) fail(`${name} dependency ${dependency} uses forbidden ${spec}`)
+    // A managed source is relocated into the user Profile, so a spec only a
+    // workspace can resolve would never install there. Fail at seed time, next
+    // to the packaged source, instead of leaving pnpm to abort in a Profile.
+    if (spec.startsWith('workspace:')) {
+      fail(`${name} dependency ${dependency} uses forbidden ${spec}; declare a published version or a file: path`)
+    }
     if (!spec.startsWith('file:')) continue
     const target = resolve(packageDir, spec.slice('file:'.length))
     assertContained(root, target, `${name} dependency ${dependency}`)

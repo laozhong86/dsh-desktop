@@ -14,7 +14,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { dirname, join, relative, resolve, sep } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { listPackageNames, packageDirSegments } from '../src/preset-profile.ts'
 import {
@@ -138,6 +138,7 @@ export function stagePresetProfile(options: StagePresetProfileOptions = {}): num
       )
       dependencies[name] = toFileSpec(staging, entry.destination)
     }
+    for (const [name, entry] of packages) normalizeStagedManifest(name, entry.destination, stagedPackagesRoot)
     writeReleaseChannel(join(stagedPackagesRoot, 'omnimux'), releaseChannel)
     for (const [name, entry] of packages) {
       if (productPlugins.includes(name)) continue
@@ -169,6 +170,7 @@ export function stagePresetProfile(options: StagePresetProfileOptions = {}): num
     }
     assertNoAlphaPackages(candidatePluginsDir, alphaPlugins, releaseChannel)
     assertReleaseChannel(candidatePluginsDir, releaseChannel)
+    assertStagedSelfContained(candidatePluginsDir)
     verifyInstalledBetterSidebar(join(candidatePluginsDir, 'dsh-better-sidebar'), sidebar.packedRoot)
     stageSkeleton(targetPresetDir, candidateDir, alphaPlugins, releaseChannel)
     stageAgentPresets(resolvedPluginsRoot, candidateDir)
@@ -434,6 +436,108 @@ function stageAgentPresets(pluginsRoot: string, candidateDir: string): number {
 function toFileSpec(fromPackageDir: string, targetPackageDir: string): string {
   const path = relative(fromPackageDir, targetPackageDir).split(sep).join('/')
   return `file:${path.startsWith('.') ? path : `./${path}`}`
+}
+
+/**
+ * Make one staged package manifest safe to relocate.
+ *
+ * The preset ships as a physical copy outside the product tree, so a spec the
+ * build-time checkout can resolve may not resolve on a user machine. Dev
+ * dependencies are dropped outright: pnpm never installs a dependency's dev
+ * dependencies, and they are the usual home of a source-relative `file:` edge
+ * that the preset would carry forever. A workspace-only spec fails here, where
+ * the offending product source is still known, rather than surfacing later as
+ * `ERR_PNPM_CANNOT_RESOLVE_WORKSPACE_PROTOCOL` inside a user Profile.
+ */
+export function normalizeStagedManifest(name: string, packageDir: string, stagedPackagesRoot: string): void {
+  const manifestPath = join(packageDir, 'package.json')
+  const manifest = readManifest(manifestPath)
+  let changed = false
+  if (manifest.devDependencies !== undefined) {
+    delete manifest.devDependencies
+    changed = true
+  }
+  for (const field of ['dependencies', 'optionalDependencies'] as const) {
+    const dependencyMap = manifest[field]
+    if (dependencyMap === undefined) continue
+    const optionalDependencies = manifest.optionalDependencies ?? {}
+    for (const [dependency, spec] of Object.entries(dependencyMap)) {
+      // pnpm gives optionalDependencies precedence over dependencies for the
+      // same name, so the shadowed spec is not an effective edge.
+      if (field === 'dependencies' && Object.hasOwn(optionalDependencies, dependency)) continue
+      if (spec.startsWith('workspace:')) {
+        throw new Error(
+          `staged package ${JSON.stringify(name)} declares ${JSON.stringify(dependency)} as ${JSON.stringify(spec)}: `
+          + 'a workspace-only spec cannot resolve after the preset is relocated, so publish a version or use a file: path',
+        )
+      }
+      if (spec.startsWith('link:')) {
+        throw new Error(
+          `staged package ${JSON.stringify(name)} declares ${JSON.stringify(dependency)} as ${JSON.stringify(spec)}: `
+          + 'symbolic links are forbidden in the preset',
+        )
+      }
+      if (!spec.startsWith('file:')) continue
+      if (!isInside(stagedPackagesRoot, resolve(packageDir, spec.slice('file:'.length)))) {
+        throw new Error(
+          `staged package ${JSON.stringify(name)} dependency ${JSON.stringify(dependency)} escapes the staged root (${JSON.stringify(spec)})`,
+        )
+      }
+    }
+  }
+  if (changed) writeFileSync(manifestPath, `${JSON.stringify(manifest, undefined, 2)}\n`)
+}
+
+/**
+ * Verify the published preset cannot reference anything outside itself.
+ *
+ * `seedOmnimuxProfile` copies these directories into a user Profile verbatim,
+ * so a manifest that still points at the product tree fails there with a pnpm
+ * error naming neither the plugin nor the preset. Check the artifact.
+ */
+export function assertStagedSelfContained(pluginsDir: string): void {
+  for (const name of listPackageNames(pluginsDir)) {
+    const packageDir = join(pluginsDir, ...packageDirSegments(name))
+    const manifest = readManifest(join(packageDir, 'package.json'))
+    for (const field of ['dependencies', 'optionalDependencies'] as const) {
+      const dependencyMap = manifest[field]
+      if (dependencyMap === undefined) continue
+      const optionalDependencies = manifest.optionalDependencies ?? {}
+      for (const [dependency, spec] of Object.entries(dependencyMap)) {
+        // pnpm gives optionalDependencies precedence over dependencies for the
+        // same name, so the shadowed spec is not an effective edge.
+        if (field === 'dependencies' && Object.hasOwn(optionalDependencies, dependency)) continue
+        if (!spec.startsWith('file:')) {
+          if (spec.startsWith('workspace:') || spec.startsWith('link:')) {
+            throw new Error(
+              `staged preset package ${JSON.stringify(name)} declares ${JSON.stringify(dependency)} as ${JSON.stringify(spec)}`,
+            )
+          }
+          continue
+        }
+        const target = resolve(packageDir, spec.slice('file:'.length))
+        if (!isInside(pluginsDir, target)) {
+          throw new Error(
+            `staged preset package ${JSON.stringify(name)} dependency ${JSON.stringify(dependency)} escapes the preset (${JSON.stringify(spec)})`,
+          )
+        }
+        // An effective optional local edge may be absent when the platform
+        // excludes its package; a target that is present must still be real.
+        if (field === 'optionalDependencies' && !existsSync(target)) continue
+        if (!existsSync(join(target, 'package.json'))) {
+          throw new Error(
+            `staged preset package ${JSON.stringify(name)} dependency ${JSON.stringify(dependency)} has no staged source at ${JSON.stringify(spec)}`,
+          )
+        }
+      }
+    }
+  }
+}
+
+/** True when `target` stays inside `root`, comparing resolved path segments. */
+function isInside(root: string, target: string): boolean {
+  const path = relative(root, target)
+  return path !== '..' && !path.startsWith(`..${sep}`) && !isAbsolute(path)
 }
 
 function copyPluginSources(source: string, destination: string): void {

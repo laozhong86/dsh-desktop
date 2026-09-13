@@ -11,9 +11,11 @@ import {
   resolveDesktopL2Launch,
   resolveHarnessHome,
   replaceManagedHub,
+  reconcileManagedProfile,
   seedOmnimuxProfile,
   seedOmnimuxSettings,
   seedPresetSkills,
+  isReleaseHarnessHome,
   listStagedSkills,
   MANAGED_LEDGER_FILENAME,
 } from '../src/preset-profile.ts'
@@ -660,6 +662,66 @@ describe('seedOmnimuxProfile managed sources', () => {
       seedOmnimuxProfile({ home, presetDir })
       expect(readFileSync(join(sources, 'omnimux-assets', 'index.js'), 'utf8'))
         .toBe('module.exports = "user edit"\n')
+      expect(readFileSync(join(sources, 'omnimux-workflow', 'index.js'), 'utf8'))
+        .toBe('module.exports = "v2 omnimux-workflow"\n')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('only the released product home counts as this desktop\'s own', () => {
+    expect(isReleaseHarnessHome(join(homedir(), '.omnimux'))).toBe(true)
+    expect(isReleaseHarnessHome(`${join(homedir(), '.omnimux')}/`)).toBe(true)
+    expect(isReleaseHarnessHome(join(homedir(), '.omnimux-dev'))).toBe(false)
+    expect(isReleaseHarnessHome(join(homedir(), '.dsh'))).toBe(false)
+    expect(isReleaseHarnessHome(join(tmpdir(), 'omnimux-adopt-mode-home'))).toBe(false)
+  })
+
+  it('replaces an unrecorded source only where the desktop is its only writer', () => {
+    const root = mkdtempSync(join(tmpdir(), 'omnimux-adopt-mode-'))
+    try {
+      const presetDir = createPreset(root)
+      writeDistribution(presetDir, 1)
+      const home = join(root, 'home')
+      const seeded = seedOmnimuxProfile({ home, presetDir })
+      const profileDir = seeded.profileDir
+      const sources = join(profileDir, '.materialize-snapshots', 'plugins')
+      const pluginsDir = join(presetDir, 'plugins')
+      const owned = readJson(join(presetDir, 'owned-packages.json')) as string[]
+
+      // The next installer ships changed bytes, and the Profile predates the
+      // ledger, so every source looks unrecorded.
+      for (const name of ['omnimux-assets', 'omnimux-workflow']) {
+        writeFileSync(join(pluginsDir, name, 'index.js'), `module.exports = "v2 ${name}"\n`)
+      }
+      writeDistribution(presetDir, 2)
+      rmSync(join(profileDir, MANAGED_LEDGER_FILENAME))
+
+      // A development-like home: record a baseline and overwrite nothing.
+      const adopted = reconcileManagedProfile({
+        profileDir,
+        presetDir,
+        pluginsDir,
+        owned,
+        home,
+        refreshUnrecorded: false,
+      })
+      expect(adopted.updated).toEqual([])
+      expect(adopted.adopted).toContain('omnimux-workflow')
+      expect(readFileSync(join(sources, 'omnimux-workflow', 'index.js'), 'utf8'))
+        .toBe('module.exports = "omnimux-workflow"\n')
+
+      // The released product's home: the packaged copy wins on first sight.
+      rmSync(join(profileDir, MANAGED_LEDGER_FILENAME))
+      const refreshed = reconcileManagedProfile({
+        profileDir,
+        presetDir,
+        pluginsDir,
+        owned,
+        home,
+        refreshUnrecorded: true,
+      })
+      expect(refreshed.updated).toContain('omnimux-workflow')
       expect(readFileSync(join(sources, 'omnimux-workflow', 'index.js'), 'utf8'))
         .toBe('module.exports = "v2 omnimux-workflow"\n')
     } finally {

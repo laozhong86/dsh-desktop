@@ -59,8 +59,13 @@ digest of the packaged distribution record.
   left exactly as it is, and the ledger keeps the earlier digest, so the next
   upgrade recognises the same edit instead of adopting it as a new baseline.
 - A source the ledger has never seen — every source of a Profile installed before
-  the ledger existed — is adopted as-is. The first pass records a baseline rather
-  than overwriting on the strength of a missing record.
+  the ledger existed — is handled according to the home it lives in. In the
+  released product's home (`~/.omnimux`), where this desktop is the only writer,
+  an unrecorded source that differs from the packaged copy is replaced, so an
+  upgrade reaches an existing user on the first launch after they install it.
+  Everywhere else — the development home, a custom `$DSH_HOME` — `omnimux:sync`
+  and the explicit rebuild write managed sources too, so the first pass records a
+  baseline rather than overwriting content that may be deliberate.
 - A skill missing from the Harness Home is installed. That is how a newly packaged
   skill reaches an existing Profile.
 

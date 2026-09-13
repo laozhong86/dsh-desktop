@@ -49,6 +49,22 @@ export const SKILL_ORIGIN_FILENAME = 'omnimux-skill.json'
 /** Ledger of the digests this desktop last installed, per managed source. */
 export const MANAGED_LEDGER_FILENAME = '.omnimux-managed.json'
 
+/** The released product's home directory name, relative to the user's home. */
+const RELEASE_HOME_DIRNAME = '.omnimux'
+
+/**
+ * True for the released product's Harness home.
+ *
+ * That home has exactly one writer — this desktop, through the packaged preset.
+ * The development home and a custom `$DSH_HOME` do not: `omnimux:sync` and the
+ * explicit rebuild both write managed sources there, so content found in them
+ * may be deliberate and must not be replaced on sight.
+ * @param home - Harness home directory under consideration.
+ */
+export function isReleaseHarnessHome(home: string): boolean {
+  return resolve(home) === join(homedir(), RELEASE_HOME_DIRNAME)
+}
+
 /** Stamp written inside the user profile after a successful seed or refresh. */
 export const PROFILE_SEED_STAMP = '.omnimux-seed-version'
 
@@ -335,6 +351,7 @@ export function seedOmnimuxProfile(options: SeedOmnimuxProfileOptions): SeedOmni
       pluginsDir,
       owned,
       home: options.home,
+      refreshUnrecorded: isReleaseHarnessHome(options.home),
     })
     const changed = policyChanged || reconciled.updated.length > 0
     return {
@@ -363,7 +380,14 @@ export function seedOmnimuxProfile(options: SeedOmnimuxProfileOptions): SeedOmni
     publishFreshCandidate(candidateDir, profileDir, owned)
     // Record the baseline this Profile was installed from, so the next upgrade
     // can tell this desktop's own files from a user's edit.
-    reconcileManagedProfile({ profileDir, presetDir, pluginsDir, owned, home: options.home })
+    reconcileManagedProfile({
+      profileDir,
+      presetDir,
+      pluginsDir,
+      owned,
+      home: options.home,
+      refreshUnrecorded: isReleaseHarnessHome(options.home),
+    })
   } finally {
     rmSync(candidateDir, { recursive: true, force: true })
   }
@@ -759,8 +783,19 @@ export function reconcileManagedProfile(options: {
   readonly pluginsDir: string
   readonly owned: readonly string[]
   readonly home: string
+  /**
+   * Adopt the packaged content for a source the ledger has never seen.
+   *
+   * Only the released product's home qualifies: it has exactly one writer, so an
+   * unrecorded source there is this desktop's own older copy and an upgrade is
+   * expected to replace it. Everywhere else — the development home, a custom
+   * `$DSH_HOME` — a local workflow may have written that content on purpose, and
+   * the first pass records a baseline instead of overwriting it.
+   */
+  readonly refreshUnrecorded?: boolean
 }): ReconcileOutcome {
   const { profileDir, presetDir, pluginsDir, owned, home } = options
+  const refreshUnrecorded = options.refreshUnrecorded === true
   const record = stagedRecordDigest(presetDir)
   const ledger = readLedger(profileDir)
   if (ledger !== undefined && record !== null && ledger.preset === record) {
@@ -785,6 +820,15 @@ export function reconcileManagedProfile(options: {
       const installedDigest = hashDirectory(installed)
       const recorded = previous.packages[name]
       if (recorded === undefined) {
+        if (refreshUnrecorded && installedDigest !== packagedDigest) {
+          const candidate = join(workspace, ...packageDirSegments(name))
+          mkdirSync(dirname(candidate), { recursive: true })
+          cpSync(join(pluginsDir, ...packageDirSegments(name)), candidate, { recursive: true, dereference: true })
+          replaceManagedSource(installed, candidate, join(workspace, '.backup', ...packageDirSegments(name)))
+          packages[name] = packagedDigest
+          updated.push(name)
+          continue
+        }
         packages[name] = installedDigest
         adopted.push(name)
         continue
@@ -822,6 +866,13 @@ export function reconcileManagedProfile(options: {
       const installedDigest = hashDirectory(installed)
       const recorded = previous.skills[id]
       if (recorded === undefined) {
+        if (refreshUnrecorded && installedDigest !== packagedDigest) {
+          rmSync(installed, { recursive: true, force: true })
+          cpSync(packaged, installed, { recursive: true, dereference: true })
+          skills[id] = packagedDigest
+          updated.push(`skill:${id}`)
+          continue
+        }
         skills[id] = installedDigest
         adopted.push(`skill:${id}`)
         continue

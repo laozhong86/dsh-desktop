@@ -35,13 +35,39 @@ entries, and atomically renames `package.json` last as the commit point. Any
 interruption before that rename remains a fresh, retryable initialization; any
 interruption after it sees the fence and runs packaged pnpm before the first
 Profile composition. The fence is removed only after that install succeeds. If
-the Profile already exists, startup only validates the managed declarations and source closure. It
-does not refresh packages, rewrite declarations, or replace a valid source with
-the packaged copy, even when the packaged seed has the same or a newer version.
+the Profile already exists, startup validates the managed declarations and source
+closure, applies the release-channel gate, and then reconciles the managed
+sources and the Harness Home's skills against the packaged preset.
 
 Legacy self-references and damaged managed sources stop startup before repair
 writes. The diagnostic always points to the explicit rebuild command; startup
 does not silently migrate them.
+
+## Reconciliation
+
+An existing Profile is reconciled with the packaged preset on startup, so an
+upgraded installer can deliver a new plugin or skill to a Profile that already
+exists. The Profile keeps a ledger, `.omnimux-managed.json`, recording the digest
+this desktop last installed for each managed source and skill, together with the
+digest of the packaged distribution record.
+
+- A source whose bytes still match the ledger is this desktop's own copy. When
+  the packaged preset ships different bytes, the source is replaced through a
+  same-filesystem candidate and an atomic rename, with the previous copy restored
+  if the rename fails, and the ledger records the new digest.
+- A source whose bytes no longer match the ledger was changed by the user. It is
+  left exactly as it is, and the ledger keeps the earlier digest, so the next
+  upgrade recognises the same edit instead of adopting it as a new baseline.
+- A source the ledger has never seen — every source of a Profile installed before
+  the ledger existed — is adopted as-is. The first pass records a baseline rather
+  than overwriting on the strength of a missing record.
+- A skill missing from the Harness Home is installed. That is how a newly packaged
+  skill reaches an existing Profile.
+
+The record digest keeps the steady state cheap: when the packaged record is
+unchanged, reconciliation reads that one file and returns without hashing a tree.
+A ledger that cannot be parsed, or that carries an invalid digest, stops startup
+instead of silently re-baselining.
 
 ## Explicit Dev rebuild
 
@@ -51,7 +77,7 @@ The only public recovery entry is:
 yarn omnimux:profile rebuild --target dev --app /absolute/path/to/frozen/OmniMux.app
 ```
 
-The command accepts only the Dev target. The supplied app is resolved to a
+The command accepts `--target dev` or `--target prod`. The supplied app is resolved to a
 frozen physical path and provides the authoritative preset, bundled pnpm,
 Electron executable, and ABI version. The operation:
 

@@ -1,7 +1,7 @@
 # Decision: OmniMux 预安装统一方案（插件套件 + Skill/Agent 基础设施）
 
 Date: 2026-09-13
-Status: 已批准实施（P0/P1/P2 已落地；P3 待做）
+Status: 已实施（P0–P3 全部落地）
 Scope: 发行侧 `dsh-plugin-desktop/`（producer + settler + verifier）；清单源 `dsh-plugin/product/omnimux-dsh/`
 
 ## 问题（为什么改）
@@ -161,6 +161,29 @@ Scope: 发行侧 `dsh-plugin-desktop/`（producer + settler + verifier）；清�
 | 再次 seed（模拟升级） | 带标记的副本被刷新，用户自建技能不受影响 |
 | 单元测试 | stage 侧 +3、seed 侧 +1、verifier 侧 +8 |
 
+## P3 实施记录（2026-09-13）
+
+落地在 `agent/preset-upgrade-reconcile`（叠在 P2 之上）：
+
+- **`reconcileManagedProfile()` 取代「已有 profile 不刷新」。** Profile 里新增账本
+  `.omnimux-managed.json`：记录本机上次安装的每个受管源与每个技能的内容指纹，外加**发行记录自身的指纹**。
+  - 现盘指纹 == 账本 → 这是本产品装的副本；与发行包不同就替换（同盘候选 + 原子 rename + 失败回滚），账本记新值。
+  - 现盘指纹 ≠ 账本 → 用户改过；**原样保留**，账本保留旧值，让下一次升级仍然认得这个改动，而不是把它当成新基线。
+  - 账本里没有的源（升级前就存在的 Profile）→ 只登记基线，不改写任何东西。
+  - Home 里缺失的技能 → 安装 —— 这就是新技能到达老 Profile 的路径。
+- **稳态开销是「读一个文件」。** 发行记录没变时直接返回，不做任何树哈希；只有记录变了才做全量比对。
+- 契约同步：`docs/contracts/profile-materialization.md` 的 Startup 段改写，并新增 `## Reconciliation` 一节说明三条规则与
+  失败关闭语义；顺带修正两处文档漂移（rebuild 实际接受 `dev|prod`；`AGENTS.md` 里 sync 的目标应为 `~/.omnimux-dev`）。
+
+实测（单元测试，端到端）：
+
+| 场景 | 结果 |
+| --- | --- |
+| 装 v1（写入账本基线） | 新建 Profile 后账本存在 |
+| 手改一个受管源 + 换装 v2（记录变化） | **被改的那个原样保留**，其余更新到 v2 的字节 |
+| 再启动一次（记录未变） | 直接返回，手改仍在、已更新内容不回滚 |
+| v2 里新增一个技能 | 老 Profile 的 Home 里出现该技能（含来源标记） |
+
 ## 落地顺序
 
 | 阶段 | 内容 | 验收 |
@@ -168,7 +191,7 @@ Scope: 发行侧 `dsh-plugin-desktop/`（producer + settler + verifier）；清�
 | P0 止血（已落地） | preset 产物自包含，消灭 `workspace:*`；`omnimux:profile rebuild` 可用 | dev 上 rebuild 成功且 app 正常启动 ✓ |
 | P1 清单化 | 生成 `distribution.json`；`omnimux:verify` 接入 CI | 故意删 preset 里一个包，verify 必须报错 |
 | P2 Skill/Agent 进清单（已落地） | skill 有产品级预装与协调通道 | 干净机器上的技能列表 == 清单 ✓ |
-| P3 升级协调 | 替换"已有 profile 不刷新" | 装 v1 → 手改一个插件 → 装 v2 → 只有该插件保留旧值 |
+| P3 升级协调（已落地） | 替换"已有 profile 不刷新" | 装 v1 → 手改一个插件 → 装 v2 → 只有该插件保留旧值 ✓ |
 
 ## 防回滚红线
 

@@ -26,7 +26,7 @@ This fork is the **main ops entry** for OmniMux plugin develop / browser QA / sy
 | --- | --- |
 | `yarn omnimux:dev start <task> <plugin>` | L2: isolated Host + link one in-progress plugin + unified watch (official HMR) |
 | `yarn omnimux:dev watch <task> <plugin>` | Switch which plugin the watch targets (Host stays up) |
-| `yarn omnimux:sync [plugin…]` | Build then materialize into `~/.dsh/profiles/omnimux` (**does not restart App**) |
+| `yarn omnimux:sync [plugin…]` | Build then materialize into `~/.omnimux-dev/profiles/omnimux` (`--prod` targets `~/.omnimux`) (**does not restart App**) |
 | `yarn omnimux:restart` | Manually restart `/Applications/OmniMux.app` after sync |
 | `yarn omnimux:doctor` | Compliance check (prod must not link, etc.) |
 | `yarn omnimux:stage` | Materialize into `preset/plugins/` before packaging |

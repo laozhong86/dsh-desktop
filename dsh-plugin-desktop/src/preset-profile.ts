@@ -2,6 +2,7 @@
 
 import { defaultDesktopShellMode } from './desktop-mode-default.ts'
 
+import { createHash } from 'node:crypto'
 import {
   cpSync,
   existsSync,
@@ -23,6 +24,7 @@ import {
   assertFreshManagedProfileDestination,
   assertManagedSourceGraph,
   createFreshManagedSources,
+  hashDirectory,
   managedSourcePath,
 } from './managed-profile.ts'
 
@@ -43,6 +45,9 @@ export const SKILLS_DIRNAME = 'skills'
 
 /** Marker a seeded skill carries, naming the product surface it came from. */
 export const SKILL_ORIGIN_FILENAME = 'omnimux-skill.json'
+
+/** Ledger of the digests this desktop last installed, per managed source. */
+export const MANAGED_LEDGER_FILENAME = '.omnimux-managed.json'
 
 /** Stamp written inside the user profile after a successful seed or refresh. */
 export const PROFILE_SEED_STAMP = '.omnimux-seed-version'
@@ -322,12 +327,21 @@ export function seedOmnimuxProfile(options: SeedOmnimuxProfileOptions): SeedOmni
       version,
     )
     seedOmnimuxSettings(options.home)
-    seedPresetSkills(options.home, presetDir)
+    // Reconciliation owns the managed sources and the Home's skills from here:
+    // it refreshes what this desktop installed and leaves a user's edits alone.
+    const reconciled = reconcileManagedProfile({
+      profileDir,
+      presetDir,
+      pluginsDir,
+      owned,
+      home: options.home,
+    })
+    const changed = policyChanged || reconciled.updated.length > 0
     return {
       profileDir,
       created: false,
-      refreshedPlugins: policyChanged,
-      materializationRequired: policyChanged || existsSync(join(profileDir, PROFILE_MATERIALIZATION_PENDING)),
+      refreshedPlugins: changed,
+      materializationRequired: changed || existsSync(join(profileDir, PROFILE_MATERIALIZATION_PENDING)),
     }
   }
 
@@ -347,6 +361,9 @@ export function seedOmnimuxProfile(options: SeedOmnimuxProfileOptions): SeedOmni
     seedOmnimuxSettings(options.home)
     seedPresetSkills(options.home, presetDir)
     publishFreshCandidate(candidateDir, profileDir, owned)
+    // Record the baseline this Profile was installed from, so the next upgrade
+    // can tell this desktop's own files from a user's edit.
+    reconcileManagedProfile({ profileDir, presetDir, pluginsDir, owned, home: options.home })
   } finally {
     rmSync(candidateDir, { recursive: true, force: true })
   }
@@ -641,6 +658,194 @@ function readJsonObject(path: string, label: string): Record<string, unknown> {
     throw new Error(`${label} must be an object: ${path}`)
   }
   return value as Record<string, unknown>
+}
+
+/** The digests this desktop last installed, keyed by managed source. */
+interface ManagedLedger {
+  readonly preset: string | null
+  readonly packages: Record<string, string>
+  readonly skills: Record<string, string>
+}
+
+/** What one reconciliation pass did, so a caller can report it and a test can assert it. */
+export interface ReconcileOutcome {
+  readonly updated: readonly string[]
+  readonly keptUserEdits: readonly string[]
+  readonly adopted: readonly string[]
+}
+
+/** Digest of the staged distribution record: the cheapest "did anything move" signal. */
+function stagedRecordDigest(presetDir: string): string | null {
+  const path = join(presetDir, DISTRIBUTION_FILENAME)
+  if (!existsSync(path)) return null
+  return createHash('sha256').update(readFileSync(path)).digest('hex')
+}
+
+function readDigestMap(value: unknown, path: string): Record<string, string> {
+  if (value === undefined) return {}
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error(`managed ledger digest map must be an object: ${path}`)
+  }
+  const map: Record<string, string> = {}
+  for (const [key, digest] of Object.entries(value as Record<string, unknown>)) {
+    if (typeof digest !== 'string' || !/^[0-9a-f]{64}$/u.test(digest)) {
+      throw new Error(`managed ledger digest for ${JSON.stringify(key)} is invalid: ${path}`)
+    }
+    map[key] = digest
+  }
+  return map
+}
+
+function readLedger(profileDir: string): ManagedLedger | undefined {
+  const path = join(profileDir, MANAGED_LEDGER_FILENAME)
+  if (!existsSync(path)) return undefined
+  let value: unknown
+  try {
+    value = JSON.parse(readFileSync(path, 'utf8'))
+  } catch (error) {
+    throw new Error(`managed ledger is unreadable (${path}): ${String(error)}`)
+  }
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new Error(`managed ledger must be an object: ${path}`)
+  }
+  const record = value as { preset?: unknown; packages?: unknown; skills?: unknown }
+  return {
+    preset: typeof record.preset === 'string' ? record.preset : null,
+    packages: readDigestMap(record.packages, path),
+    skills: readDigestMap(record.skills, path),
+  }
+}
+
+function writeLedger(profileDir: string, ledger: ManagedLedger): void {
+  const path = join(profileDir, MANAGED_LEDGER_FILENAME)
+  writeFileSync(path, `${JSON.stringify({
+    schema: 1,
+    preset: ledger.preset,
+    packages: ledger.packages,
+    skills: ledger.skills,
+  }, undefined, 2)}\n`)
+}
+
+/** Swap one managed source for a prepared candidate, restoring the old one on failure. */
+function replaceManagedSource(installed: string, candidate: string, backup: string): void {
+  mkdirSync(dirname(backup), { recursive: true })
+  rmSync(backup, { recursive: true, force: true })
+  renameSync(installed, backup)
+  try {
+    renameSync(candidate, installed)
+  } catch (error) {
+    renameSync(backup, installed)
+    throw error
+  }
+}
+
+/**
+ * Reconcile an existing Profile with the packaged preset.
+ *
+ * The Profile contract used to say an existing Profile is never refreshed, so an
+ * upgraded installer could not deliver a new plugin or skill to anyone who
+ * already had one. This keeps user edits instead: the ledger records the digest
+ * this desktop last installed, so a source whose bytes still match that record is
+ * ours to update, and a source the user changed is left exactly as they left it.
+ * A source the ledger has never seen is adopted as-is — the first pass records a
+ * baseline rather than overwriting on the strength of a missing record.
+ *
+ * The ledger also stores the staged record's own digest, so a launch whose preset
+ * is unchanged costs one file read instead of a full tree hash.
+ */
+export function reconcileManagedProfile(options: {
+  readonly profileDir: string
+  readonly presetDir: string
+  readonly pluginsDir: string
+  readonly owned: readonly string[]
+  readonly home: string
+}): ReconcileOutcome {
+  const { profileDir, presetDir, pluginsDir, owned, home } = options
+  const record = stagedRecordDigest(presetDir)
+  const ledger = readLedger(profileDir)
+  if (ledger !== undefined && record !== null && ledger.preset === record) {
+    return { updated: [], keptUserEdits: [], adopted: [] }
+  }
+
+  const previous = ledger ?? { preset: record, packages: {}, skills: {} }
+  const packages: Record<string, string> = {}
+  const skills: Record<string, string> = {}
+  const updated: string[] = []
+  const keptUserEdits: string[] = []
+  const adopted: string[] = []
+
+  const workspace = mkdtempSync(join(profileDir, '.reconcile-'))
+  try {
+    for (const name of owned) {
+      const installed = managedSourcePath(profileDir, name)
+      if (!existsSync(installed)) {
+        throw new Error(`managed source ${JSON.stringify(name)} is missing from the Profile: ${installed}`)
+      }
+      const packagedDigest = hashDirectory(join(pluginsDir, ...packageDirSegments(name)))
+      const installedDigest = hashDirectory(installed)
+      const recorded = previous.packages[name]
+      if (recorded === undefined) {
+        packages[name] = installedDigest
+        adopted.push(name)
+        continue
+      }
+      if (installedDigest !== recorded) {
+        packages[name] = recorded
+        keptUserEdits.push(name)
+        continue
+      }
+      if (installedDigest === packagedDigest) {
+        packages[name] = recorded
+        continue
+      }
+      const candidate = join(workspace, ...packageDirSegments(name))
+      mkdirSync(dirname(candidate), { recursive: true })
+      cpSync(join(pluginsDir, ...packageDirSegments(name)), candidate, { recursive: true, dereference: true })
+      replaceManagedSource(installed, candidate, join(workspace, '.backup', ...packageDirSegments(name)))
+      packages[name] = packagedDigest
+      updated.push(name)
+    }
+
+    // Skills live in the Harness Home, one directory per skill; the rule is the same.
+    const skillRoot = join(resolve(home), SKILLS_DIRNAME)
+    for (const id of listStagedSkills(presetDir)) {
+      const packaged = join(presetDir, SKILLS_DIRNAME, id)
+      const installed = join(skillRoot, id)
+      const packagedDigest = hashDirectory(packaged)
+      if (!existsSync(installed)) {
+        mkdirSync(skillRoot, { recursive: true })
+        cpSync(packaged, installed, { recursive: true, dereference: true })
+        skills[id] = packagedDigest
+        updated.push(`skill:${id}`)
+        continue
+      }
+      const installedDigest = hashDirectory(installed)
+      const recorded = previous.skills[id]
+      if (recorded === undefined) {
+        skills[id] = installedDigest
+        adopted.push(`skill:${id}`)
+        continue
+      }
+      if (installedDigest !== recorded) {
+        skills[id] = recorded
+        keptUserEdits.push(`skill:${id}`)
+        continue
+      }
+      if (installedDigest !== packagedDigest) {
+        rmSync(installed, { recursive: true, force: true })
+        cpSync(packaged, installed, { recursive: true, dereference: true })
+        skills[id] = packagedDigest
+        updated.push(`skill:${id}`)
+        continue
+      }
+      skills[id] = recorded
+    }
+  } finally {
+    rmSync(workspace, { recursive: true, force: true })
+  }
+
+  writeLedger(profileDir, { preset: record, packages, skills })
+  return { updated, keptUserEdits, adopted }
 }
 
 function removeExcludedPackages(

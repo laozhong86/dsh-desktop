@@ -14,6 +14,8 @@ import {
   seedOmnimuxProfile,
   seedOmnimuxSettings,
   seedPresetSkills,
+  listStagedSkills,
+  MANAGED_LEDGER_FILENAME,
 } from '../src/preset-profile.ts'
 import { managedDependencySpec, managedSourcePath } from '../src/managed-profile.ts'
 import { materializeProfile } from '../src/profile-materializer.ts'
@@ -32,6 +34,31 @@ function writeSkillDir(root: string, id: string, seeded = true): void {
   mkdirSync(directory, { recursive: true })
   writeFileSync(join(directory, 'SKILL.md'), `---\nname: ${id}\ndescription: fixture skill\n---\n`)
   if (seeded) writeFileSync(join(directory, 'omnimux-skill.json'), `${JSON.stringify({ id, origin: 'plugin:fixture' })}\n`)
+}
+
+/**
+ * Record the preset's packages and skills the way `stage-preset-profile` does.
+ * `generation` only has to change when the shipped content changes: the ledger
+ * compares this record's digest to decide whether anything moved.
+ */
+function writeDistribution(presetDir: string, generation: number): void {
+  const packages = readJson(join(presetDir, 'owned-packages.json')) as string[]
+  writeJson(join(presetDir, 'distribution.json'), {
+    schema: 1,
+    channel: 'development',
+    generatedFrom: { appVersion: `2.0.${String(generation)}`, desktopCommit: null },
+    items: [
+      ...packages.map(id => ({ kind: 'plugin', id, tier: 'product', version: '1.0.0', digest: 'a'.repeat(64) })),
+      ...listStagedSkills(presetDir).map(id => ({
+        kind: 'skill',
+        id,
+        tier: 'product',
+        version: null,
+        origin: 'plugin:fixture',
+        digest: 'b'.repeat(64),
+      })),
+    ],
+  })
 }
 
 const LIFECYCLE = {
@@ -597,6 +624,64 @@ describe('seedOmnimuxProfile managed sources', () => {
       expect(() => seedOmnimuxProfile({ home, presetDir }))
         .toThrow('desktop preset distribution record names packages the preset does not own: omnimux-ghost')
       expect(existsSync(join(home, 'profiles', 'omnimux'))).toBe(false)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('updates the sources this desktop installed and keeps a user edit across an upgrade', () => {
+    const root = mkdtempSync(join(tmpdir(), 'omnimux-reconcile-upgrade-'))
+    try {
+      const presetDir = createPreset(root)
+      writeDistribution(presetDir, 1)
+      const home = join(root, 'home')
+      const first = seedOmnimuxProfile({ home, presetDir })
+      expect(first.created).toBe(true)
+      const sources = join(first.profileDir, '.materialize-snapshots', 'plugins')
+      expect(existsSync(join(first.profileDir, MANAGED_LEDGER_FILENAME))).toBe(true)
+
+      // The user edits one installed package in place.
+      writeFileSync(join(sources, 'omnimux-assets', 'index.js'), 'module.exports = "user edit"\n')
+
+      // The next installer ships changed bytes for its packages.
+      for (const name of ['omnimux-assets', 'omnimux-workflow']) {
+        writeFileSync(join(presetDir, 'plugins', name, 'index.js'), `module.exports = "v2 ${name}"\n`)
+      }
+      writeDistribution(presetDir, 2)
+      const second = seedOmnimuxProfile({ home, presetDir })
+
+      expect(second.refreshedPlugins).toBe(true)
+      expect(readFileSync(join(sources, 'omnimux-workflow', 'index.js'), 'utf8'))
+        .toBe('module.exports = "v2 omnimux-workflow"\n')
+      expect(readFileSync(join(sources, 'omnimux-assets', 'index.js'), 'utf8'))
+        .toBe('module.exports = "user edit"\n')
+
+      // A launch whose preset is unchanged does no work and keeps the edit.
+      seedOmnimuxProfile({ home, presetDir })
+      expect(readFileSync(join(sources, 'omnimux-assets', 'index.js'), 'utf8'))
+        .toBe('module.exports = "user edit"\n')
+      expect(readFileSync(join(sources, 'omnimux-workflow', 'index.js'), 'utf8'))
+        .toBe('module.exports = "v2 omnimux-workflow"\n')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('installs a newly packaged skill into the Harness Home on upgrade', () => {
+    const root = mkdtempSync(join(tmpdir(), 'omnimux-reconcile-skill-'))
+    try {
+      const presetDir = createPreset(root)
+      writeDistribution(presetDir, 1)
+      const home = join(root, 'home')
+      seedOmnimuxProfile({ home, presetDir })
+      expect(existsSync(join(home, 'skills'))).toBe(false)
+
+      writeSkillDir(join(presetDir, 'skills'), 'clip-craft')
+      writeDistribution(presetDir, 2)
+      seedOmnimuxProfile({ home, presetDir })
+
+      expect(existsSync(join(home, 'skills', 'clip-craft', 'SKILL.md'))).toBe(true)
+      expect(existsSync(join(home, 'skills', 'clip-craft', 'omnimux-skill.json'))).toBe(true)
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

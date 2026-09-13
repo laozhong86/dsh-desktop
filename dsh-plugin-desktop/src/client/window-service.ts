@@ -39,7 +39,7 @@ export function desktopWindowService(environment: DesktopClientEnvironment): Des
     return Object.freeze({
       ...environment,
       availableMaterials,
-      safeAreaInsets: frozenInsets(ADVANCED_MACOS_DRAG_REGION_HEIGHT),
+      safeAreaInsets: frozenInsets(0),
       dragRegion: frozenDragRegion(
         ADVANCED_MACOS_DRAG_REGION_HEIGHT,
         MACOS_TRAFFIC_LIGHT_SAFE_WIDTH,

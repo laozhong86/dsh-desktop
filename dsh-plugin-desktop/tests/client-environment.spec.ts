@@ -185,7 +185,7 @@ describe('advanced desktop layout', () => {
 
   it('owns native caption geometry with one fixed macOS drag strip above page content', () => {
     expect(ADVANCED_MACOS_CONTENT_INSET).toBe(20)
-    expect(ADVANCED_MACOS_DRAG_REGION_HEIGHT).toBe(32)
+    expect(ADVANCED_MACOS_DRAG_REGION_HEIGHT).toBe(38)
     expect(ADVANCED_MACOS_DRAG_LAYER_Z_INDEX).toBe(20)
     expect(ADVANCED_MACOS_DRAG_LAYER_Z_INDEX).toBeLessThan(25)
     expect(ADVANCED_MACOS_DRAG_REGION_HEIGHT).toBeGreaterThan(ADVANCED_MACOS_CONTENT_INSET)
@@ -217,18 +217,20 @@ describe('advanced desktop layout', () => {
       expect(css).toMatch(/\.dshDesktopSidebarSurface\s*\{[^}]*--dsw-specific-sidebar-fill:\s*transparent;/)
       expect(css).toMatch(/data-desktop-mode="advanced"\]\[data-desktop-platform="darwin"\]\[data-sidebar-collapsed\][^{]*\.dshDesktopUpstreamSidebar \{[^}]*width:\s*56px;[^}]*margin:\s*0 auto;/)
       expect(css).not.toMatch(/data-desktop-mode="extended"[^{}]*data-sidebar-collapsed[^{}]*\.dshDesktopUpstreamSidebar/)
-      expect(css).toMatch(new RegExp(`data-desktop-mode="advanced"\\]\\[data-desktop-platform="darwin"\\] \\.dshDesktopUpstreamSidebar \\{[^}]*padding-top: ${ADVANCED_MACOS_CONTENT_INSET}px;`))
+      expect(css).not.toMatch(new RegExp(`data-desktop-mode="advanced"\\]\\[data-desktop-platform="darwin"\\] \\.dshDesktopUpstreamSidebar \\{[^}]*padding-top: ${ADVANCED_MACOS_CONTENT_INSET}px;`))
       expect(css).not.toMatch(/\.dshDesktopUpstreamSidebar \{[^}]*-webkit-app-region: no-drag;/)
-      expect(css).toContain(`grid-template-rows: ${ADVANCED_MACOS_DRAG_REGION_HEIGHT}px minmax(0, 1fr)`)
-      expect(css).toMatch(/\.dshDesktopFrame\[data-desktop-mode="advanced"\]\[data-desktop-platform="darwin"\] \.dshDesktopSidebarSurface \{[^}]*grid-row: 1 \/ -1;/)
+      expect(css).not.toMatch(/data-desktop-platform="darwin"\][^{]*grid-template-rows:/)
+      expect(css).not.toMatch(/\.dshDesktopFrame\[data-desktop-mode="advanced"\]\[data-desktop-platform="darwin"\] \.dshDesktopSidebarSurface \{[^}]*grid-row: 1 \/ -1;/)
       expect(css).not.toMatch(/data-desktop-platform="darwin"\] \.dshDesktopSidebarSurface \{[^}]*-webkit-app-region: no-drag;/)
-      expect(css).toMatch(/\.dshDesktopFrame\[data-desktop-mode="advanced"\]\[data-desktop-platform="darwin"\] \.dshDesktopConversationSurface,\s*\.dshDesktopFrame\[data-desktop-mode="advanced"\]\[data-desktop-platform="darwin"\] \.dshDesktopRightbarSurface \{ grid-row: 2; \}/)
+      expect(css).not.toMatch(/\.dshDesktopFrame\[data-desktop-mode="advanced"\]\[data-desktop-platform="darwin"\] \.dshDesktopConversationSurface,\s*\.dshDesktopFrame\[data-desktop-mode="advanced"\]\[data-desktop-platform="darwin"\] \.dshDesktopRightbarSurface \{ grid-row: 2; \}/)
       expect(css).toMatch(new RegExp(`data-desktop-platform="darwin"\\] \\.dshDesktopSidebarSurface::before \\{[^}]*z-index: ${ADVANCED_MACOS_DRAG_LAYER_Z_INDEX};[^}]*left: ${MACOS_TRAFFIC_LIGHT_SAFE_WIDTH}px;[^}]*height: ${ADVANCED_MACOS_DRAG_REGION_HEIGHT}px;[^}]*-webkit-app-region: drag;`))
       expect(css).toMatch(new RegExp(`\\.dshDesktopSidebarSurface \\[class\\*="logoRow"\\],[^}]*\\.dshDesktopSidebarSurface \\[class\\*="logoRow"\\] \\* \\{[^}]*z-index: ${ADVANCED_MACOS_DRAG_LAYER_Z_INDEX + 1};[^}]*-webkit-app-region: no-drag !important;`))
-      expect(css).toMatch(new RegExp(`\\.dshDesktopMacCaptionRow \\{[^}]*position: absolute;[^}]*z-index: ${ADVANCED_MACOS_DRAG_LAYER_Z_INDEX};[^}]*grid-column: 2 / -1;[^}]*grid-row: 1;[^}]*left: 0;[^}]*height: ${ADVANCED_MACOS_DRAG_REGION_HEIGHT}px;[^}]*background: var\\(--dsw-alias-bg-base\\);[^}]*-webkit-app-region: drag;`))
-      expect(css).not.toContain('.dshDesktopMacCaptionRow::before')
+      expect(css).toMatch(/body\[data-dsh-desktop-platform="darwin"\] :is\(\[class\*="sidebarCol"\], \.dshDesktopSidebarSurface\) \[class\*="_root"\]:not\(\[class\*="collapsed"\]\) \{ padding-top: 4px !important; \}/)
+      expect(css).toMatch(new RegExp(`body\\[data-dsh-desktop-platform="darwin"\\] :is\\(\\[class\\*="sidebarCol"\\], \\.dshDesktopSidebarSurface\\) \\[class\\*="_root"\\]:not\\(\\[class\\*="collapsed"\\]\\) \\[class\\*="logoRow"\\] \\{ height: ${ADVANCED_MACOS_DRAG_REGION_HEIGHT}px !important; padding-left: 72px !important; margin-bottom: 6px !important; \\}`))
+      expect(css).toMatch(/body\[data-dsh-desktop-platform="darwin"\] :is\(\[class\*="sidebarCol"\], \.dshDesktopSidebarSurface\) \[class\*="_root"\]\[class\*="collapsed"\] \{ padding-top: 42px !important; \}/)
+      expect(css).toMatch(/body\[data-dsh-desktop-platform="darwin"\] header,[^{}]*\{ -webkit-app-region: drag; \}/)
+      expect(css).not.toContain('.dshDesktopMacCaptionRow')
       expect(css).not.toMatch(/data-desktop-platform="darwin"\] \.dshDesktopSidebarSurface \{[^}]*-webkit-app-region:\s*drag;/)
-      expect(css).not.toContain('[data-slot="conversation.session.header"]')
       expect(css).not.toContain('[data-phase')
       expect(css).toMatch(/\.dshDesktopNoDrag, button, input, textarea, select, label, summary, a,[^{}]*\{ -webkit-app-region: no-drag !important; \}/)
       expect(css).toContain('[contenteditable="true"]')
@@ -404,7 +406,7 @@ describe('advanced desktop layout', () => {
       material: 'transparent',
       micaSupported: false,
       availableMaterials: ['off', 'transparent'],
-      safeAreaInsets: { top: ADVANCED_MACOS_DRAG_REGION_HEIGHT, right: 0, bottom: 0, left: 0 },
+      safeAreaInsets: { top: 0, right: 0, bottom: 0, left: 0 },
       dragRegion: {
         height: ADVANCED_MACOS_DRAG_REGION_HEIGHT,
         leftInset: MACOS_TRAFFIC_LIGHT_SAFE_WIDTH,

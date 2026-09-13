@@ -1,5 +1,4 @@
 import {
-  ADVANCED_MACOS_CONTENT_INSET,
   ADVANCED_MACOS_DRAG_LAYER_Z_INDEX,
   ADVANCED_MACOS_DRAG_REGION_HEIGHT,
   ADVANCED_WINDOWS_TITLEBAR_HEIGHT,
@@ -18,16 +17,28 @@ body:is([data-dsh-desktop-mode="extended"], [data-dsh-desktop-mode="advanced"])[
 .dshDesktopUpstreamSidebar { box-sizing: border-box; width: 100%; height: 100%; }
 body:is([data-dsh-desktop-mode="extended"], [data-dsh-desktop-mode="advanced"]) [data-slot="sidebar.footer.action"] { display: flex !important; flex-direction: column; gap: 6px; min-width: 0; width: 100%; max-height: min(40vh, 240px); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 body:is([data-dsh-desktop-mode="extended"], [data-dsh-desktop-mode="advanced"]) [data-slot="sidebar.footer.action"] > * { flex: none; min-width: 0; }
-.dshDesktopFrame[data-desktop-mode="advanced"][data-desktop-platform="darwin"] .dshDesktopUpstreamSidebar { padding-top: ${ADVANCED_MACOS_CONTENT_INSET}px; }
 .dshDesktopFrame[data-desktop-mode="advanced"][data-desktop-platform="darwin"][data-sidebar-collapsed] .dshDesktopUpstreamSidebar { width: ${SIDEBAR_COLLAPSED}px; margin: 0 auto; }
-.dshDesktopFrame[data-desktop-mode="advanced"][data-desktop-platform="darwin"] { grid-template-rows: ${ADVANCED_MACOS_DRAG_REGION_HEIGHT}px minmax(0, 1fr); }
-.dshDesktopFrame[data-desktop-mode="advanced"][data-desktop-platform="darwin"] .dshDesktopSidebarSurface { grid-row: 1 / -1; }
-.dshDesktopFrame[data-desktop-mode="advanced"][data-desktop-platform="darwin"] .dshDesktopConversationSurface,
-.dshDesktopFrame[data-desktop-mode="advanced"][data-desktop-platform="darwin"] .dshDesktopRightbarSurface { grid-row: 2; }
 .dshDesktopFrame[data-desktop-mode="advanced"][data-desktop-platform="darwin"] .dshDesktopSidebarSurface::before { content: ""; position: absolute; z-index: ${ADVANCED_MACOS_DRAG_LAYER_Z_INDEX}; top: 0; right: 0; left: ${MACOS_TRAFFIC_LIGHT_SAFE_WIDTH}px; height: ${ADVANCED_MACOS_DRAG_REGION_HEIGHT}px; user-select: none; -webkit-app-region: drag; }
 .dshDesktopFrame[data-desktop-mode="advanced"][data-desktop-platform="darwin"] .dshDesktopSidebarSurface [class*="logoRow"],
 .dshDesktopFrame[data-desktop-mode="advanced"][data-desktop-platform="darwin"] .dshDesktopSidebarSurface [class*="logoRow"] * { position: relative; z-index: ${ADVANCED_MACOS_DRAG_LAYER_Z_INDEX + 1}; -webkit-app-region: no-drag !important; pointer-events: auto !important; }
-.dshDesktopMacCaptionRow { position: absolute; z-index: ${ADVANCED_MACOS_DRAG_LAYER_Z_INDEX}; grid-column: 2 / -1; grid-row: 1; top: 0; right: 0; left: 0; height: ${ADVANCED_MACOS_DRAG_REGION_HEIGHT}px; background: var(--dsw-alias-bg-base); user-select: none; -webkit-app-region: drag; }
+body[data-dsh-desktop-platform="darwin"] :is([class*="sidebarCol"], .dshDesktopSidebarSurface) [class*="_root"]:not([class*="collapsed"]) { padding-top: 4px !important; }
+body[data-dsh-desktop-platform="darwin"] :is([class*="sidebarCol"], .dshDesktopSidebarSurface) [class*="_root"]:not([class*="collapsed"]) [class*="logoRow"] { height: ${ADVANCED_MACOS_DRAG_REGION_HEIGHT}px !important; padding-left: 72px !important; margin-bottom: 6px !important; }
+body[data-dsh-desktop-platform="darwin"] :is([class*="sidebarCol"], .dshDesktopSidebarSurface) [class*="_root"][class*="collapsed"] { padding-top: 42px !important; }
+body[data-dsh-desktop-platform="darwin"] [class*="_panel"] { padding-top: 0 !important; }
+body[data-dsh-desktop-platform="darwin"]:not([data-dsh-sidebar-collapsed]) [class*="toggleCluster"],
+body[data-dsh-desktop-platform="darwin"] .dshDesktopFrame:not([data-sidebar-collapsed]) [class*="toggleCluster"] { top: 3px !important; }
+body[data-dsh-desktop-platform="darwin"][data-dsh-sidebar-collapsed] [class*="toggleCluster"],
+body[data-dsh-desktop-platform="darwin"] .dshDesktopFrame[data-sidebar-collapsed] [class*="toggleCluster"] { top: 14px !important; }
+body[data-dsh-desktop-platform="darwin"] header,
+body[data-dsh-desktop-platform="darwin"] [data-slot="conversation.session.header"],
+body[data-dsh-desktop-platform="darwin"] [data-slot="conversation"] > header,
+body[data-dsh-desktop-platform="darwin"] [data-slot="shell.overlay"] header,
+body[data-dsh-desktop-platform="darwin"] [class*="PageHeader"],
+body[data-dsh-desktop-platform="darwin"] [class*="pageHeader"],
+body[data-dsh-desktop-platform="darwin"] [class*="-stage"] > header,
+body[data-dsh-desktop-platform="darwin"] [class*="-stage"] > [class*="Header"],
+body[data-dsh-desktop-platform="darwin"] .sh-plaza-page > header,
+body[data-dsh-desktop-platform="darwin"] .dshUk-PageHeader-pageHeader { -webkit-app-region: drag; }
 .dshDesktopConversationSurface { grid-column: 2; grid-row: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--dsw-alias-bg-base); }
 .dshDesktopRightbarSurface { position: relative; grid-column: 3; grid-row: 1; min-width: 0; min-height: 0; overflow: visible; }
 .dshDesktopFrame[data-rightbar-fullscreen], .dshDesktopFrame[data-rightbar-fullscreen] .dshDesktopResizeHandle { transition: none; }

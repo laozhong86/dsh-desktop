@@ -84,6 +84,17 @@ export function DesktopOwnedFrame({
   useEffect(() => { layout.setNarrow(narrow) }, [layout, narrow])
 
   const collapsed = narrow ? !panels.narrowExpanded : panels.sidebar === 0
+
+  useEffect(() => {
+    if (collapsed) {
+      document.body.dataset.dshSidebarCollapsed = ''
+    } else {
+      delete document.body.dataset.dshSidebarCollapsed
+    }
+    return () => {
+      delete document.body.dataset.dshSidebarCollapsed
+    }
+  }, [collapsed])
   const sidebarPreference = collapsed ? 0 : panels.sidebar === 0 ? SIDEBAR_DEFAULT : panels.sidebar
   const rightbarPreference = panels.rightbar ?? viewport * RIGHTBAR_DEFAULT_RATIO
   const normal = computeDesktopColumns(
@@ -135,7 +146,6 @@ export function DesktopOwnedFrame({
       data-dragging={dragging || undefined}
       style={{ gridTemplateColumns: `${columns.sidebar}px minmax(0, 1fr) ${columns.rightbar}px` }}
     >
-      {mode === 'advanced' && platform === 'darwin' && <div className="dshDesktopMacCaptionRow" aria-hidden="true" />}
       <aside className="dshDesktopSidebarSurface">
         {/* The official layout marks its sidebar column with `data-pane="sidebar"`,
             and third-party rows (the OmniMux hub coordinator among them) anchor to

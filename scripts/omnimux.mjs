@@ -127,6 +127,9 @@ function printHelp() {
   profile rebuild --target dev --app <frozen-candidate.app>
                                   从冻结候选 App 全量重建 Dev Profile 依赖图
   stage                           物化进 preset/plugins（发布前）
+  verify --preset <dir>           校验发行清单与打包内容是否一致（发布前）
+  verify --profile <dir> --expect <distribution.json>
+                                  校验已安装的开发环境与发行清单是否一致
   path                            打印产品树 / 插件路径
 
 示例:
@@ -136,6 +139,8 @@ function printHelp() {
   yarn omnimux:restart dev
   yarn omnimux:profile rebuild --target dev --app /absolute/path/OmniMux.app
   yarn omnimux:stage
+  yarn omnimux:verify --preset dsh-plugin-desktop/preset
+  yarn omnimux:verify --profile ~/.omnimux-dev/profiles/omnimux --expect /Applications/OmniMux Dev.app/Contents/Resources/app.asar.unpacked/preset/distribution.json
 `)
 }
 
@@ -166,6 +171,9 @@ switch (cmd) {
       process.env.OMNIMUX_PLUGINS_DIR = pluginsRoot
     }
     runYarnWorkspace('stage:preset', rest)
+    break
+  case 'verify':
+    runYarnWorkspace('verify:distribution', rest)
     break
   case 'path':
     requireProduct()

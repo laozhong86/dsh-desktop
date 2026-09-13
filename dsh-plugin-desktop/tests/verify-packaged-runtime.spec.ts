@@ -156,6 +156,7 @@ function presetSeedLeaves(): TestAsarHeaderEntry {
     unpacked: true,
     files: {
       'owned-packages.json': { size: 1 },
+      'distribution.json': { size: 1 },
       'seed-version': { size: 1 },
       plugins: { files: { omnimux: { files: { 'package.json': { size: 1 } } } } },
     },
@@ -265,6 +266,7 @@ describe('packaged desktop runtime verification', () => {
   it('ships the staged OmniMux preset seed unpacked beside app.asar', () => {
     expect(REQUIRED_PRESET_RUNTIME_ENTRIES).toEqual([
       'preset/owned-packages.json',
+      'preset/distribution.json',
       'preset/seed-version',
       'preset/plugins/omnimux/package.json',
     ])
@@ -337,7 +339,9 @@ describe('packaged desktop runtime verification', () => {
   })
 
   it('probes the staged preset seed inside the desktop package root', () => {
-    expect(STAGED_PRESET_SEED_MANIFEST).toBe(REQUIRED_PRESET_RUNTIME_ENTRIES[2])
+    // Membership, not position: the probe path must be one of the required
+    // entries, and the list is expected to grow.
+    expect(REQUIRED_PRESET_RUNTIME_ENTRIES).toContain(STAGED_PRESET_SEED_MANIFEST)
     const present = vi.fn(() => true)
     expect(isPresetSeedStaged(present, '/desktop')).toBe(true)
     expect(present).toHaveBeenCalledWith(join('/desktop', STAGED_PRESET_SEED_MANIFEST))
@@ -740,6 +744,7 @@ describe('packaged desktop runtime verification', () => {
     expect(UNPACKED_PRESET_PREFIX).toBe('preset/')
     const seed = [
       'preset/owned-packages.json',
+      'preset/distribution.json',
       'preset/seed-version',
       'preset/plugins/omnimux/package.json',
       'preset/plugins/omnimux/lib/index.js',

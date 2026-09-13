@@ -570,4 +570,47 @@ describe('seedOmnimuxProfile managed sources', () => {
       rmSync(root, { recursive: true, force: true })
     }
   })
+
+  it('refuses a distribution record that names packages the preset does not own', () => {
+    const root = mkdtempSync(join(tmpdir(), 'omnimux-distribution-unknown-'))
+    try {
+      const presetDir = createPreset(root)
+      writeJson(join(presetDir, 'distribution.json'), {
+        schema: 1,
+        channel: 'development',
+        generatedFrom: { appVersion: '2.0.9', desktopCommit: null },
+        items: [
+          { kind: 'plugin', id: 'omnimux', tier: 'core', version: '1.0.0', digest: 'a'.repeat(64) },
+          { kind: 'plugin', id: 'omnimux-ghost', tier: 'product', version: '1.0.0', digest: 'b'.repeat(64) },
+        ],
+      })
+      const home = join(root, 'home')
+      expect(() => seedOmnimuxProfile({ home, presetDir }))
+        .toThrow('desktop preset distribution record names packages the preset does not own: omnimux-ghost')
+      expect(existsSync(join(home, 'profiles', 'omnimux'))).toBe(false)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('refuses a distribution record that lists fewer packages than the preset owns', () => {
+    const root = mkdtempSync(join(tmpdir(), 'omnimux-distribution-short-'))
+    try {
+      const presetDir = createPreset(root)
+      writeJson(join(presetDir, 'distribution.json'), {
+        schema: 1,
+        channel: 'development',
+        generatedFrom: { appVersion: '2.0.9', desktopCommit: null },
+        items: [
+          { kind: 'plugin', id: 'omnimux', tier: 'core', version: '1.0.0', digest: 'a'.repeat(64) },
+          { kind: 'plugin', id: 'dsh-better-sidebar', tier: 'core', version: '1.0.0', digest: 'b'.repeat(64) },
+        ],
+      })
+      const home = join(root, 'home')
+      expect(() => seedOmnimuxProfile({ home, presetDir }))
+        .toThrow('desktop preset distribution record lists 2 packages, the preset owns 7')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
 })

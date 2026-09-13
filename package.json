@@ -620,6 +620,7 @@
     "omnimux:doctor": "node scripts/omnimux.mjs doctor",
     "omnimux:profile": "node scripts/omnimux.mjs profile",
     "omnimux:stage": "node scripts/omnimux.mjs stage",
+    "omnimux:verify": "node scripts/omnimux.mjs verify",
     "omnimux:path": "node scripts/omnimux.mjs path"
   },
   "version": "2.0.9"

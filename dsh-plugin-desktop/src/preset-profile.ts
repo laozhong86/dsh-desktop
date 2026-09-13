@@ -35,6 +35,9 @@ export const SEED_VERSION_FILENAME = 'seed-version'
 /** Generated list of package directories the preset owns under `plugins/`. */
 export const OWNED_PACKAGES_FILENAME = 'owned-packages.json'
 
+/** Generated account of what the preset ships, written beside the seed. */
+export const DISTRIBUTION_FILENAME = 'distribution.json'
+
 /** Stamp written inside the user profile after a successful seed or refresh. */
 export const PROFILE_SEED_STAMP = '.omnimux-seed-version'
 
@@ -297,6 +300,7 @@ export function seedOmnimuxProfile(options: SeedOmnimuxProfileOptions): SeedOmni
   const candidateDir = join(dirname(profileDir), `.${basename(profileDir)}-initializing`)
   const created = !existsSync(join(profileDir, 'package.json'))
   const owned = readOwnedPackages(presetDir, pluginsDir)
+  assertDistributionRecordAgrees(presetDir, owned)
   const excludedOwned = owned.filter(name => policy.excludedPackages.includes(name))
   if (excludedOwned.length > 0) {
     throw new Error(`production desktop preset owns excluded Alpha packages: ${excludedOwned.join(', ')}`)
@@ -519,6 +523,45 @@ function readPresetPolicy(skeletonDir: string, pluginsDir: string): PresetPolicy
   return {
     requiredBundles,
     excludedPackages: releaseChannel === 'production' ? alphaPlugins : [],
+  }
+}
+
+/**
+ * Cross-check a staged preset against its own distribution record.
+ *
+ * `stage-preset-profile` writes the record beside the packages. A preset that
+ * carries one must agree with it — a record naming packages the seed does not
+ * own would make every later audit read a claim rather than a fact. Presets
+ * staged before the record existed are left alone; `verify-distribution` is what
+ * makes the record mandatory, at package time.
+ */
+function assertDistributionRecordAgrees(presetDir: string, owned: readonly string[]): void {
+  const path = join(presetDir, DISTRIBUTION_FILENAME)
+  if (!existsSync(path)) return
+  const record = readJsonObject(path, 'desktop preset distribution record')
+  const items = record.items
+  if (!Array.isArray(items)) {
+    throw new Error(`desktop preset distribution record has no items array: ${path}`)
+  }
+  const recorded = items.map((entry) => {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+      throw new Error(`desktop preset distribution item must be an object: ${path}`)
+    }
+    const id = (entry as { id?: unknown }).id
+    if (typeof id !== 'string' || id === '') {
+      throw new Error(`desktop preset distribution item has no id: ${path}`)
+    }
+    return id
+  })
+  const installed = new Set(owned)
+  const unknown = recorded.filter(id => !installed.has(id))
+  if (unknown.length > 0) {
+    throw new Error(`desktop preset distribution record names packages the preset does not own: ${unknown.join(', ')}`)
+  }
+  if (recorded.length !== owned.length) {
+    throw new Error(
+      `desktop preset distribution record lists ${String(recorded.length)} packages, the preset owns ${String(owned.length)}; run scripts/stage-preset-profile.ts`,
+    )
   }
 }
 

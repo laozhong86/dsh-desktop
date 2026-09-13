@@ -16,7 +16,8 @@ import {
 import { tmpdir } from 'node:os'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { listPackageNames, packageDirSegments } from '../src/preset-profile.ts'
+import { hashDirectory } from '../src/managed-profile.ts'
+import { DISTRIBUTION_FILENAME, listPackageNames, packageDirSegments } from '../src/preset-profile.ts'
 import {
   BETTER_SIDEBAR_PNPM_VERSION,
   buildPatchedBetterSidebar,
@@ -54,6 +55,8 @@ const AGENT_PRESETS_DIRNAME = 'agent-presets'
 const AGENT_PRESET_MANIFEST = 'preset.yml'
 /** Shared preset inputs the repository keeps beside the preset ids. */
 const AGENT_PRESET_EXCLUDED_DIRS: ReadonlySet<string> = new Set(['fragments'])
+/** Version of the distribution record's own shape. */
+const DISTRIBUTION_SCHEMA = 1
 
 /**
  * Product-tree plugins staged into the preset. The profile stays on `link:`
@@ -64,6 +67,7 @@ const AGENT_PRESET_EXCLUDED_DIRS: ReadonlySet<string> = new Set(['fragments'])
  */
 interface Manifest {
   name?: string
+  version?: string
   dependencies?: Record<string, string>
   optionalDependencies?: Record<string, string>
   devDependencies?: Record<string, string>
@@ -175,6 +179,10 @@ export function stagePresetProfile(options: StagePresetProfileOptions = {}): num
     stageSkeleton(targetPresetDir, candidateDir, alphaPlugins, releaseChannel)
     stageAgentPresets(resolvedPluginsRoot, candidateDir)
     writeFileSync(join(candidateDir, 'owned-packages.json'), `${JSON.stringify(owned, undefined, 2)}\n`)
+    writeFileSync(
+      join(candidateDir, DISTRIBUTION_FILENAME),
+      `${JSON.stringify(distributionManifest(owned, candidatePluginsDir, releaseChannel, alphaPlugins), undefined, 2)}\n`,
+    )
     const seedVersionPath = join(targetPresetDir, 'seed-version')
     writeFileSync(
       join(candidateDir, 'seed-version'),
@@ -608,12 +616,90 @@ function removeDanglingBinLinks(packageDir: string): void {
   }
 }
 
+/** One preinstalled entry in a staged preset's distribution record. */
+interface DistributionItem {
+  readonly kind: 'plugin'
+  readonly id: string
+  readonly tier: 'core' | 'product' | 'beta'
+  readonly version: string | null
+  readonly digest: string
+}
+
+/** The staged preset's own account of what it ships. */
+interface DistributionManifest {
+  readonly schema: number
+  readonly channel: ReleaseChannel
+  readonly generatedFrom: { readonly appVersion: string; readonly desktopCommit: string | null }
+  readonly items: readonly DistributionItem[]
+}
+
+/**
+ * Record what this preset ships, beside the packages themselves.
+ *
+ * `owned-packages.json` answers "which directories exist"; this answers "which
+ * product, at which version, at which bytes" — the question a support report or
+ * a release audit actually asks. `verify-distribution` reads it back and fails
+ * when the artifact no longer matches, so the record cannot drift into a claim.
+ *
+ * `tier` restates the release-channel decision as data: `beta` entries are the
+ * lifecycle-registry Alpha plugins, which a production channel never stages.
+ */
+function distributionManifest(
+  owned: readonly string[],
+  pluginsDir: string,
+  releaseChannel: ReleaseChannel,
+  alphaPlugins: ReadonlySet<string>,
+): DistributionManifest {
+  const core = new Set<string>(CORE_REQUIRED_BUNDLES)
+  const items: DistributionItem[] = owned.map((id) => {
+    const packageDir = join(pluginsDir, ...packageDirSegments(id))
+    const manifest = readManifest(join(packageDir, 'package.json'))
+    return {
+      kind: 'plugin',
+      id,
+      tier: core.has(id) ? 'core' : alphaPlugins.has(id) ? 'beta' : 'product',
+      version: typeof manifest.version === 'string' ? manifest.version : null,
+      digest: hashDirectory(packageDir),
+    }
+  })
+  return {
+    schema: DISTRIBUTION_SCHEMA,
+    channel: releaseChannel,
+    generatedFrom: { appVersion: desktopPackageVersion(), desktopCommit: desktopCommit() },
+    items,
+  }
+}
+
+/** Version of the desktop package that produced this preset. */
+function desktopPackageVersion(): string {
+  const manifest = readManifest(join(desktopRoot, 'package.json'))
+  return typeof manifest.version === 'string' ? manifest.version : '0.0.0'
+}
+
+/** Short HEAD of the fork checkout, or null when the tree is not a Git work tree. */
+function desktopCommit(): string | null {
+  const result = spawnSync('git', ['rev-parse', '--short', 'HEAD'], {
+    cwd: resolve(desktopRoot, '..'),
+    encoding: 'utf8',
+  })
+  if (result.status !== 0) return null
+  const head = (result.stdout ?? '').trim()
+  return head.length > 0 ? head : null
+}
+
 export function publishCandidate(
   candidateDir: string,
   targetPresetDir: string,
   rename: typeof renameSync = renameSync,
 ): void {
-  const entries = ['plugins', 'skeleton', 'agent-presets', 'owned-packages.json', 'seed-version'] as const
+  const entries = [
+    'plugins',
+    'skeleton',
+    'agent-presets',
+    'owned-packages.json',
+    DISTRIBUTION_FILENAME,
+    'seed-version',
+  ] as const
   const backupRoot = mkdtempSync(join(targetPresetDir, '.preset-backup-'))
   const backedUp: string[] = []
   const published: string[] = []
@@ -625,7 +711,9 @@ export function publishCandidate(
       backedUp.push(entry)
     }
     for (const entry of entries) {
-      rename(join(candidateDir, entry), join(targetPresetDir, entry))
+      const source = join(candidateDir, entry)
+      if (!existsSync(source)) continue
+      rename(source, join(targetPresetDir, entry))
       published.push(entry)
     }
   } catch (error) {

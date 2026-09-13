@@ -108,6 +108,33 @@ Scope: 发行侧 `dsh-plugin-desktop/`（producer + settler + verifier）；清�
   `packageCount: 304`、`droppedLegacySources: []`。
 - `/Applications/OmniMux Dev.app` 启动正常：main 进程 + DSH Host（`node.mojom.NodeService`）+ renderer 均存活。
 
+## P1 实施记录（2026-09-13）
+
+落地在 `agent/preset-distribution`（叠在 P0 之上）：
+
+- `scripts/stage-preset-profile.ts` 产出 `preset/distribution.json`：
+  `{schema, channel, generatedFrom:{appVersion, desktopCommit}, items:[{kind, id, tier, version, digest}]}`。
+  `tier` 把发布决策写成数据 —— `core` = 必需 bundle、`beta` = lifecycle Alpha、其余 `product`；
+  `digest` 复用 `managed-profile.ts` 的 `hashDirectory`（本身对软链失败关闭，且排序确定）。
+  `publishCandidate` 收录该文件，并改为跳过候选里不存在的条目（此前对缺失条目做硬 rename 会抛错）。
+- 新增 `scripts/verify-distribution.ts`，并接上 `verify:distribution` / `yarn omnimux:verify`：
+  - `--preset <dir>`：清单 ↔ 实装集合双向相等、逐包版本与 digest、无软链、无 `workspace:`/越界 `file:`、
+    与 `owned-packages.json` 一致；
+  - `--profile <dir> --expect <record>`：校验已安装环境；默认容忍开发态多出的包并列出，`--strict` 升级为错误。
+- `src/preset-profile.ts`：seed 时交叉校验 `distribution.json` 与 `owned-packages.json` —— 记录点名了 preset
+  不拥有的包、或数量不符，都失败关闭并指向重新 stage。没有记录的旧 preset 不受影响（打包期的 verify 才是
+  强制点）。
+- 打包清单：`REQUIRED_PRESET_RUNTIME_ENTRIES` 增加 `preset/distribution.json`。
+- 发布流水线：`.github/workflows/release.yml` 的 mac / win 两个 job 在 stage 之后、build 之前各加一步校验。
+  普通 CI 不需要改动 —— `tests/verify-distribution.spec.ts` 随既有 `yarn test` 一起跑。
+
+实测：
+
+- `yarn omnimux:stage` → 296 包；`verify --preset` → `verified 296 preset package(s) against production`。
+- 验收（用户口径）：删掉 preset 里一个包 → 退出码 1 并点名 `omnimux-market`；改动包内字节 → digest 不匹配、
+  退出码 1。
+- 对开发环境跑同一份记录 → 退出码 1，并指出与发行记录不一致的包 —— 这正是 P3 要消除的漂移现场。
+
 ## 落地顺序
 
 | 阶段 | 内容 | 验收 |

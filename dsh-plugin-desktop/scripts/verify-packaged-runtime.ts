@@ -123,6 +123,7 @@ export const UNPACKED_PRESET_PREFIX = 'preset/'
 /** Archive entries proving the staged OmniMux preset seed reached the package. */
 export const REQUIRED_PRESET_RUNTIME_ENTRIES = [
   'preset/owned-packages.json',
+  'preset/distribution.json',
   'preset/seed-version',
   'preset/plugins/omnimux/package.json',
 ] as const

@@ -136,6 +136,7 @@
     "verify:aa": "DSH_VERIFY_AA=1 node scripts/verify-profile-boot.mjs",
     "prepare:electron-native": "node scripts/prepare-fs-ext.ts",
     "stage:preset": "node scripts/stage-preset-profile.ts",
+    "verify:distribution": "node scripts/verify-distribution.ts",
     "package:dev": "node scripts/package-dev.mjs",
     "dist:win-release": "node scripts/release-win.ts"
   },

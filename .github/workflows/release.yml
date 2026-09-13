@@ -48,6 +48,12 @@ jobs:
         env:
           OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}/omni-source/plugins
         run: corepack yarn workspace dsh-plugin-desktop stage:preset
+      - name: Verify staged preset
+        # The artifact, not the intent: a preset whose record disagrees with the
+        # packages it ships must fail here, not on a user machine.
+        run: |
+          cd dsh-plugin-desktop
+          node scripts/verify-distribution.ts --preset preset
       - name: Build macOS release (arm64 DMG)
         env:
           OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}/omni-source/plugins
@@ -94,6 +100,12 @@ jobs:
         env:
           OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}\omni-source\plugins
         run: corepack yarn workspace dsh-plugin-desktop stage:preset
+      - name: Verify staged preset
+        # The artifact, not the intent: a preset whose record disagrees with the
+        # packages it ships must fail here, not on a user machine.
+        run: |
+          cd dsh-plugin-desktop
+          node scripts/verify-distribution.ts --preset preset
       - name: Build Windows installer (website unsigned)
         env:
           OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}\omni-source\plugins

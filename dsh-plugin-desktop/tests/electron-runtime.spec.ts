@@ -173,10 +173,13 @@ const electron = vi.hoisted(() => {
     readonly isFocused = vi.fn(() => false)
     readonly isVisible = vi.fn(() => false)
     readonly isMinimized = vi.fn(() => false)
+    readonly isMaximized = vi.fn(() => false)
     readonly isFullScreen = vi.fn(() => false)
     readonly getNormalBounds = vi.fn(() => ({ x: 120, y: 80, width: 1280, height: 840 }))
     readonly flashFrame = vi.fn()
     readonly restore = vi.fn()
+    readonly maximize = vi.fn()
+    readonly unmaximize = vi.fn()
     readonly show = vi.fn()
     readonly hide = vi.fn()
     readonly focus = vi.fn()
@@ -675,15 +678,59 @@ describe('Electron desktop runtime', () => {
     move()
     expect(store.read()).toEqual({ x: 260, y: 140, width: 1440, height: 900 })
     await vi.advanceTimersByTimeAsync(250)
-    expect(store.read()).toEqual({ x: 320, y: 180, width: 1500, height: 920 })
+    expect(store.read()).toEqual({
+      x: 320,
+      y: 180,
+      width: 1500,
+      height: 920,
+      isMaximized: false,
+      isFullScreen: false,
+    })
 
     window?.getNormalBounds.mockReturnValue({ x: 360, y: 220, width: 1520, height: 940 })
     close({ preventDefault: vi.fn() })
-    expect(store.read()).toEqual({ x: 360, y: 220, width: 1520, height: 940 })
+    expect(store.read()).toEqual({
+      x: 360,
+      y: 220,
+      width: 1520,
+      height: 940,
+      isMaximized: false,
+      isFullScreen: false,
+    })
 
     await release()
     expect(electron.browserWindowOff).toHaveBeenCalledWith('move', move)
     expect(electron.browserWindowOff).toHaveBeenCalledWith('resize', expect.any(Function))
+    expect(electron.browserWindowOff).toHaveBeenCalledWith('maximize', expect.any(Function))
+    expect(electron.browserWindowOff).toHaveBeenCalledWith('enter-full-screen', expect.any(Function))
+  })
+
+  it('restores fullscreen or maximized window state on startup', async () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+    const { FileMainWindowStateStore } = await import('../src/main-window-state.ts')
+    const store = new FileMainWindowStateStore('/tmp/dsh-desktop-user-data')
+    store.write({ x: 100, y: 50, width: 1440, height: 900, isFullScreen: true, isMaximized: false })
+
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const runtime = new ElectronDesktopRuntime(async () => {})
+    const release = runtime.schedule(spec)
+
+    await runtime.mountScheduled()
+    const window = electron.browserWindows[0]
+    expect(window?.setFullScreen).toHaveBeenCalledWith(true)
+
+    await release()
+    clearMainWindowState()
+
+    // Test maximized restore
+    store.write({ x: 100, y: 50, width: 1440, height: 900, isFullScreen: false, isMaximized: true })
+    const runtime2 = new ElectronDesktopRuntime(async () => {})
+    const release2 = runtime2.schedule(spec)
+    await runtime2.mountScheduled()
+    const window2 = electron.browserWindows[1]
+    expect(window2?.maximize).toHaveBeenCalledOnce()
+
+    await release2()
   })
 
   it('fits stale saved bounds into the current display work area', async () => {

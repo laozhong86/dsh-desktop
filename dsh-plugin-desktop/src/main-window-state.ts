@@ -24,6 +24,8 @@ export interface MainWindowBounds {
   readonly y: number
   readonly width: number
   readonly height: number
+  readonly isMaximized?: boolean
+  readonly isFullScreen?: boolean
 }
 
 interface MainWindowStateV1 {
@@ -61,6 +63,8 @@ function parseBounds(value: unknown): MainWindowBounds {
     y: candidate.y,
     width: candidate.width,
     height: candidate.height,
+    ...(typeof candidate.isMaximized === 'boolean' ? { isMaximized: candidate.isMaximized } : {}),
+    ...(typeof candidate.isFullScreen === 'boolean' ? { isFullScreen: candidate.isFullScreen } : {}),
   }
 }
 
@@ -155,6 +159,8 @@ export function fitMainWindowBounds(
     y: Math.min(maxY, Math.max(available.y, restored.y)),
     width,
     height,
+    ...(restored.isMaximized !== undefined ? { isMaximized: restored.isMaximized } : {}),
+    ...(restored.isFullScreen !== undefined ? { isFullScreen: restored.isFullScreen } : {}),
   }
 }
 
@@ -164,4 +170,6 @@ export function sameMainWindowBounds(left: MainWindowBounds, right: MainWindowBo
     && left.y === right.y
     && left.width === right.width
     && left.height === right.height
+    && Boolean(left.isMaximized) === Boolean(right.isMaximized)
+    && Boolean(left.isFullScreen) === Boolean(right.isFullScreen)
 }

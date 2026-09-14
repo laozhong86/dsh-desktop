@@ -304,10 +304,17 @@ export class ElectronShellGeneration {
       }
       if (window.isDestroyed()) return
       const bounds = window.getNormalBounds()
-      if (persistedBounds !== undefined && sameMainWindowBounds(bounds, persistedBounds)) return
+      const isMaximized = window.isMaximized()
+      const isFullScreen = window.isFullScreen() || restoreFullscreenOnShow
+      const stateToSave: MainWindowBounds = {
+        ...bounds,
+        isMaximized,
+        isFullScreen,
+      }
+      if (persistedBounds !== undefined && sameMainWindowBounds(stateToSave, persistedBounds)) return
       try {
-        this.options.mainWindowState.write(bounds)
-        persistedBounds = { ...bounds }
+        this.options.mainWindowState.write(stateToSave)
+        persistedBounds = { ...stateToSave }
       } catch (cause) {
         this.options.logError(`dsh-plugin-desktop: failed to save main-window state: ${cause instanceof Error ? cause.message : String(cause)}`)
       }
@@ -319,7 +326,19 @@ export class ElectronShellGeneration {
     }
     this.flushWindowState = persistWindowState
 
-    const show = (): void => { this.show() }
+    const restorePersistedWindowState = (): void => {
+      if (window.isDestroyed()) return
+      if (persistedBounds?.isFullScreen && !window.isFullScreen()) {
+        window.setFullScreen(true)
+      } else if (persistedBounds?.isMaximized && !window.isMaximized()) {
+        window.maximize()
+      }
+    }
+
+    const show = (): void => {
+      restorePersistedWindowState()
+      this.show()
+    }
     let startupSurfaceRevealed = false
     const revealStartupSurface = (): void => {
       if (window.isDestroyed()) return
@@ -327,6 +346,7 @@ export class ElectronShellGeneration {
       // window after the startup surface was revealed early.
       if (startupSurfaceRevealed) return
       startupSurfaceRevealed = true
+      restorePersistedWindowState()
       this.show()
     }
     const activate = (): void => {
@@ -377,6 +397,9 @@ export class ElectronShellGeneration {
     }
     this.prepareFullscreenReveal = prepareFullscreenReveal
     const close = (event: Electron.Event): void => {
+      if (platform.platform === 'darwin' && window.isFullScreen()) {
+        restoreFullscreenOnShow = true
+      }
       persistWindowState()
       if (this.options.isQuitting()) return
       event.preventDefault()
@@ -487,6 +510,10 @@ export class ElectronShellGeneration {
     window.on('focus', clearAttention)
     window.on('move', scheduleWindowStateWrite)
     window.on('resize', scheduleWindowStateWrite)
+    window.on('maximize', scheduleWindowStateWrite)
+    window.on('unmaximize', scheduleWindowStateWrite)
+    window.on('enter-full-screen', scheduleWindowStateWrite)
+    window.on('leave-full-screen', scheduleWindowStateWrite)
     window.on('page-title-updated', preserveBlankTitle)
     const detachTitleBarDoubleClickListener = attachTitleBarDoubleClickListener({
       window,
@@ -533,6 +560,10 @@ export class ElectronShellGeneration {
       window.off('focus', clearAttention)
       window.off('move', scheduleWindowStateWrite)
       window.off('resize', scheduleWindowStateWrite)
+      window.off('maximize', scheduleWindowStateWrite)
+      window.off('unmaximize', scheduleWindowStateWrite)
+      window.off('enter-full-screen', scheduleWindowStateWrite)
+      window.off('leave-full-screen', scheduleWindowStateWrite)
       window.off('page-title-updated', preserveBlankTitle)
       window.off('ready-to-show', revealStartupSurface)
       detachTitleBarDoubleClickListener()

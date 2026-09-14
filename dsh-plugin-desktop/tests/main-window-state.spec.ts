@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import {
   FileMainWindowStateStore,
   fitMainWindowBounds,
+  sameMainWindowBounds,
 } from '../src/main-window-state.ts'
 
 const temporaryDirectories: string[] = []
@@ -30,6 +31,37 @@ describe('main-window state', () => {
     store.write(bounds)
 
     expect(store.read()).toEqual(bounds)
+  })
+
+  it('atomically round-trips bounds with maximized and fullscreen flags', () => {
+    const store = new FileMainWindowStateStore(temporaryDirectory())
+    const state = {
+      x: 100,
+      y: 100,
+      width: 1400,
+      height: 900,
+      isMaximized: true,
+      isFullScreen: false,
+    }
+    store.write(state)
+    expect(store.read()).toEqual(state)
+
+    const fullScreenState = {
+      ...state,
+      isMaximized: false,
+      isFullScreen: true,
+    }
+    store.write(fullScreenState)
+    expect(store.read()).toEqual(fullScreenState)
+  })
+
+  it('detects changes in maximize or fullscreen flags in sameMainWindowBounds', () => {
+    const base = { x: 100, y: 100, width: 1200, height: 800 }
+    expect(sameMainWindowBounds(base, { ...base })).toBe(true)
+    expect(sameMainWindowBounds(base, { ...base, isMaximized: true })).toBe(false)
+    expect(sameMainWindowBounds({ ...base, isMaximized: true }, { ...base, isMaximized: true })).toBe(true)
+    expect(sameMainWindowBounds({ ...base, isFullScreen: true }, { ...base, isFullScreen: false })).toBe(false)
+    expect(sameMainWindowBounds({ ...base, isFullScreen: true }, { ...base, isFullScreen: true })).toBe(true)
   })
 
   it('rejects malformed state instead of constructing an invalid BrowserWindow', () => {

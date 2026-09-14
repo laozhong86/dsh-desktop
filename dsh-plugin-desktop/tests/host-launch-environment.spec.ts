@@ -13,3 +13,12 @@ it('retains shadowed environment values and their trust sources across structure
   expect(restored.getFrom('ONLY_USER', ['process'])).toBeUndefined()
   expect(restored.get('ONLY_USER')).toEqual(snapshot.get('ONLY_USER'))
 })
+
+it('includes OMNIMUX_INSTALLATION_ID in default serialized host environment names', () => {
+  const snapshot = createLaunchEnvironmentSnapshot([
+    { source: 'process', values: { OMNIMUX_INSTALLATION_ID: 'test-install-uuid' } },
+  ])
+  const serialized = serializeHostEnvironment(snapshot)
+  const restored = createLaunchEnvironmentSnapshot(serialized)
+  expect(restored.get('OMNIMUX_INSTALLATION_ID')?.value).toBe('test-install-uuid')
+})

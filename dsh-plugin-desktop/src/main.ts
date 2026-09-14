@@ -33,7 +33,13 @@ import {
   installDesktopPnpmRuntime,
 } from './desktop-runtime-environment.ts'
 import { desktopProductVersion, ElectronDesktopRuntime } from './electron-runtime.ts'
-import { getOrCreateDesktopInstallationId } from './desktop-installation-id.ts'
+import {
+  getOrCreateDesktopInstallationIdentity,
+} from './desktop-installation-id.ts'
+import {
+  DesktopAnalyticsClient,
+  extractStartupAnalyticsFromSummary,
+} from './desktop-analytics.ts'
 import {
   ElectronStderrLogger,
   installDesktopChildProcessLogging,
@@ -544,7 +550,20 @@ async function start(l2: ReturnType<typeof resolveDesktopL2Launch>): Promise<voi
     },
   )
   let restartRequested = false
-  const installationId = await getOrCreateDesktopInstallationId(app.getPath('userData'))
+  const desktopAnalytics = new DesktopAnalyticsClient({
+    userDataDir: app.getPath('userData'),
+    logger: electronLogger,
+  })
+  const installationIdentity = await getOrCreateDesktopInstallationIdentity(app.getPath('userData'))
+  const installationId = installationIdentity.id
+  process.env.OMNIMUX_INSTALLATION_ID = installationId
+  if (installationIdentity.isNew) {
+    void desktopAnalytics.reportFirstRun(installationId, {
+      appVersion,
+      platform: process.platform,
+      arch: process.arch,
+    })
+  }
   runtime = new ElectronDesktopRuntime(async target => {
     if (shutdown === undefined) {
       throw new Error('dsh-plugin-desktop: shutdown coordinator is not ready')
@@ -576,7 +595,14 @@ async function start(l2: ReturnType<typeof resolveDesktopL2Launch>): Promise<voi
   }, electronLogger, undefined, undefined, installationId)
   const finalExit = (code: number): void => { nativeExit.finish(code) }
   shutdown = createDesktopShutdown(
-    async () => { await generation.release() },
+    async () => {
+      await desktopAnalytics.reportSessionExit({
+        appVersion,
+        platform: process.platform,
+        arch: process.arch,
+      })
+      await generation.release()
+    },
     finalExit,
   )
   const requestQuit = (code: number): void => { void shutdown.request(code) }
@@ -1703,6 +1729,21 @@ async function start(l2: ReturnType<typeof resolveDesktopL2Launch>): Promise<voi
       )
     }
     lifecycleRecorder.completeStartup(startupStage, rendererReport)
+    const startupSummary = lifecycleRecorder.summarize()
+    if (startupSummary !== undefined) {
+      void desktopAnalytics.reportStartup(
+        extractStartupAnalyticsFromSummary(startupSummary, {
+          appVersion,
+          platform: process.platform,
+          arch: process.arch,
+        }),
+      )
+    }
+    desktopAnalytics.startHeartbeat({
+      appVersion,
+      platform: process.platform,
+      arch: process.arch,
+    })
     notifySkippedOptionalEntries(runtime, electronLogger, prepared.skippedOptionalEntries)
     notifyWindowsVolumeConcerns(runtime, electronLogger, windowsVolumeConcerns)
     if (safeModePaths !== undefined && DESKTOP_SAFE_MODE_DEFAULTS.settings.notifications.enabled) {
@@ -1715,6 +1756,16 @@ async function start(l2: ReturnType<typeof resolveDesktopL2Launch>): Promise<voi
     runtime.stopRendererBootMonitoring()
     lifecycleRecorder.failRendererBootIfPending(lifecycleRendererFailureReason(runtime.rendererBootFailureReason))
     lifecycleRecorder.failStartup(startupStage, lifecycleStartupFailureReason(cause, runtime))
+    const failedStartupSummary = lifecycleRecorder.summarize()
+    if (failedStartupSummary !== undefined) {
+      void desktopAnalytics.reportStartup(
+        extractStartupAnalyticsFromSummary(failedStartupSummary, {
+          appVersion,
+          platform: process.platform,
+          arch: process.arch,
+        }),
+      )
+    }
     electronLogger.errorCause(cause)
     let exitCode = 1
     const failureRoute = routeDesktopStartupFailure({

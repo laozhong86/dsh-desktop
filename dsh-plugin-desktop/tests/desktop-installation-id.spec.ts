@@ -8,6 +8,7 @@ import {
   assertDesktopInstallationId,
   desktopInstallationIdPath,
   getOrCreateDesktopInstallationId,
+  getOrCreateDesktopInstallationIdentity,
   parseDesktopInstallationId,
 } from '../src/desktop-installation-id.ts'
 
@@ -125,6 +126,15 @@ describe('Desktop installation identity', () => {
 
     expect(new Set(values)).toEqual(new Set([values[0]]))
     expect(await readFile(desktopInstallationIdPath(root), 'utf8')).toBe(`${values[0]}\n`)
+  })
+
+  it('reports isNew accurately for fresh creation vs existing identity', async () => {
+    const root = await userData()
+    const first = await getOrCreateDesktopInstallationIdentity(root, { randomUUID: () => FIRST })
+    expect(first).toEqual({ id: FIRST, isNew: true })
+
+    const second = await getOrCreateDesktopInstallationIdentity(root, { randomUUID: () => SECOND })
+    expect(second).toEqual({ id: FIRST, isNew: false })
   })
 
   it.each(['', 'relative/path', `/tmp/bad\0path`])('rejects unsafe userData path %j', async (root) => {

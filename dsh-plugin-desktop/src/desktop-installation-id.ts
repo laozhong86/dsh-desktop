@@ -1,4 +1,4 @@
-/** Private installation identity used only by DSH Desktop update checks. */
+/** Private installation identity used by DSH Desktop update checks and anonymous lifecycle metrics. */
 
 import { randomUUID } from 'node:crypto'
 import { chmod, lstat, mkdir, open } from 'node:fs/promises'
@@ -20,6 +20,13 @@ const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}
 
 /** Locally generated, pseudonymous UUID v4 scoped to one Desktop userData tree. */
 export type DesktopInstallationId = string & { readonly __desktopInstallationId: unique symbol }
+
+/** Installation identity along with a flag indicating whether it was freshly generated. */
+export interface DesktopInstallationIdentity {
+  readonly id: DesktopInstallationId
+  /** True when the private installation ID file was newly created during this invocation. */
+  readonly isNew: boolean
+}
 
 /** Injectable UUID source used only by focused tests. */
 export interface DesktopInstallationIdOptions {
@@ -61,6 +68,40 @@ export function assertDesktopInstallationId(value: string): DesktopInstallationI
 }
 
 /**
+ * Return the installation UUID identity along with a freshness flag for one Desktop userData tree.
+ *
+ * A missing or corrupt ordinary file is rebuilt atomically. Symbolic links,
+ * directories, and other special entries are rejected rather than followed or
+ * removed. Persistence failures are explicit: callers must not silently emit a
+ * fresh, process-local identifier on every check or analytics report.
+ */
+export async function getOrCreateDesktopInstallationIdentity(
+  userDataDirectory: string,
+  options: DesktopInstallationIdOptions = {},
+): Promise<DesktopInstallationIdentity> {
+  const statePath = desktopInstallationIdPath(userDataDirectory)
+  const identityDirectory = dirname(statePath)
+  await prepareIdentityDirectory(identityDirectory)
+
+  try {
+    return await withFileLock(statePath, async () => {
+      const persisted = await readPersistedInstallationId(statePath)
+      if (persisted !== undefined) return { id: persisted, isNew: false }
+
+      const generated = assertDesktopInstallationId((options.randomUUID ?? randomUUID)())
+      await writeFileAtomic(statePath, `${generated}\n`, {
+        mode: PRIVATE_FILE_MODE,
+        dirMode: PRIVATE_DIRECTORY_MODE,
+      })
+      return { id: generated, isNew: true }
+    })
+  } catch (cause) {
+    if (cause instanceof DesktopInstallationIdError) throw cause
+    throw new DesktopInstallationIdError('Desktop installation identity could not be persisted safely.', { cause })
+  }
+}
+
+/**
  * Return the installation UUID for one Desktop userData tree.
  *
  * A missing or corrupt ordinary file is rebuilt atomically. Symbolic links,
@@ -72,26 +113,8 @@ export async function getOrCreateDesktopInstallationId(
   userDataDirectory: string,
   options: DesktopInstallationIdOptions = {},
 ): Promise<DesktopInstallationId> {
-  const statePath = desktopInstallationIdPath(userDataDirectory)
-  const identityDirectory = dirname(statePath)
-  await prepareIdentityDirectory(identityDirectory)
-
-  try {
-    return await withFileLock(statePath, async () => {
-      const persisted = await readPersistedInstallationId(statePath)
-      if (persisted !== undefined) return persisted
-
-      const generated = assertDesktopInstallationId((options.randomUUID ?? randomUUID)())
-      await writeFileAtomic(statePath, `${generated}\n`, {
-        mode: PRIVATE_FILE_MODE,
-        dirMode: PRIVATE_DIRECTORY_MODE,
-      })
-      return generated
-    })
-  } catch (cause) {
-    if (cause instanceof DesktopInstallationIdError) throw cause
-    throw new DesktopInstallationIdError('Desktop installation identity could not be persisted safely.', { cause })
-  }
+  const identity = await getOrCreateDesktopInstallationIdentity(userDataDirectory, options)
+  return identity.id
 }
 
 async function prepareIdentityDirectory(directory: string): Promise<void> {

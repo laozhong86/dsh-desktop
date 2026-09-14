@@ -534,6 +534,18 @@ export class DesktopLifecycleRecorder {
       : ''
     this.options.logger.error(`dsh-plugin-desktop: failed to persist lifecycle evidence${code}`)
   }
+
+  summarize(): DesktopLifecycleSummary | undefined {
+    try {
+      if (!existsSync(this.evidencePath)) return undefined
+      const buf = readFileSync(this.evidencePath)
+      const summaryBuf = summarizeDesktopLifecycleEvidence(buf)
+      if (summaryBuf === undefined) return undefined
+      return JSON.parse(summaryBuf.toString('utf8')) as DesktopLifecycleSummary
+    } catch {
+      return undefined
+    }
+  }
 }
 
 function noFollowFlag(): number {

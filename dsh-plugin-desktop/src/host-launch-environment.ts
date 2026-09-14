@@ -4,7 +4,7 @@ import type { LaunchEnvironmentLayerInput, LaunchEnvironmentSnapshot } from '@de
 // loadLayeredEnv materializes all layer names into process.env before launch.
 // Keep every source, including shadowed values, instead of flattening trust levels.
 export function serializeHostEnvironment(snapshot: LaunchEnvironmentSnapshot,
-  names: readonly string[] = [...Object.keys(process.env), 'DSH_HOME'],
+  names: readonly string[] = [...Object.keys(process.env), 'DSH_HOME', 'OMNIMUX_INSTALLATION_ID'],
 ): LaunchEnvironmentLayerInput[] {
   return (['process', 'project-env', 'user-env'] as const).map(source => {
     const values: Record<string, string> = {}

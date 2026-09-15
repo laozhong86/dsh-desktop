@@ -108,7 +108,9 @@ export function stagePresetProfile(options: StagePresetProfileOptions = {}): num
   const alphaPlugins = new Set(Object.keys(lifecycle))
   const productPlugins: readonly string[] = PRODUCT_PLUGINS.filter(name => releaseChannel === 'development' || !alphaPlugins.has(name))
   for (const name of alphaPlugins) {
-    if (!(PRODUCT_PLUGINS as readonly string[]).includes(name)) throw new Error(`unknown lifecycle plugin: ${name}`)
+    if (!existsSync(join(resolvedPluginsRoot, ...packageDirSegments(name)))) {
+      throw new Error(`unknown lifecycle plugin: ${name}`)
+    }
   }
   for (const name of PRODUCT_PLUGINS) assertProductPluginSource(resolvedPluginsRoot, name)
   mkdirSync(targetPresetDir, { recursive: true })

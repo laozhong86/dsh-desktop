@@ -421,6 +421,7 @@ virtualStoreDirMaxLength: 60
           { path: stagedPresetRoot(), trust: 'system' },
           { path: join(home, '.agent-presets'), trust: 'user' },
         ],
+        includeShippedRoot: true,
         includeUserRoot: false,
       }),
     }))
@@ -488,6 +489,27 @@ virtualStoreDirMaxLength: 60
     }))
     expect(rows.find(row => row.id === 'desktop-profiles')).toEqual(expect.objectContaining({
       name: 'dsh-plugin-desktop/profiles',
+    }))
+  })
+
+  it('isolates agent presets to product-staged roster and excludes upstream shipped root for omnimux profile', () => {
+    const home = temporaryHome()
+    const omnimuxDir = join(home, 'profiles', 'omnimux')
+    const template = PROFILE_TEMPLATES.web
+    if (template === undefined) throw new Error('test requires the shipped Web template')
+    initProfile(omnimuxDir, template.bundles, template.patchReload)
+    const prepared = prepareDesktopProfile(undefined, home, 'darwin', 'omnimux')
+    const patches = prepared.patches as Array<Record<string, unknown>>
+    expect(patches).toContainEqual(expect.objectContaining({
+      id: 'agent-presets',
+      config: expect.objectContaining({
+        roots: [
+          { path: stagedPresetRoot(), trust: 'system' },
+          { path: join(home, '.agent-presets'), trust: 'user' },
+        ],
+        includeShippedRoot: false,
+        includeUserRoot: false,
+      }),
     }))
   })
 
@@ -1064,6 +1086,7 @@ virtualStoreDirMaxLength: 60
           { path: stagedPresetRoot(), trust: 'system' },
           { path: join(home, '.agent-presets'), trust: 'user' },
         ],
+        includeShippedRoot: true,
         includeUserRoot: false,
       }),
     }))

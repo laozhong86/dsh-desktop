@@ -103,6 +103,7 @@ const PWSH_SANDBOX_ROW_ID = 'pwsh-sandbox'
 const UPSTREAM_PWSH_SANDBOX_PACKAGE = '@deepseek-ai/dsh-pwsh-sandbox'
 const DESKTOP_WINDOWS_PWSH_SANDBOX_ROW_ID = 'desktop-windows-pwsh-sandbox'
 const DESKTOP_WINDOWS_PWSH_SANDBOX_PACKAGE = `${DESKTOP_PACKAGE_NAME}/windows-pwsh-sandbox`
+const OMNIMUX_PROFILE_NAME = 'omnimux'
 const AGENT_PRESETS_ROW_ID = 'agent-presets'
 /** Harness-home directory holding locally authored presets (`agent-presets/discovery`). */
 const USER_PRESET_DIRNAME = '.agent-presets'
@@ -1053,6 +1054,7 @@ export function prepareDesktopProfile(
   }
   const presets = rows.get(AGENT_PRESETS_ROW_ID)
   if (presets !== undefined) {
+    const isOmnimuxProfile = profileName === OMNIMUX_PROFILE_NAME
     const roots: Array<{ path: string, trust: 'system' | 'user' }> = [
       // Staged product presets define the product's official preset set.
       { path: stagedPresetRoot(), trust: 'system' },
@@ -1060,7 +1062,12 @@ export function prepareDesktopProfile(
     ]
     patches.push({
       id: AGENT_PRESETS_ROW_ID,
-      config: { ...rowConfig(presets), roots, includeUserRoot: false },
+      config: {
+        ...rowConfig(presets),
+        roots,
+        includeShippedRoot: !isOmnimuxProfile,
+        includeUserRoot: false,
+      },
     })
   }
   const webserver = rows.get('webserver')

@@ -18,6 +18,8 @@
       name: dsh-plugin-desktop/profiles
     - id: desktop-updates
       name: dsh-plugin-desktop/updates
+    - id: time-context
+      name: '@deepseek-ai/dsh-time-context'
 
 # A desktop launch has no terminal operator waiting for the Web readiness line.
 - id: web-runtime

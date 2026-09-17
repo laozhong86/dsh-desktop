@@ -490,6 +490,9 @@ virtualStoreDirMaxLength: 60
     expect(rows.find(row => row.id === 'desktop-profiles')).toEqual(expect.objectContaining({
       name: 'dsh-plugin-desktop/profiles',
     }))
+    expect(rows.find(row => row.id === 'time-context')).toEqual(expect.objectContaining({
+      name: '@deepseek-ai/dsh-time-context',
+    }))
   })
 
   it('isolates agent presets to product-staged roster and excludes upstream shipped root for omnimux profile', () => {

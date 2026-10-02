@@ -391,7 +391,10 @@
         "CFBundleLocalizations": [
           "en",
           "zh_CN"
-        ]
+        ],
+        "NSDesktopFolderUsageDescription": "OmniMux needs access to your Desktop folder to read and save working files.",
+        "NSDocumentsFolderUsageDescription": "OmniMux needs access to your Documents folder to read and save working files.",
+        "NSDownloadsFolderUsageDescription": "OmniMux needs access to your Downloads folder to read and save working files."
       },
       "hardenedRuntime": true,
       "icon": "build/app-icon-mac.png",

@@ -1,0 +1,95 @@
+omnimux-rc-upgrade · required report block (SKILL.md "## Report")
+task: harness-rc3-repin (Issue #3145 follow-up) — execution leg, cross-workspace write authorized by the user
+generated: 2026-10-05
+worktree: omnimux-desktop-fork/.worktrees/harness-rc3-repin   branch: agent/harness-rc3-repin
+base: fork/omnimux f245033bc2   pin commit: 9dda0eeba3084e1e92fe15f8fcda956d656c9136
+NOTE: the skill mandates this block's FORMAT, not a path. Deliverable report:
+      omnimux-dsh/.agent-reports/harness-version-align/execution-report.md
+
+pin: dsh@0.1.5-rc.3 — upstream tag dsh-v0.1.5-rc.3 = a4c74a91e06b00fe0b0937bde982170c526cc842
+     (verified read-only in the shell's own submodule after `fetch --tags origin`; equals the
+     required SHA). upstream.json stable channel before -> after:
+       commit               183f08e9c6dde7e36cd2318eaee70b0da08fb35e -> a4c74a91e06b00fe0b0937bde982170c526cc842
+       sourceVersion        0.1.5-rc.1 -> 0.1.5-rc.3
+       runtimePackageVersion 0.1.5-rc.1 -> 0.1.5-rc.3
+       runtimeSource        vendor/dsh-runtime/0.1.5-rc.1/manifest.json -> vendor/dsh-runtime/0.1.5-rc.3/manifest.json
+     Vendored runtime: 265 official-profile tarballs + manifest.json for rc.3, replacing the 266
+     rc.1 entries (265 tarballs + manifest.json). Root resolutions: 530 dsh entries, 0 stale.
+     Patches: 13 DSH patches re-keyed @0.1.5-rc.1 -> @0.1.5-rc.3, every hunk verified against the
+     freshly built rc.3 tarballs (13/13 patches, 40/40 hunks; 0 repairs, 0 failures). The 5
+     non-DSH patches keep third-party version keys and were not re-keyed.
+product: omnimux-dsh origin/main 9a6da6050 — UNCHANGED. The plugin repository needed no edit:
+     its lockfile already resolved @deepseek-ai/dsh-*@0.1.5-rc.3 x247 and `verify-dsh-lockfile-uniform`
+     was already green before this task, so nothing was written there beyond reports.
+     Shell product source: dsh-plugin-desktop/src and dsh-community-market/src untouched
+     (`git diff --name-only -- '*/src/**'` = empty in the pin commit).
+host: built artifact /Users/x/Desktop/Project/omnimux-desktop-fork/.worktrees/harness-rc3-repin/
+      dsh-plugin-desktop/dist/mac-arm64/OmniMux.app (1.3 GB, channel "package-dev",
+      CFBundleDisplayName "OmniMux Dev", CFBundleIdentifier ai.omnimux.desktop, version 2.0.9,
+      ad-hoc codesign verified). Its Contents/Resources/build-info.json records
+      dsh.packageSpec = "0.1.5-rc.3" and dsh.submodule = "a4c74a91e0".
+      INSTALLED host (read-only, deliberately NOT replaced): /Applications/OmniMux Dev.app is
+      still 0.1.5-rc.1 / submodule 183f08e9c6. Replacing it is outside this authorization.
+      Host boot evidence on rc.3: verify:loader and verify:profile both REAL_EXIT=0.
+profile: ~/.omnimux-dev/profiles/omnimux (Dev, target) — read-only, NOT materialized. No home was
+      written (Prod ~/.omnimux and Base ~/.dsh were not touched either).
+install-tree: PASS (worktree install tree; the primary checkout's rc.1 tree used only as the
+      pre-change oracle). dsh-plugin-desktop/node_modules/@deepseek-ai holds 245 packages; every
+      DSH runtime package is 0.1.5-rc.3 and the non-rc.3 entries are the independently versioned
+      framework/native packages (cordis 4.0.2, cordis-plugin-* , cosmokit 1.8.3, schemastery
+      3.18.2, node-addon-system 0.1.2) — expected, not drift.
+      Host singletons resolve to a single realpath per workspace: @deepseek-ai/dsh-tools 0.1.5-rc.3,
+      @deepseek-ai/schemastery 3.18.2, @deepseek-ai/cordis 4.0.2. dsh-community-market carries its
+      own workspace-level copy at the SAME versions; that duplication is pre-existing
+      (`nmHoistingLimits: workspaces`) and is byte-identical in shape to the base checkout.
+      Declaration sites are unchanged from base (dsh-tools in `dependencies`, schemastery ^3.18.2,
+      cordis 4.0.2); no second independently loaded instance was introduced. Note for the record:
+      this shell declares those three as dependencies, not as peerDependencies — that is the
+      pre-existing topology, not a regression from this change.
+brand-checks: Host seat census on the rc.3 client packages (dsh-web-frontend, dsh-client-ui-chat,
+      dsh-client-ui-conversation, dsh-client-ui-primitives) vs the rc.1 base checkout — IDENTICAL:
+        viewBox "0 0 182 24"   (WORDMARK_VIEWBOX)       rc.3 = 2 hits | rc.1 = 2 hits
+        viewBox "26 0 156 24"  (NAME_WORDMARK_VIEWBOX)  rc.3 = 2 hits | rc.1 = 2 hits
+        viewBox "0 0 23.16 17.04" (FISH_VIEWBOX)        rc.3 = 0 static hits | rc.1 = 0 static hits
+          -> NOT a mismatch: the Host composes the fish viewBox at runtime from FISH_LOGO_VIEWBOX
+             {width:23.16,height:17.04}; the literal joined string does not exist (13
+             FISH_LOGO_VIEWBOX hits on both sides).
+        [data-composer-seat]                              rc.3 = 3 hits | rc.1 = 3 hits
+      These match plugins/omnimux/src/brand/defaults.js (FISH_VIEWBOX '0 0 23.16 17.04',
+      WORDMARK_VIEWBOX '0 0 182 24', NAME_WORDMARK_VIEWBOX '26 0 156 24'), so the rc.1 -> rc.3 move
+      does not shift the brand seat contract. Plugin-side brand checks were already green in the
+      investigation leg (node --test plugins/omnimux/src/brand/*.test.js = 51/51, REAL_EXIT=0;
+      pnpm --filter omnimux build REAL_EXIT=0) and were not re-run here because the plugin
+      repository is unchanged.
+screens:
+  empty-session: missing
+  sidebar-brand: missing
+  tool-call: missing
+  desktop-no-open: missing
+  (All four remain human-owned. AGENTS.md: "Dev app (port 45120) acceptance is human-owned"; the
+   task and a user-level hard rule both forbid installing the built app, restarting or quitting it.
+   The artifact is built and verified but NOT installed, so no rc.3 Dev screen exists to test.)
+evidence:
+  omnimux-desktop-fork/.worktrees/harness-rc3-repin/docs/evidence/harness-rc3-repin/commands.md
+  omnimux-desktop-fork/.worktrees/harness-rc3-repin/docs/evidence/harness-rc3-repin/patch-verification.md
+  omnimux-desktop-fork/.worktrees/harness-rc3-repin/docs/evidence/harness-rc3-repin/patch-verification.json
+  omnimux-desktop-fork/.worktrees/harness-rc3-repin/docs/evidence/harness-rc3-repin/verify-patches.mjs
+  omnimux-dsh/.agent-reports/harness-version-align/execution-report.md              (deliverable)
+  Artifact: dsh-plugin-desktop/dist/mac-arm64/OmniMux.app  (build-info.json dsh.packageSpec 0.1.5-rc.3)
+  Logs (real exit codes): /tmp/rca-prepare-runtime.log (REAL_EXIT=1),
+    /tmp/rca-prepare-runtime2.log (REAL_EXIT=0, 265 tarballs), /tmp/rca-sync-vendor-write.log (0),
+    /tmp/rca-check-vendor.log (0), /tmp/rca-yarn-install.log (0), /tmp/rca-notices.log (0),
+    /tmp/rca-check-layout.log (1), /tmp/rca-check-layout2.log (1), /tmp/rca-check-layout3.log (0),
+    /tmp/rca-yarn-check.log (1, 2 pre-existing dshmarket failures), /tmp/rca-base-dshmarket.log
+    (1, same failures on the untouched base), /tmp/rca-step-verify_*.log (0 each),
+    /tmp/rca-package-summary.txt (prepare:electron-native 0, omnimux:stage 0, package:dev 0).
+  Tested environment: macOS (darwin-arm64), Node v25.8.0 via nvm, Corepack Yarn 4.18.0,
+  worktree .worktrees/harness-rc3-repin @ pin commit 9dda0eeba3.
+residual: The four Dev acceptance screens are human-owned and missing -> per the skill this blocks
+  upgrade acceptance and any release claim. Not done by design: installing /Applications/OmniMux
+  Dev.app, restarting any app, writing any profile home, materializing Dev, and touching the global
+  dsh CLI (still 0.1.5-rc.3) or the plugin repository's product source. The built artifact was
+  produced from a working tree in which `yarn omnimux:stage` refreshed
+  dsh-plugin-desktop/preset/{owned-packages.json,skeleton/package.json}; those two generated
+  snapshots were restored to their committed content and kept OUT of this pin-scoped change (they
+  carry an unrelated product-plugin roster drift) — see the execution report, section "Out of scope".

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const patch = readFileSync(new URL(
-  '../../patches/dsh-client-ui-directory-picker-browse@0.1.5-rc.1.patch',
+  '../../patches/dsh-client-ui-directory-picker-browse@0.1.5-rc.3.patch',
   import.meta.url,
 ), 'utf8')
 

@@ -1,0 +1,1130 @@
+{
+  "control": {
+    "generatedAt": "2026-10-05T19:11:50.564Z",
+    "repoRoot": "/Users/x/Desktop/Project/omnimux-desktop-fork/.worktrees/harness-rc3-repin",
+    "sourceVersion": "0.1.5-rc.1",
+    "targetVersion": "0.1.5-rc.1",
+    "packedDir": "/Users/x/Desktop/Project/omnimux-desktop-fork/.worktrees/harness-rc3-repin/vendor/dsh-runtime/0.1.5-rc.1",
+    "oracle": "patch -p1 --dry-run --forward --fuzz=0",
+    "crossCheck": "git apply --check -p1 (stricter; rejects zero-context hunks)",
+    "patchCount": 13,
+    "patches": [
+      {
+        "patch": "patches/dsh-agent-presets@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh-agent-presets",
+        "tarball": "deepseek-ai-dsh-agent-presets-0.1.5-rc.1.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 1,
+            "header": "@@ -1,1 +1,1 @@",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": false,
+            "gitApplyOutput": "error: patch failed: lib/index.js:1\nerror: lib/index.js: patch does not apply"
+          },
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 2,
+            "header": "@@ -248,2 +248,14 @@",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": false,
+        "gitApplyWholePatchOutput": "error: patch failed: lib/index.js:1\nerror: lib/index.js: patch does not apply",
+        "hunkCount": 2,
+        "result": "PASS"
+      },
+      {
+        "patch": "patches/dsh-app-boot@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh-app-boot",
+        "tarball": "deepseek-ai-dsh-app-boot-0.1.5-rc.1.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 1,
+            "header": "@@ -656,6 +656,13 @@ function moduleFallbackCurrent(modulesDir, entries) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 2,
+            "header": "@@ -675,7 +682,7 @@ function healProfilesModuleFallbackLocked(entries, modulesDir) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 3,
+            "header": "@@ -694,7 +701,10 @@ function dependencyClosure(anchors, reserved, exclude) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 4,
+            "header": "@@ -709,12 +719,19 @@ function dependencyClosure(anchors, reserved, exclude) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 5,
+            "header": "@@ -725,7 +742,7 @@ function healProfileModuleFallback(profile, installationPackageNames) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": true,
+        "gitApplyWholePatchOutput": "",
+        "hunkCount": 5,
+        "result": "PASS"
+      },
+      {
+        "patch": "patches/dsh-client-modules@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh-client-modules",
+        "tarball": "deepseek-ai-dsh-client-modules-0.1.5-rc.1.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 1,
+            "header": "@@ -240,7 +240,7 @@ function sourceMapSnapshot(clientPath) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": true,
+        "gitApplyWholePatchOutput": "",
+        "hunkCount": 1,
+        "result": "PASS"
+      },
+      {
+        "patch": "patches/dsh-client-ui-directory-picker-browse@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh-client-ui-directory-picker-browse",
+        "tarball": "deepseek-ai-dsh-client-ui-directory-picker-browse-0.1.5-rc.1.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/client.js b/lib/client.js",
+            "hunk": 1,
+            "header": "@@ -280,7 +280,7 @@ window.__ModuleLoader__.load({",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/client.js b/lib/client.js",
+            "hunk": 2,
+            "header": "@@ -293,6 +293,8 @@ window.__ModuleLoader__.load({",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/client.js b/lib/client.js",
+            "hunk": 3,
+            "header": "@@ -670,12 +672,39 @@ window.__ModuleLoader__.load({",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/client.js b/lib/client.js",
+            "hunk": 4,
+            "header": "@@ -833,6 +862,16 @@ window.__ModuleLoader__.load({",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/client.js b/lib/client.js",
+            "hunk": 5,
+            "header": "@@ -860,7 +899,7 @@ window.__ModuleLoader__.load({",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/client.js b/lib/client.js",
+            "hunk": 6,
+            "header": "@@ -956,6 +995,8 @@ window.__ModuleLoader__.load({",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/client.js b/lib/client.js",
+            "hunk": 7,
+            "header": "@@ -993,7 +1034,8 @@ window.__ModuleLoader__.load({",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/client.js b/lib/client.js",
+            "hunk": 8,
+            "header": "@@ -1007,7 +1049,8 @@ window.__ModuleLoader__.load({",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/client.js b/lib/client.js",
+            "hunk": 9,
+            "header": "@@ -1022,6 +1065,16 @@ window.__ModuleLoader__.load({",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/types/client/DirectoryBrowser.d.ts b/lib/types/client/DirectoryBrowser.d.ts",
+            "hunk": 1,
+            "header": "@@ -17,6 +17,10 @@ export interface DirectoryBrowserProps {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/types/client/DirectoryBrowser.d.ts b/lib/types/client/DirectoryBrowser.d.ts",
+            "hunk": 2,
+            "header": "@@ -31,5 +35,5 @@ export interface DirectoryBrowserProps {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/types/client/flow.d.ts b/lib/types/client/flow.d.ts",
+            "hunk": 1,
+            "header": "@@ -8,6 +8,10 @@ export interface BrowseFlowInjected {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/types/client/flow.d.ts b/lib/types/client/flow.d.ts",
+            "hunk": 2,
+            "header": "@@ -21,4 +25,4 @@ export interface BrowseFlowInjected {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": true,
+        "gitApplyWholePatchOutput": "",
+        "hunkCount": 13,
+        "result": "PASS"
+      },
+      {
+        "patch": "patches/dsh-client-ui-primitives@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh-client-ui-primitives",
+        "tarball": "deepseek-ai-dsh-client-ui-primitives-0.1.5-rc.1.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/markdown/MarkdownText.module.css b/lib/markdown/MarkdownText.module.css",
+            "hunk": 1,
+            "header": "@@ -193,24 +193,27 @@",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": true,
+        "gitApplyWholePatchOutput": "",
+        "hunkCount": 1,
+        "result": "PASS"
+      },
+      {
+        "patch": "patches/dsh-client-ui-settings-general@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh-client-ui-settings-general",
+        "tarball": "deepseek-ai-dsh-client-ui-settings-general-0.1.5-rc.1.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/client.js b/lib/client.js",
+            "hunk": 1,
+            "header": "@@ -72,6 +72,32 @@ window.__ModuleLoader__.load({",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/client.js b/lib/client.js",
+            "hunk": 2,
+            "header": "@@ -86,6 +112,10 @@ window.__ModuleLoader__.load({",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": true,
+        "gitApplyWholePatchOutput": "",
+        "hunkCount": 2,
+        "result": "PASS"
+      },
+      {
+        "patch": "patches/dsh-host-directory-picker-browse@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh-host-directory-picker-browse",
+        "tarball": "deepseek-ai-dsh-host-directory-picker-browse-0.1.5-rc.1.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 1,
+            "header": "@@ -117,11 +117,13 @@ function messageOf(error) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": true,
+        "gitApplyWholePatchOutput": "",
+        "hunkCount": 1,
+        "result": "PASS"
+      },
+      {
+        "patch": "patches/dsh-plugin-package-inventory-deepseek@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh-plugin-package-inventory-deepseek",
+        "tarball": "deepseek-ai-dsh-plugin-package-inventory-deepseek-0.1.5-rc.1.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 1,
+            "header": "@@ -43,2 +43,16 @@",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": true,
+        "gitApplyWholePatchOutput": "",
+        "hunkCount": 1,
+        "result": "PASS"
+      },
+      {
+        "patch": "patches/dsh-settings@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh-settings",
+        "tarball": "deepseek-ai-dsh-settings-0.1.5-rc.1.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 1,
+            "header": "@@ -85,6 +85,13 @@ function parseSettingsNamespace(value) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 2,
+            "header": "@@ -606,5 +613,14 @@ function isUnloading(ctx) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/types/index.d.ts b/lib/types/index.d.ts",
+            "hunk": 1,
+            "header": "@@ -12,6 +12,13 @@ import type { SettingsNamespace, SettingsUpdateSource } from './types.ts';",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/types/index.d.ts b/lib/types/index.d.ts",
+            "hunk": 2,
+            "header": "@@ -332,5 +339,16 @@ export interface SettingsSectionHooks<T> {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": true,
+        "gitApplyWholePatchOutput": "",
+        "hunkCount": 4,
+        "result": "PASS"
+      },
+      {
+        "patch": "patches/dsh-subprocess-local@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh-subprocess-local",
+        "tarball": "deepseek-ai-dsh-subprocess-local-0.1.5-rc.1.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/runner-launch-COYGu0Dl.js b/lib/runner-launch-COYGu0Dl.js",
+            "hunk": 1,
+            "header": "@@ -1449,6 +1449,14 @@",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": true,
+        "gitApplyWholePatchOutput": "",
+        "hunkCount": 1,
+        "result": "PASS"
+      },
+      {
+        "patch": "patches/dsh-web-app@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh-web-app",
+        "tarball": "deepseek-ai-dsh-web-app-0.1.5-rc.1.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 1,
+            "header": "@@ -43,6 +43,7 @@ const LOOPBACK_HOST = \"127.0.0.1\";",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 2,
+            "header": "@@ -122,7 +123,11 @@ function spawnBrowserLauncher(url) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": true,
+        "gitApplyWholePatchOutput": "",
+        "hunkCount": 2,
+        "result": "PASS"
+      },
+      {
+        "patch": "patches/dsh-win32-process@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh-win32-process",
+        "tarball": "deepseek-ai-dsh-win32-process-0.1.5-rc.1.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 1,
+            "header": "@@ -389,7 +389,8 @@ function spawnPipedProcess(api, options) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 2,
+            "header": "@@ -533,7 +534,8 @@ function spawnJobProcess(api, options, resolveStdio, createName, create) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": true,
+        "gitApplyWholePatchOutput": "",
+        "hunkCount": 2,
+        "result": "PASS"
+      },
+      {
+        "patch": "patches/dsh@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh",
+        "tarball": "deepseek-ai-dsh-0.1.5-rc.1.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/bin.js b/lib/bin.js",
+            "hunk": 1,
+            "header": "@@ -79,7 +79,7 @@ function resolveBoot(program, profile, options, args) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/bin.js b/lib/bin.js",
+            "hunk": 2,
+            "header": "@@ -89,7 +89,7 @@ function parseDshArgs(argv, version) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/bin.js b/lib/bin.js",
+            "hunk": 3,
+            "header": "@@ -106,7 +106,7 @@ function parseDshArgs(argv, version) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/bin.js b/lib/bin.js",
+            "hunk": 4,
+            "header": "@@ -138,8 +138,8 @@ function readVersion() {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/plugin-Ddi42qoW.js b/lib/plugin-Ddi42qoW.js",
+            "hunk": 1,
+            "header": "@@ -109,7 +109,8 @@ function runPlugin(profile, args) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": true,
+        "gitApplyWholePatchOutput": "",
+        "hunkCount": 5,
+        "result": "PASS"
+      }
+    ],
+    "totals": {
+      "patches": 13,
+      "patchesPass": 13,
+      "patchesFail": 0,
+      "hunks": 40,
+      "hunksPass": 40,
+      "hunksFail": 0,
+      "gitApplyWholePatchPass": 12,
+      "gitApplyWholePatchFail": 1
+    }
+  },
+  "target": {
+    "generatedAt": "2026-10-05T19:11:59.540Z",
+    "repoRoot": "/Users/x/Desktop/Project/omnimux-desktop-fork/.worktrees/harness-rc3-repin",
+    "sourceVersion": "0.1.5-rc.1",
+    "targetVersion": "0.1.5-rc.3",
+    "packedDir": "/Users/x/Desktop/Project/omnimux-desktop-fork/.worktrees/harness-rc3-repin/deepseek-harness/dist/npm",
+    "oracle": "patch -p1 --dry-run --forward --fuzz=0",
+    "crossCheck": "git apply --check -p1 (stricter; rejects zero-context hunks)",
+    "patchCount": 13,
+    "patches": [
+      {
+        "patch": "patches/dsh-agent-presets@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh-agent-presets",
+        "tarball": "deepseek-ai-dsh-agent-presets-0.1.5-rc.3.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 1,
+            "header": "@@ -1,1 +1,1 @@",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": false,
+            "gitApplyOutput": "error: patch failed: lib/index.js:1\nerror: lib/index.js: patch does not apply"
+          },
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 2,
+            "header": "@@ -248,2 +248,14 @@",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": false,
+        "gitApplyWholePatchOutput": "error: patch failed: lib/index.js:1\nerror: lib/index.js: patch does not apply",
+        "hunkCount": 2,
+        "result": "PASS"
+      },
+      {
+        "patch": "patches/dsh-app-boot@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh-app-boot",
+        "tarball": "deepseek-ai-dsh-app-boot-0.1.5-rc.3.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 1,
+            "header": "@@ -656,6 +656,13 @@ function moduleFallbackCurrent(modulesDir, entries) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 2,
+            "header": "@@ -675,7 +682,7 @@ function healProfilesModuleFallbackLocked(entries, modulesDir) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 3,
+            "header": "@@ -694,7 +701,10 @@ function dependencyClosure(anchors, reserved, exclude) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 4,
+            "header": "@@ -709,12 +719,19 @@ function dependencyClosure(anchors, reserved, exclude) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 5,
+            "header": "@@ -725,7 +742,7 @@ function healProfileModuleFallback(profile, installationPackageNames) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": true,
+        "gitApplyWholePatchOutput": "",
+        "hunkCount": 5,
+        "result": "PASS"
+      },
+      {
+        "patch": "patches/dsh-client-modules@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh-client-modules",
+        "tarball": "deepseek-ai-dsh-client-modules-0.1.5-rc.3.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 1,
+            "header": "@@ -240,7 +240,7 @@ function sourceMapSnapshot(clientPath) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": true,
+        "gitApplyWholePatchOutput": "",
+        "hunkCount": 1,
+        "result": "PASS"
+      },
+      {
+        "patch": "patches/dsh-client-ui-directory-picker-browse@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh-client-ui-directory-picker-browse",
+        "tarball": "deepseek-ai-dsh-client-ui-directory-picker-browse-0.1.5-rc.3.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/client.js b/lib/client.js",
+            "hunk": 1,
+            "header": "@@ -280,7 +280,7 @@ window.__ModuleLoader__.load({",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/client.js b/lib/client.js",
+            "hunk": 2,
+            "header": "@@ -293,6 +293,8 @@ window.__ModuleLoader__.load({",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/client.js b/lib/client.js",
+            "hunk": 3,
+            "header": "@@ -670,12 +672,39 @@ window.__ModuleLoader__.load({",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/client.js b/lib/client.js",
+            "hunk": 4,
+            "header": "@@ -833,6 +862,16 @@ window.__ModuleLoader__.load({",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/client.js b/lib/client.js",
+            "hunk": 5,
+            "header": "@@ -860,7 +899,7 @@ window.__ModuleLoader__.load({",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/client.js b/lib/client.js",
+            "hunk": 6,
+            "header": "@@ -956,6 +995,8 @@ window.__ModuleLoader__.load({",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/client.js b/lib/client.js",
+            "hunk": 7,
+            "header": "@@ -993,7 +1034,8 @@ window.__ModuleLoader__.load({",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/client.js b/lib/client.js",
+            "hunk": 8,
+            "header": "@@ -1007,7 +1049,8 @@ window.__ModuleLoader__.load({",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/client.js b/lib/client.js",
+            "hunk": 9,
+            "header": "@@ -1022,6 +1065,16 @@ window.__ModuleLoader__.load({",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/types/client/DirectoryBrowser.d.ts b/lib/types/client/DirectoryBrowser.d.ts",
+            "hunk": 1,
+            "header": "@@ -17,6 +17,10 @@ export interface DirectoryBrowserProps {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/types/client/DirectoryBrowser.d.ts b/lib/types/client/DirectoryBrowser.d.ts",
+            "hunk": 2,
+            "header": "@@ -31,5 +35,5 @@ export interface DirectoryBrowserProps {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/types/client/flow.d.ts b/lib/types/client/flow.d.ts",
+            "hunk": 1,
+            "header": "@@ -8,6 +8,10 @@ export interface BrowseFlowInjected {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/types/client/flow.d.ts b/lib/types/client/flow.d.ts",
+            "hunk": 2,
+            "header": "@@ -21,4 +25,4 @@ export interface BrowseFlowInjected {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": true,
+        "gitApplyWholePatchOutput": "",
+        "hunkCount": 13,
+        "result": "PASS"
+      },
+      {
+        "patch": "patches/dsh-client-ui-primitives@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh-client-ui-primitives",
+        "tarball": "deepseek-ai-dsh-client-ui-primitives-0.1.5-rc.3.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/markdown/MarkdownText.module.css b/lib/markdown/MarkdownText.module.css",
+            "hunk": 1,
+            "header": "@@ -193,24 +193,27 @@",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": true,
+        "gitApplyWholePatchOutput": "",
+        "hunkCount": 1,
+        "result": "PASS"
+      },
+      {
+        "patch": "patches/dsh-client-ui-settings-general@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh-client-ui-settings-general",
+        "tarball": "deepseek-ai-dsh-client-ui-settings-general-0.1.5-rc.3.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/client.js b/lib/client.js",
+            "hunk": 1,
+            "header": "@@ -72,6 +72,32 @@ window.__ModuleLoader__.load({",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/client.js b/lib/client.js",
+            "hunk": 2,
+            "header": "@@ -86,6 +112,10 @@ window.__ModuleLoader__.load({",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": true,
+        "gitApplyWholePatchOutput": "",
+        "hunkCount": 2,
+        "result": "PASS"
+      },
+      {
+        "patch": "patches/dsh-host-directory-picker-browse@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh-host-directory-picker-browse",
+        "tarball": "deepseek-ai-dsh-host-directory-picker-browse-0.1.5-rc.3.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 1,
+            "header": "@@ -117,11 +117,13 @@ function messageOf(error) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": true,
+        "gitApplyWholePatchOutput": "",
+        "hunkCount": 1,
+        "result": "PASS"
+      },
+      {
+        "patch": "patches/dsh-plugin-package-inventory-deepseek@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh-plugin-package-inventory-deepseek",
+        "tarball": "deepseek-ai-dsh-plugin-package-inventory-deepseek-0.1.5-rc.3.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 1,
+            "header": "@@ -43,2 +43,16 @@",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": true,
+        "gitApplyWholePatchOutput": "",
+        "hunkCount": 1,
+        "result": "PASS"
+      },
+      {
+        "patch": "patches/dsh-settings@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh-settings",
+        "tarball": "deepseek-ai-dsh-settings-0.1.5-rc.3.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 1,
+            "header": "@@ -85,6 +85,13 @@ function parseSettingsNamespace(value) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 2,
+            "header": "@@ -606,5 +613,14 @@ function isUnloading(ctx) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/types/index.d.ts b/lib/types/index.d.ts",
+            "hunk": 1,
+            "header": "@@ -12,6 +12,13 @@ import type { SettingsNamespace, SettingsUpdateSource } from './types.ts';",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/types/index.d.ts b/lib/types/index.d.ts",
+            "hunk": 2,
+            "header": "@@ -332,5 +339,16 @@ export interface SettingsSectionHooks<T> {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": true,
+        "gitApplyWholePatchOutput": "",
+        "hunkCount": 4,
+        "result": "PASS"
+      },
+      {
+        "patch": "patches/dsh-subprocess-local@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh-subprocess-local",
+        "tarball": "deepseek-ai-dsh-subprocess-local-0.1.5-rc.3.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/runner-launch-COYGu0Dl.js b/lib/runner-launch-COYGu0Dl.js",
+            "hunk": 1,
+            "header": "@@ -1449,6 +1449,14 @@",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": true,
+        "gitApplyWholePatchOutput": "",
+        "hunkCount": 1,
+        "result": "PASS"
+      },
+      {
+        "patch": "patches/dsh-web-app@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh-web-app",
+        "tarball": "deepseek-ai-dsh-web-app-0.1.5-rc.3.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 1,
+            "header": "@@ -43,6 +43,7 @@ const LOOPBACK_HOST = \"127.0.0.1\";",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 2,
+            "header": "@@ -122,7 +123,11 @@ function spawnBrowserLauncher(url) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": true,
+        "gitApplyWholePatchOutput": "",
+        "hunkCount": 2,
+        "result": "PASS"
+      },
+      {
+        "patch": "patches/dsh-win32-process@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh-win32-process",
+        "tarball": "deepseek-ai-dsh-win32-process-0.1.5-rc.3.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 1,
+            "header": "@@ -389,7 +389,8 @@ function spawnPipedProcess(api, options) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/index.js b/lib/index.js",
+            "hunk": 2,
+            "header": "@@ -533,7 +534,8 @@ function spawnJobProcess(api, options, resolveStdio, createName, create) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": true,
+        "gitApplyWholePatchOutput": "",
+        "hunkCount": 2,
+        "result": "PASS"
+      },
+      {
+        "patch": "patches/dsh@0.1.5-rc.1.patch",
+        "package": "@deepseek-ai/dsh",
+        "tarball": "deepseek-ai-dsh-0.1.5-rc.3.tgz",
+        "tarballPresent": true,
+        "hunks": [
+          {
+            "file": "a/lib/bin.js b/lib/bin.js",
+            "hunk": 1,
+            "header": "@@ -79,7 +79,7 @@ function resolveBoot(program, profile, options, args) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/bin.js b/lib/bin.js",
+            "hunk": 2,
+            "header": "@@ -89,7 +89,7 @@ function parseDshArgs(argv, version) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/bin.js b/lib/bin.js",
+            "hunk": 3,
+            "header": "@@ -106,7 +106,7 @@ function parseDshArgs(argv, version) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/bin.js b/lib/bin.js",
+            "hunk": 4,
+            "header": "@@ -138,8 +138,8 @@ function readVersion() {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          },
+          {
+            "file": "a/lib/plugin-Ddi42qoW.js b/lib/plugin-Ddi42qoW.js",
+            "hunk": 1,
+            "header": "@@ -109,7 +109,8 @@ function runPlugin(profile, args) {",
+            "ok": true,
+            "output": "",
+            "gitApplyOk": true,
+            "gitApplyOutput": ""
+          }
+        ],
+        "wholePatchApplies": true,
+        "wholePatchOutput": "",
+        "gitApplyWholePatch": true,
+        "gitApplyWholePatchOutput": "",
+        "hunkCount": 5,
+        "result": "PASS"
+      }
+    ],
+    "totals": {
+      "patches": 13,
+      "patchesPass": 13,
+      "patchesFail": 0,
+      "hunks": 40,
+      "hunksPass": 40,
+      "hunksFail": 0,
+      "gitApplyWholePatchPass": 12,
+      "gitApplyWholePatchFail": 1
+    }
+  }
+}

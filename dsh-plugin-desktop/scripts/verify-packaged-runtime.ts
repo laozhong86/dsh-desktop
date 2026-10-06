@@ -68,8 +68,15 @@ const PNPM_RUNTIME_VERSION = packageVersion(PNPM_PACKAGE_ROOT)
 /** Maximum physical file count accepted beside ASAR after smart unpack. */
 export const MAX_UNPACKED_RUNTIME_FILES = 1_500
 
-/** Maximum physical payload accepted beside ASAR after smart unpack. */
-export const MAX_UNPACKED_RUNTIME_BYTES = 128 * 1024 * 1024
+/**
+ * Maximum physical payload accepted beside ASAR after smart unpack.
+ *
+ * The rc.3 connector bridge ships the uv Python runtime, which adds roughly
+ * 86 MB across both macOS architecture packages and lifts the budgeted surface
+ * (everything beside the staged preset seed) past the pre-uv 128 MB ceiling.
+ * The budget still rejects a regression to the old full app.asar mirror.
+ */
+export const MAX_UNPACKED_RUNTIME_BYTES = 192 * 1024 * 1024
 
 /** Narrow ceiling for pnpm's smart-unpacked native-helper package root. */
 export const MAX_PNPM_SMART_UNPACK_FILES = 32

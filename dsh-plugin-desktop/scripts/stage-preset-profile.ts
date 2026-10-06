@@ -40,6 +40,7 @@ const PRODUCT_PLUGINS = [
   'omnimux-analytics',
   'omnimux-publish',
   'omnimux-forms',
+  'omnimux-automation',
 ] as const
 const CORE_REQUIRED_BUNDLES = [
   '@deepseek-ai/dsh-base',
@@ -181,6 +182,7 @@ export function stagePresetProfile(options: StagePresetProfileOptions = {}): num
     assertStagedSelfContained(candidatePluginsDir)
     verifyInstalledBetterSidebar(join(candidatePluginsDir, 'dsh-better-sidebar'), sidebar.packedRoot)
     stageSkeleton(targetPresetDir, candidateDir, alphaPlugins, releaseChannel)
+    assertSkeletonBundlesAreStaged(candidateDir)
     stageAgentPresets(resolvedPluginsRoot, candidateDir)
     const skills = stageSkills(resolvedPluginsRoot, candidateDir, productPlugins)
     writeFileSync(join(candidateDir, 'owned-packages.json'), `${JSON.stringify(owned, undefined, 2)}\n`)
@@ -411,6 +413,29 @@ function stageSkeleton(
       },
     },
   }, undefined, 2)}\n`)
+}
+
+/**
+ * Refuse a preset whose skeleton names a bundle the staging never wrote.
+ *
+ * The skeleton's bundles are the Profile's load list, and the seed asserts each
+ * one resolves under `preset/plugins` before it touches the user's Profile. A
+ * preset that fails that assert cannot boot: the app opens its recovery window
+ * instead of the desktop. Asserting the artifact here keeps that failure in the
+ * build, where the message names the package instead of a startup crash.
+ */
+function assertSkeletonBundlesAreStaged(candidateDir: string): void {
+  const manifest = readManifest(join(candidateDir, 'skeleton', 'package.json'))
+  const pluginsDir = join(candidateDir, 'plugins')
+  const missing = (manifest.dsh?.profile?.bundles ?? []).filter(name =>
+    !name.startsWith('@deepseek-ai/')
+    && !existsSync(join(pluginsDir, ...packageDirSegments(name), 'package.json')))
+  if (missing.length > 0) {
+    throw new Error(
+      `desktop preset declares bundles it does not stage: ${missing.join(', ')}; `
+      + 'list every declared bundle in PRODUCT_PLUGINS or drop it from preset/skeleton/package.json',
+    )
+  }
 }
 
 /** A skill staged from a product plugin, recorded so the seed can own its copy. */

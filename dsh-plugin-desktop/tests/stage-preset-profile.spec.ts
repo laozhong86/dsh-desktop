@@ -61,18 +61,21 @@ const PRODUCT_PLUGINS = [
   'omnimux-analytics',
   'omnimux-publish',
   'omnimux-forms',
+  'omnimux-automation',
 ] as const
 const ALPHA_PLUGINS = [
   'omnimux-accounts',
   'omnimux-publish',
   'omnimux-analytics',
   'omnimux-forms',
+  'omnimux-automation',
 ] as const
 const LIFECYCLE = {
   'omnimux-accounts': { stage: 'alpha', toolPrefixes: ['omnimux_accounts_'] },
   'omnimux-publish': { stage: 'alpha', toolPrefixes: ['omnimux_publish_'] },
   'omnimux-analytics': { stage: 'alpha', toolPrefixes: ['omnimux_analytics_'] },
   'omnimux-forms': { stage: 'alpha', toolPrefixes: ['omnimux_forms_'] },
+  'omnimux-automation': { stage: 'alpha', toolPrefixes: ['automation_'] },
 } as const
 
 describe('stagePresetProfile', () => {
@@ -165,7 +168,7 @@ describe('stagePresetProfile', () => {
       )
 
       sidebarFixture.path = sidebar
-      expect(stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' })).toBe(16)
+      expect(stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' })).toBe(17)
       const stagedPresets = join(presetDir, 'agent-presets')
       expect(readdirSync(stagedPresets).sort()).toEqual(['cordis', 'daily-work', 'standard', 'tiktok-agent'])
       expect(readFileSync(join(stagedPresets, 'cordis', 'preset.yml'), 'utf8')).toBe('name: cordis\n')
@@ -316,7 +319,7 @@ describe('stagePresetProfile', () => {
       })
 
       sidebarFixture.path = sidebar
-      expect(stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' })).toBe(13)
+      expect(stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' })).toBe(14)
       expect(listPackageNames(join(presetDir, 'plugins'))).not.toContain('@fixture/excluded')
       expect(readJson(join(presetDir, 'owned-packages.json'))).not.toContain('@fixture/excluded')
     } finally {
@@ -417,7 +420,7 @@ describe('stagePresetProfile', () => {
       createProductPlugins(pluginsRoot)
       createPresetSkeleton(presetDir)
 
-      expect(stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' })).toBe(13)
+      expect(stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' })).toBe(14)
 
       const output = join(presetDir, 'plugins')
       const owned = readJson(join(presetDir, 'owned-packages.json')) as unknown as string[]
@@ -430,6 +433,55 @@ describe('stagePresetProfile', () => {
       expect(readJson(join(output, 'omnimux', 'src', 'release-channel.json'))).toEqual({
         channel: 'development',
       })
+    } finally {
+      rmSync(fixture, { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  it('refuses a development stage whose skeleton would name an unstaged Alpha bundle', () => {
+    const fixture = mkdtempSync(join(tmpdir(), 'omnimux unstaged alpha bundle '))
+    try {
+      const pluginsRoot = join(fixture, 'product plugins')
+      const presetDir = join(fixture, 'preset')
+      createProductPlugins(pluginsRoot)
+      createPresetSkeleton(presetDir)
+      // A lifecycle entry outside PRODUCT_PLUGINS is how a packaged preset once
+      // declared a bundle the stage never wrote: the app opened its recovery
+      // window instead of the desktop. The stage has to refuse it here.
+      createPackage(join(pluginsRoot, 'omnimux-extra'), 'omnimux-extra')
+      writeFileSync(
+        join(pluginsRoot, 'omnimux', 'src', 'plugin-lifecycle.json'),
+        `${JSON.stringify({
+          ...LIFECYCLE,
+          'omnimux-extra': { stage: 'alpha', toolPrefixes: ['omnimux_extra_'] },
+        }, undefined, 2)}\n`,
+      )
+
+      expect(() => stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' }))
+        .toThrowError('desktop preset declares bundles it does not stage: omnimux-extra')
+      expect(existsSync(join(presetDir, 'plugins'))).toBe(false)
+    } finally {
+      rmSync(fixture, { recursive: true, force: true })
+    }
+  }, 30_000)
+
+  it('stages a package for every bundle the development skeleton declares', () => {
+    const fixture = mkdtempSync(join(tmpdir(), 'omnimux declared bundles '))
+    try {
+      const pluginsRoot = join(fixture, 'product plugins')
+      const presetDir = join(fixture, 'preset')
+      createProductPlugins(pluginsRoot)
+      createPresetSkeleton(presetDir)
+
+      stagePresetProfile({ pluginsRoot, presetDir, releaseChannel: 'development' })
+
+      const skeleton = readJson(join(presetDir, 'skeleton', 'package.json'))
+      const declared = (skeleton.dsh.profile.bundles as string[])
+        .filter((name: string) => !name.startsWith('@deepseek-ai/'))
+      expect(declared).toContain('omnimux-automation')
+      for (const name of declared) {
+        expect(existsSync(join(presetDir, 'plugins', name, 'package.json'))).toBe(true)
+      }
     } finally {
       rmSync(fixture, { recursive: true, force: true })
     }

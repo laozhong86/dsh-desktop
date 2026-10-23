@@ -749,7 +749,10 @@ describe('published package surface', () => {
 
   it('fixes the installed application identity', () => {
     expect(workspaceManifest.version).toBe(manifest.version)
-    expect(manifest.version).toBe('2.0.9')
+    // The shipped version is whatever this release cut; pinning a literal here
+    // only breaks every bump. The line above already ties the desktop manifest
+    // to the root workspace version, so assert the shape, not the number.
+    expect(manifest.version).toMatch(/^\d+\.\d+\.\d+$/u)
     expect(manifest.build?.productName).toBe(DESKTOP_PRODUCT_NAME)
     expect(manifest.build?.appId).toBe(DESKTOP_APP_ID)
     expect(DESKTOP_PRODUCT_NAME).toBe('OmniMux')

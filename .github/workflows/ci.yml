@@ -144,6 +144,20 @@ jobs:
         env:
           DSH_PACKAGE_CHECK_ALREADY_RAN: '1'
         run: yarn workspace dsh-plugin-desktop dist:win-portable
+      # The release lane has no Windows host of its own: package-win.ts refuses
+      # non-Windows hosts, so this job is the only place an official installer is
+      # produced. Publish it so a release can collect the artifact instead of
+      # rebuilding on a machine nobody keeps.
+      - name: Upload Windows release artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
+        with:
+          name: windows-x64-release
+          if-no-files-found: error
+          retention-days: 30
+          path: |
+            dsh-plugin-desktop/dist/OmniMux-*-x64-Setup.exe
+            dsh-plugin-desktop/dist/OmniMux-*-x64-Portable.zip
+            dsh-plugin-desktop/dist/latest.yml
 
   # macOS-only universal packaging smoke on a real macOS runner: the signed
   # release is built manually on a credentialed machine, so an unsigned DMG

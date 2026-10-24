@@ -128,7 +128,10 @@ export class DesktopLayoutState implements ILayout {
     this.navigation.abort()
     if (this.panel.activePanelId === panelId) return
     this.panel = Object.freeze({ activePanelId: panelId })
+    // The panel observable and the layout snapshot are separate channels, and
+    // both audiences must learn about a selection change.
     for (const listener of this.panelListeners) listener()
+    for (const listener of this.listeners) listener()
   }
 
   /** Return to the Conversation when the selected plugin panel is unloaded. */

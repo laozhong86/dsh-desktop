@@ -348,12 +348,29 @@ try {
   const ids = new Set(graph.entries.map(entry => entry.id))
   const aaEnabled = aaRequested && !brokenAa
   if (ids.has('@agents-anywhere/dsh-bridge-next') !== aaEnabled) throw new Error('AA client graph does not match explicit selection')
-  if (aaEnabled && (!ctx.get('agentsAnywhereRuntime') || !ctx.get('agentsAnywhereOnboarding'))) {
-    throw new Error('AA Host services did not activate in the actual Desktop profile')
+  if (aaEnabled) {
+    // The AA bridge activates asynchronously, so poll for its services.
+    const deadline = Date.now() + 30_000
+    while ((!ctx.get('agentsAnywhereRuntime') || !ctx.get('agentsAnywhereOnboarding')) && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 250))
+    }
+    if (!ctx.get('agentsAnywhereRuntime') || !ctx.get('agentsAnywhereOnboarding')) {
+      throw new Error('AA Host services did not activate in the actual Desktop profile')
+    }
   }
   if (aaEnabled) {
     const endpoint = join(home, 'agents-anywhere', 'bridge', 'endpoint.json')
-    if (!existsSync(endpoint)) throw new Error('AA did not publish its native DSH home endpoint')
+    // The bridge publishes the endpoint once its connector is up, which is
+    // asynchronous, so poll instead of sampling once.
+    const deadline = Date.now() + 30_000
+    while (!existsSync(endpoint) && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 250))
+    }
+    if (!existsSync(endpoint)) {
+      const { readdirSync } = await import('node:fs')
+      const walk = (dir) => { try { return readdirSync(dir).join(', ') } catch { return '<absent>' } }
+      throw new Error(`AA did not publish its native DSH home endpoint; home=${walk(join(home, 'agents-anywhere'))} state=${walk(join(home, 'aa-smoke-state'))}`)
+    }
     const snapshot = await ctx.get('agentsAnywhereOnboarding').inspect()
     if (snapshot.account) throw new Error('A fresh Profile inherited an AA account')
   }

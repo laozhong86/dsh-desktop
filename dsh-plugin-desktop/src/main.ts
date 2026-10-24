@@ -127,7 +127,6 @@ import { routeDesktopStartupFailure } from './startup-failure-routing.ts'
 import { DesktopStartupGeneration } from './startup-generation.ts'
 import {
   desktopInstallAnchor,
-  healDesktopProfileModuleFallback,
   prepareDesktopProfile,
   type SkippedOptionalEntry,
 } from './profile.ts'
@@ -1140,7 +1139,6 @@ async function start(l2: ReturnType<typeof resolveDesktopL2Launch>): Promise<voi
         }
       },
     }
-    await healDesktopProfileModuleFallback(homeDir)
     let prepared = prepareDesktopProfile(
       process.env.DSH_TELEMETRY_DISABLED,
       homeDir,
@@ -1459,7 +1457,6 @@ async function start(l2: ReturnType<typeof resolveDesktopL2Launch>): Promise<voi
       clearEnvironmentPath: pnpmRuntime.clearEnvironmentPath,
       dshBootstrapPath,
     }
-    await healDesktopProfileModuleFallback(homeDir, prepared.profile)
     if (profilePreferences === undefined) {
       throw new Error(`${BIN_NAME}: active Profile preferences were not initialized`)
     }

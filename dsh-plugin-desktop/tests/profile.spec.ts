@@ -3,9 +3,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
-  realpathSync,
   rmSync,
-  symlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -14,11 +12,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   composeEntries,
-  healProfilesModuleFallback,
   initProfile,
   PROFILE_TEMPLATES,
 } from '@deepseek-ai/dsh-app-boot'
-import { retainAsarModuleResolver } from '../src/asar-module-resolver-state.ts'
 import {
   DESKTOP_PACKAGE_NAME,
   desktopShellModeFromSettings,
@@ -28,8 +24,6 @@ import {
   ensureDesktopProfile,
   prepareDesktopProfile,
   readDesktopShellMode,
-  removeObsoleteDesktopSharedModuleFallback,
-  shippedPresetRoot,
   stagedPresetRoot,
   validateDshMarketBundlePatches,
 } from '../src/profile.ts'
@@ -54,7 +48,7 @@ function installWebClient(
   const webDir = join(home, 'profiles', 'web')
   const template = PROFILE_TEMPLATES.web
   if (template === undefined) throw new Error('test requires the shipped Web template')
-  initProfile(webDir, template.bundles, template.patchReload)
+  initProfile(webDir, template.bundles)
   const packageDir = join(webDir, 'node_modules', ...packageName.split('/'))
   mkdirSync(packageDir, { recursive: true })
   writeFileSync(join(packageDir, 'package.json'), JSON.stringify({
@@ -87,104 +81,13 @@ afterEach(() => {
 describe('desktop profile composition', {
   timeout: process.platform === 'win32' ? 10_000 : 5_000,
 }, () => {
-  it('does not recreate the shared Profile fallback while the packaged ASAR resolver is active', async () => {
-    const home = temporaryHome()
-    const installAnchor = join(
-      home,
-      'resources',
-      'app.asar',
-      'node_modules',
-      '@deepseek-ai',
-      'dsh',
-      'package.json',
-    )
-    const releaseResolver = retainAsarModuleResolver()
-    try {
-      await expect(healProfilesModuleFallback({ home, installAnchor })).resolves.toBeUndefined()
-      expect(existsSync(join(home, 'profiles', 'node_modules'))).toBe(false)
-    } finally {
-      releaseResolver()
-    }
-  })
-
-  it('removes only provably managed legacy shared fallbacks', () => {
-    const home = temporaryHome()
-    const sharedModules = join(home, 'profiles', 'node_modules')
-    const legacyTarget = join(
-      home,
-      'old-install',
-      'resources',
-      'app.asar.unpacked',
-      'node_modules',
-      'legacy-package',
-    )
-    const ordinaryTarget = join(home, 'user-packages', 'ordinary-package')
-    mkdirSync(legacyTarget, { recursive: true })
-    mkdirSync(ordinaryTarget, { recursive: true })
-    mkdirSync(sharedModules, { recursive: true })
-    const legacyLink = join(sharedModules, 'legacy-package')
-    const ordinaryLink = join(sharedModules, 'ordinary-package')
-    symlinkSync(legacyTarget, legacyLink, process.platform === 'win32' ? 'junction' : 'dir')
-    symlinkSync(ordinaryTarget, ordinaryLink, process.platform === 'win32' ? 'junction' : 'dir')
-
-    const managedProxy = join(sharedModules, '@deepseek-ai', 'managed-proxy')
-    mkdirSync(managedProxy, { recursive: true })
-    writeFileSync(join(managedProxy, 'package.json'), `${JSON.stringify({
-      name: '@deepseek-ai/managed-proxy',
-      dsh: {
-        moduleFallback: {
-          targets: { '.': pathToFileURL(join(legacyTarget, 'index.js')).href },
-        },
-      },
-    })}\n`)
-    const unknownDirectory = join(sharedModules, '@deepseek-ai', 'user-package')
-    mkdirSync(unknownDirectory, { recursive: true })
-    writeFileSync(join(unknownDirectory, 'package.json'), '{"name":"@deepseek-ai/user-package"}\n')
-    const userManagedShape = join(sharedModules, '@deepseek-ai', 'user-managed-shape')
-    mkdirSync(userManagedShape, { recursive: true })
-    writeFileSync(join(userManagedShape, 'package.json'), `${JSON.stringify({
-      name: '@deepseek-ai/user-managed-shape',
-      dsh: {
-        moduleFallback: {
-          targets: { '.': pathToFileURL(join(ordinaryTarget, 'index.js')).href },
-        },
-      },
-    })}\n`)
-    writeFileSync(join(sharedModules, 'user-note.txt'), 'preserve me\n')
-
-    expect(removeObsoleteDesktopSharedModuleFallback(home)).toBe(2)
-    expect(existsSync(legacyLink)).toBe(false)
-    expect(existsSync(managedProxy)).toBe(false)
-    expect(existsSync(ordinaryLink)).toBe(true)
-    expect(existsSync(unknownDirectory)).toBe(true)
-    expect(existsSync(userManagedShape)).toBe(true)
-    expect(readFileSync(join(sharedModules, 'user-note.txt'), 'utf8')).toBe('preserve me\n')
-    expect(removeObsoleteDesktopSharedModuleFallback(home)).toBe(0)
-  })
-
-  it('ships a PowerShell-backed standard preset for Windows', () => {
-    const standardPreset = readFileSync(
-      join(shippedPresetRoot(), 'standard', 'agent.cordis.yml'),
-      'utf8',
-    )
-
-    expect(standardPreset).toContain("name: '@deepseek-ai/dsh-tool-pwsh'")
-    expect(standardPreset).toContain("disabled: !!js process.platform !== 'win32'")
-  })
 
   it('reads packaged Cordis skills from the archived preset root', () => {
     const home = temporaryHome()
     const resources = join(home, 'resources')
-    const archivedPresets = join(
-      resources,
-      'app.asar',
-      'node_modules',
-      '@deepseek-ai',
-      'dsh-agent-presets',
-    )
-    // Preset inputs are archived read-only data: the whole root, including the
-    // Cordis skills below it, must stay on the logical ASAR path.
-    const archivedPresetRoot = join(archivedPresets, 'presets')
+    // The staged preset root is product data inside the archive: the whole root,
+    // including the Cordis skills below it, must stay on the logical ASAR path.
+    const archivedPresetRoot = join(resources, 'app.asar', 'preset', 'agent-presets')
     const skillPath = join(
       archivedPresetRoot,
       'cordis',
@@ -192,19 +95,13 @@ describe('desktop profile composition', {
       'cordis-plugin-development',
       'SKILL.md',
     )
-    mkdirSync(join(resources, 'app.asar', 'lib'), { recursive: true })
-    mkdirSync(archivedPresets, { recursive: true })
     mkdirSync(dirname(skillPath), { recursive: true })
-    writeFileSync(join(archivedPresets, 'package.json'), JSON.stringify({
-      name: '@deepseek-ai/dsh-agent-presets',
-      exports: { './package.json': './package.json' },
-    }) + '\n')
     writeFileSync(skillPath, '# Cordis plugin development\n')
 
     const moduleUrl = pathToFileURL(join(resources, 'app.asar', 'lib', 'profile.js')).href
-    const resolvedRoot = shippedPresetRoot(moduleUrl)
+    const resolvedRoot = stagedPresetRoot(moduleUrl)
 
-    expect(resolvedRoot).toBe(realpathSync(archivedPresetRoot))
+    expect(resolvedRoot).toBe(archivedPresetRoot)
     expect(resolvedRoot).not.toContain('app.asar.unpacked')
     expect(readFileSync(join(
       resolvedRoot,
@@ -389,7 +286,7 @@ virtualStoreDirMaxLength: 60
 
   it('assembles the Host shell without replacing the upstream client shell in compatibility mode', () => {
     const home = temporaryHome()
-    writeFileSync(join(home, 'settings.yaml'), 'dsh-desktop:\n  mode: compatibility\n')
+    writeFileSync(join(home, 'settings.yaml'), 'desktop-shell:\n  mode: compatibility\n')
     const prepared = prepareDesktopProfile(undefined, home, 'darwin')
     const patches = prepared.patches as Array<Record<string, unknown>>
     const inserted = patches.flatMap((patch) => {
@@ -414,17 +311,9 @@ virtualStoreDirMaxLength: 60
       name: 'dsh-plugin-desktop/webserver',
       config: { host: '127.0.0.1', port: 44_120 },
     }))
-    expect(patches).toContainEqual(expect.objectContaining({
-      id: 'agent-presets',
-      config: expect.objectContaining({
-        roots: [
-          { path: stagedPresetRoot(), trust: 'system' },
-          { path: join(home, '.agent-presets'), trust: 'user' },
-        ],
-        includeShippedRoot: true,
-        includeUserRoot: false,
-      }),
-    }))
+    // The upstream agent-preset registry owns the roster, so the shell injects no
+    // preset root of its own.
+    expect(patches.map(patch => patch.id)).not.toContain('agent-presets')
     expect(existsSync(join(
       prepared.profile.dir,
       'agent-preset-compat',
@@ -466,8 +355,8 @@ virtualStoreDirMaxLength: 60
       id: 'sandbox',
       name: '@deepseek-ai/dsh-sandbox-local',
     })
-    expect(rows.find(row => row.id === 'agent-presets')).toEqual(expect.objectContaining({
-      name: '@deepseek-ai/dsh-agent-presets',
+    expect(rows.find(row => row.id === 'agent-preset-registry')).toEqual(expect.objectContaining({
+      name: '@deepseek-ai/dsh-agent-preset-registry',
     }))
     expect(rows.map(row => row.id)).not.toContain('desktop-windows-agent-presets')
     expect(rows.find(row => row.id === 'pwsh-sandbox')).toEqual(expect.objectContaining({
@@ -495,27 +384,17 @@ virtualStoreDirMaxLength: 60
     }))
   })
 
-  it('isolates agent presets to product-staged roster and excludes upstream shipped root for omnimux profile', () => {
+  it('leaves the agent-preset roster to the upstream registry for every profile', () => {
     const home = temporaryHome()
     const omnimuxDir = join(home, 'profiles', 'omnimux')
     const template = PROFILE_TEMPLATES.web
     if (template === undefined) throw new Error('test requires the shipped Web template')
-    initProfile(omnimuxDir, template.bundles, template.patchReload)
+    initProfile(omnimuxDir, template.bundles)
     const prepared = prepareDesktopProfile(undefined, home, 'darwin', 'omnimux')
     const patches = prepared.patches as Array<Record<string, unknown>>
-    expect(patches).toContainEqual(expect.objectContaining({
-      id: 'agent-presets',
-      config: expect.objectContaining({
-        roots: [
-          { path: stagedPresetRoot(), trust: 'system' },
-          { path: join(home, '.agent-presets'), trust: 'user' },
-        ],
-        includeShippedRoot: false,
-        includeUserRoot: false,
-      }),
-    }))
+    // The registry ships its own roster, so no profile receives an injected root.
+    expect(patches.map(patch => patch.id)).not.toContain('agent-presets')
   })
-
   it('merges a frozen LAN IPv4 snapshot into existing Web runtime trust', () => {
     const home = temporaryHome()
     writeFileSync(join(home, 'cordis.patch.yml'), [
@@ -789,7 +668,7 @@ virtualStoreDirMaxLength: 60
     const webDir = join(home, 'profiles', 'web')
     const template = PROFILE_TEMPLATES.web
     if (template === undefined) throw new Error('test requires the shipped Web template')
-    initProfile(webDir, template.bundles, template.patchReload)
+    initProfile(webDir, template.bundles)
     writeFileSync(join(webDir, 'cordis.patch.yml'), [
       '- id: ui-layout',
       "  name: '@deepseek-ai/dsh-client-ui-layout'",
@@ -821,7 +700,7 @@ virtualStoreDirMaxLength: 60
   it('keeps a custom layout and withdraws incompatible browser and LAN access', () => {
     const home = temporaryHome()
     writeFileSync(join(home, 'settings.yaml'), [
-      'dsh-desktop:',
+      'desktop-shell:',
       '  mode: advanced',
       '  port: 43189',
       '  openBrowser: true',
@@ -851,9 +730,8 @@ virtualStoreDirMaxLength: 60
     expect(rows.find(row => row.id === 'web-runtime')).toEqual(expect.objectContaining({
       config: expect.objectContaining({ openBrowser: false }),
     }))
-    expect(rows.find(row => row.id === 'settings')).toEqual(expect.objectContaining({
-      config: expect.objectContaining({ dshHome: home }),
-    }))
+    // The settings service is composed upstream; the shell no longer configures it.
+    expect(rows.find(row => row.id === 'settings')?.name).toBe('@deepseek-ai/dsh-settings')
     expect(rows.find(row => row.id === 'ui-layout')?.disabled).toBe(true)
     expect(rows.find(row => row.id === 'ui-sidebar')?.disabled).toBe(false)
     expect(rows.find(row => row.id === 'ui-conversation')?.disabled).toBe(false)
@@ -862,7 +740,7 @@ virtualStoreDirMaxLength: 60
   it('keeps legacy browser intent but clamps LAN exposure when compatibility mode is selected', () => {
     const home = temporaryHome()
     writeFileSync(join(home, 'settings.yaml'), [
-      'dsh-desktop:',
+      'desktop-shell:',
       '  mode: compatibility',
       '  port: 43189',
       '  openBrowser: true',
@@ -889,7 +767,7 @@ virtualStoreDirMaxLength: 60
   it('replaces the official root layout for extended window mode while retaining its occupants', () => {
     const home = temporaryHome()
     writeFileSync(join(home, 'settings.yaml'), [
-      'dsh-desktop:',
+      'desktop-shell:',
       '  mode: extended',
       '  macosMaterial: off',
       '  windowsMaterial: mica',
@@ -925,10 +803,10 @@ virtualStoreDirMaxLength: 60
   it('reads JSON settings and defaults an absent desktop namespace to the platform default', () => {
     const home = temporaryHome()
     const path = join(home, 'desktop-settings.json')
-    writeFileSync(path, JSON.stringify({ 'dsh-desktop': { mode: 'advanced' } }))
+    writeFileSync(path, JSON.stringify({ 'desktop-shell': { mode: 'advanced' } }))
 
-    expect(readDesktopShellMode({ path })).toBe('advanced')
-    expect(desktopStartupSettingsFromSettings({ 'dsh-desktop': { mode: 'advanced', port: 43_189 } })).toEqual({
+    expect(readDesktopShellMode(path)).toBe('advanced')
+    expect(desktopStartupSettingsFromSettings({ 'desktop-shell': { mode: 'advanced', port: 43_189 } })).toEqual({
       mode: 'advanced',
       port: 43_189,
       macosMaterial: 'transparent',
@@ -936,7 +814,7 @@ virtualStoreDirMaxLength: 60
       openBrowser: false,
       networkExposure: 'loopback',
     })
-    expect(desktopStartupSettingsFromSettings({ 'dsh-desktop': { mode: 'advanced' } })).toEqual({
+    expect(desktopStartupSettingsFromSettings({ 'desktop-shell': { mode: 'advanced' } })).toEqual({
       mode: 'advanced',
       port: 44_120,
       macosMaterial: 'transparent',
@@ -949,7 +827,7 @@ virtualStoreDirMaxLength: 60
 
   it('treats legacy LAN exposure as browser access only in compatibility mode', () => {
     expect(desktopStartupSettingsFromSettings({
-      'dsh-desktop': {
+      'desktop-shell': {
         mode: 'advanced',
         openBrowser: false,
         networkExposure: 'lan',
@@ -960,7 +838,7 @@ virtualStoreDirMaxLength: 60
       networkExposure: 'loopback',
     })
     expect(desktopStartupSettingsFromSettings({
-      'dsh-desktop': {
+      'desktop-shell': {
         mode: 'compatibility',
         openBrowser: false,
         networkExposure: 'lan',
@@ -974,24 +852,24 @@ virtualStoreDirMaxLength: 60
 
   it('rejects invalid settings roots, sections, modes, and YAML', () => {
     expect(() => desktopShellModeFromSettings([])).toThrow('must be a map')
-    expect(() => desktopShellModeFromSettings({ 'dsh-desktop': true })).toThrow('settings must be a map')
-    expect(() => desktopShellModeFromSettings({ 'dsh-desktop': { mode: 'glass' } })).toThrow(
+    expect(() => desktopShellModeFromSettings({ 'desktop-shell': true })).toThrow('settings must be a map')
+    expect(() => desktopShellModeFromSettings({ 'desktop-shell': { mode: 'glass' } })).toThrow(
       'must be "compatibility", "extended", or "advanced"',
     )
     for (const port of [-1, 1.5, 65_536, '43189']) {
-      expect(() => desktopStartupSettingsFromSettings({ 'dsh-desktop': { port } })).toThrow(
+      expect(() => desktopStartupSettingsFromSettings({ 'desktop-shell': { port } })).toThrow(
         'port must be an integer from 0 through 65535',
       )
     }
-    expect(() => desktopStartupSettingsFromSettings({ 'dsh-desktop': { openBrowser: 'yes' } }))
+    expect(() => desktopStartupSettingsFromSettings({ 'desktop-shell': { openBrowser: 'yes' } }))
       .toThrow('openBrowser must be a boolean')
-    expect(() => desktopStartupSettingsFromSettings({ 'dsh-desktop': { networkExposure: 'internet' } }))
+    expect(() => desktopStartupSettingsFromSettings({ 'desktop-shell': { networkExposure: 'internet' } }))
       .toThrow('networkExposure must be "loopback" or "lan"')
 
     const home = temporaryHome()
     const path = join(home, 'invalid.yaml')
-    writeFileSync(path, 'dsh-desktop: [\n')
-    expect(() => readDesktopShellMode({ path })).toThrow('invalid settings document')
+    writeFileSync(path, 'desktop-shell: [\n')
+    expect(() => readDesktopShellMode(path)).toThrow('invalid settings document')
   })
 
   it('treats only YAML-null machine-wide patch documents as no desktop patches without rewriting them', () => {
@@ -1078,22 +956,16 @@ virtualStoreDirMaxLength: 60
       name: '@deepseek-ai/dsh-subprocess-local',
     })
     expect(rows.map(row => row.id)).not.toContain('desktop-windows-subprocess')
+    // Windows swaps in the shell provider, so the upstream row is disabled.
     expect(rows.find(row => row.id === 'sandbox')).toEqual({
       id: 'sandbox',
       name: '@deepseek-ai/dsh-sandbox-local',
+      disabled: true,
     })
-    expect(rows.find(row => row.id === 'agent-presets')).toEqual(expect.objectContaining({
-      name: '@deepseek-ai/dsh-agent-presets',
-      config: expect.objectContaining({
-        roots: [
-          { path: stagedPresetRoot(), trust: 'system' },
-          { path: join(home, '.agent-presets'), trust: 'user' },
-        ],
-        includeShippedRoot: true,
-        includeUserRoot: false,
-      }),
+    expect(rows.find(row => row.id === 'agent-preset-registry')).toEqual(expect.objectContaining({
+      name: '@deepseek-ai/dsh-agent-preset-registry',
     }))
-    expect(rows.find(row => row.id === 'agent-presets')?.disabled).toBeFalsy()
+    expect(rows.map(row => row.id)).not.toContain('agent-presets')
     expect(rows.map(row => row.id)).not.toContain('desktop-windows-agent-presets')
     expect(rows.find(row => row.id === 'pwsh-sandbox')).toEqual(expect.objectContaining({
       name: '@deepseek-ai/dsh-pwsh-sandbox',

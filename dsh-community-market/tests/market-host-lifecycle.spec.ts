@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { describe, expect, it, vi } from 'vitest'
 import { apply } from '../src/index.js'
-import { marketRoutes } from '../src/host/routes.js'
+import { MARKET_SETTINGS_NAMESPACE, marketRoutes } from '../src/host/routes.js'
 
 type Handler = (req: any, res: any) => void | Promise<void>
 
@@ -41,10 +41,9 @@ function createHarness() {
   const context = {
     logger: { error: vi.fn() },
     settings: {
-      register: vi.fn(() => ({
-        get: () => settings,
-        update: async (patch: Record<string, unknown>) => { settings = { ...settings, ...patch } },
-      })),
+      describe: () => [{ ns: MARKET_SETTINGS_NAMESPACE, value: settings }],
+      update: async (_ns: string, patch: Record<string, unknown>) => { settings = { ...settings, ...patch } },
+      replace: async (_ns: string, section: Record<string, unknown>) => { settings = section },
     },
     webServer: {
       port: 43_120,

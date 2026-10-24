@@ -127,7 +127,6 @@ import { routeDesktopStartupFailure } from './startup-failure-routing.ts'
 import { DesktopStartupGeneration } from './startup-generation.ts'
 import {
   desktopInstallAnchor,
-  healDesktopProfileModuleFallback,
   prepareDesktopProfile,
   type SkippedOptionalEntry,
 } from './profile.ts'
@@ -216,6 +215,8 @@ import {
   DESKTOP_RELEASE_CHANNEL,
 } from './product-identity.ts'
 import { desktopRecoveryCopy } from './recovery-copy.ts'
+import { readSettingsValue } from './settings-access.ts'
+import { requireWebServerPort } from './web-server-port.ts'
 
 const BIN_NAME = DESKTOP_PACKAGE_NAME
 const PRODUCT_NAME = DESKTOP_PRODUCT_NAME
@@ -1138,7 +1139,6 @@ async function start(l2: ReturnType<typeof resolveDesktopL2Launch>): Promise<voi
         }
       },
     }
-    await healDesktopProfileModuleFallback(homeDir)
     let prepared = prepareDesktopProfile(
       process.env.DSH_TELEMETRY_DISABLED,
       homeDir,
@@ -1457,7 +1457,6 @@ async function start(l2: ReturnType<typeof resolveDesktopL2Launch>): Promise<voi
       clearEnvironmentPath: pnpmRuntime.clearEnvironmentPath,
       dshBootstrapPath,
     }
-    await healDesktopProfileModuleFallback(homeDir, prepared.profile)
     if (profilePreferences === undefined) {
       throw new Error(`${BIN_NAME}: active Profile preferences were not initialized`)
     }
@@ -1626,7 +1625,7 @@ async function start(l2: ReturnType<typeof resolveDesktopL2Launch>): Promise<voi
                 : []
               return {
                 localUrl: hostCtx.connection.authenticatedUrl(
-                  desktopLoopbackBrowserUrl(hostCtx.webServer.port),
+                  desktopLoopbackBrowserUrl(requireWebServerPort(hostCtx)),
                 ),
                 lanUrls: lanOrigins.map(url => hostCtx.connection.authenticatedUrl(url)),
                 lanState: lan.state,
@@ -1676,20 +1675,21 @@ async function start(l2: ReturnType<typeof resolveDesktopL2Launch>): Promise<voi
         throw cause
       })
       generation.bindHost(ctx)
-      fileExporter?.setThreshold((ctx.settings.get(DESKTOP_SETTINGS_NAMESPACE) as DesktopSettings | undefined)?.logLevel ?? 'info')
-      ctx.on('settings/updated', (namespace, next) => {
-        if (namespace === DESKTOP_SETTINGS_NAMESPACE) {
-          fileExporter?.setThreshold((next as DesktopSettings).logLevel)
+      fileExporter?.setThreshold((readSettingsValue<DesktopSettings>(ctx, DESKTOP_SETTINGS_NAMESPACE))?.logLevel ?? 'info')
+      ctx.on('settings/document-updated', (namespace) => {
+        // The service reports the committed namespace, not the new value, so each
+        // branch re-reads the resolved settings it needs.
+        const changed = String(namespace)
+        if (changed === DESKTOP_SETTINGS_NAMESPACE) {
+          fileExporter?.setThreshold(
+            readSettingsValue<DesktopSettings>(ctx, DESKTOP_SETTINGS_NAMESPACE)?.logLevel ?? 'info',
+          )
         }
-        if (namespace !== DESKTOP_SETTINGS_NAMESPACE
-          && namespace !== DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE) return
+        if (changed !== DESKTOP_SETTINGS_NAMESPACE
+          && changed !== DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE) return
         const write = enqueueProfilePreferencesWrite(current => desktopProfilePreferencesFromSettings(
-          namespace === DESKTOP_SETTINGS_NAMESPACE
-            ? next as DesktopSettings
-            : ctx.settings.get(DESKTOP_SETTINGS_NAMESPACE) as DesktopSettings,
-          namespace === DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE
-            ? next as DesktopNotificationSettings
-            : ctx.settings.get(DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE) as DesktopNotificationSettings,
+          readSettingsValue<DesktopSettings>(ctx, DESKTOP_SETTINGS_NAMESPACE) as DesktopSettings,
+          readSettingsValue<DesktopNotificationSettings>(ctx, DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE) as DesktopNotificationSettings,
           current.market,
           current.aaEnabled === true,
         ))

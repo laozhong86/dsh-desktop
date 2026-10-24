@@ -3,7 +3,6 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { BlockList, isIP } from 'node:net'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { type SettingsScope } from '@deepseek-ai/dsh-settings'
 import type { CatalogSourceManifest } from '../contracts/index.js'
 import { parseCatalogSnapshot, parseCatalogSource, validateLocalSourceRecords } from '../contracts/validate.js'
 import type { CatalogHttpClient } from '../contracts/types.js'
@@ -59,7 +58,7 @@ const SOURCE_SCHEMA = z.object({
   enabled: z.boolean().required(),
   order: z.number().required(),
 })
-const SETTINGS_SCHEMA = z.object({
+export const SETTINGS_SCHEMA = z.object({
   sources: z.array(SOURCE_SCHEMA).default([]),
   catalogCache: z.object({
     version: z.number().step(1),
@@ -73,6 +72,26 @@ const SETTINGS_SCHEMA = z.object({
     providerRevision: z.string(),
   }).default(undefined as never),
 }) as unknown as z<MarketSettingsDocument>
+
+/**
+ * Owner-facing handle for the market's own settings namespace. The settings
+ * service no longer hands out a per-namespace scope: a namespace is a profile
+ * entry id and its value is read from the schema-derived forms, so the market
+ * keeps this narrow adapter over the shared service.
+ */
+export interface MarketSettingsScope {
+  /** Current resolved value: schema defaults, then `base`, then the user layer. */
+  get(): MarketSettingsDocument
+  /** Merge a partial patch into this namespace's user layer and persist it. */
+  update(patch: object): Promise<void>
+  /** Replace this namespace's user section wholesale. */
+  replace(section: object): Promise<void>
+}
+
+/** Schema defaults for the market namespace, resolved from an empty config. */
+function settingsDefaults(): MarketSettingsDocument {
+  return (SETTINGS_SCHEMA as unknown as (value: object) => MarketSettingsDocument)({})
+}
 
 const ROUTE_STATE = '/api/community-market/state'
 const ROUTE_SOURCES = '/api/community-market/sources'
@@ -329,7 +348,7 @@ export interface MarketRequestContext {
   readonly origin: string | undefined
   readonly host: string | undefined
   readonly secFetchSite?: string | undefined
-  readonly expectedPort: number
+  readonly expectedPort: number | undefined
 }
 
 function marketAuthority(context: MarketRequestContext): URL | undefined {
@@ -345,6 +364,9 @@ function marketAuthority(context: MarketRequestContext): URL | undefined {
   }
   if (
     authority.protocol !== 'http:'
+    // The server publishes its port only once bound; an unknown port cannot be
+    // checked, so the request is refused rather than trusted.
+    || context.expectedPort === undefined
     || Number(authority.port || '80') !== context.expectedPort
     || authority.hostname !== '127.0.0.1'
     || context.secFetchSite === 'cross-site'
@@ -367,7 +389,7 @@ export function marketMutationAllowed(context: MarketRequestContext): boolean {
   }
 }
 
-function requestContext(req: IncomingMessage, expectedPort: number): MarketRequestContext {
+function requestContext(req: IncomingMessage, expectedPort: number | undefined): MarketRequestContext {
   const secFetchSite = req.headers['sec-fetch-site']
   return {
     remoteAddress: req.socket.remoteAddress,
@@ -378,11 +400,11 @@ function requestContext(req: IncomingMessage, expectedPort: number): MarketReque
   }
 }
 
-function requestAllowed(req: IncomingMessage, expectedPort: number): boolean {
+function requestAllowed(req: IncomingMessage, expectedPort: number | undefined): boolean {
   return marketRequestAllowed(requestContext(req, expectedPort))
 }
 
-function mutationAllowed(req: IncomingMessage, expectedPort: number): boolean {
+function mutationAllowed(req: IncomingMessage, expectedPort: number | undefined): boolean {
   return marketMutationAllowed({
     ...requestContext(req, expectedPort),
   })
@@ -560,7 +582,7 @@ export async function readStandardSourceManifest(
 }
 
 async function mutateSources(
-  scope: SettingsScope<MarketSettingsDocument>,
+  scope: MarketSettingsScope,
   mutation: MarketSourceMutation,
   signal: AbortSignal,
   onUnavailable?: (sourceRecordId: string) => void,
@@ -643,7 +665,7 @@ async function mutateSources(
 }
 
 export function createMarketSourceMutator(
-  scope: SettingsScope<MarketSettingsDocument>,
+  scope: MarketSettingsScope,
   onUnavailable?: (sourceRecordId: string) => void,
   readManifest?: (manifestUrl: string, signal: AbortSignal) => Promise<CatalogSourceManifest>,
 ): (
@@ -663,12 +685,14 @@ export function createMarketSourceMutator(
 
 export function registerMarketRoutes(
   ctx: Context,
-  scope: SettingsScope<MarketSettingsDocument>,
+  scope: MarketSettingsScope,
   installProvider?: MarketInstallServiceProvider,
   desktopActionsProvider?: MarketDesktopActionsProvider,
   desktopPluginsProvider?: MarketDesktopPluginsProvider,
 ): () => void {
-  const expectedPort = ctx.webServer.port
+  // Read per request: the web server publishes its port only once bound, and a
+  // route may be registered before that happens.
+  const expectedPort = (): number | undefined => ctx.webServer.port
   const generationController = new AbortController()
   const store = new SettingsCatalogSourceStore(scope)
   const media = createMarketMediaService({
@@ -735,7 +759,7 @@ export function registerMarketRoutes(
   const routes = [
     ctx.webServer.register({ kind: 'exact', path: ROUTE_STATE, handler: async (_req, res) => {
       if (generationController.signal.aborted) return
-      if (!requestAllowed(_req, expectedPort)) {
+      if (!requestAllowed(_req, expectedPort())) {
         sendJson(res, 403, { error: 'market request authority rejected' })
         return
       }
@@ -756,7 +780,7 @@ export function registerMarketRoutes(
       }
     }}),
     ctx.webServer.register({ kind: 'exact', path: ROUTE_CATALOG, handler: async (req, res) => {
-      if (!requestAllowed(req, expectedPort)) {
+      if (!requestAllowed(req, expectedPort())) {
         sendJson(res, 403, { error: 'market request authority rejected' })
         return
       }
@@ -885,7 +909,7 @@ export function registerMarketRoutes(
       }
     }}),
     ctx.webServer.register({ kind: 'exact', path: ROUTE_ASSETS, handler: async (req, res) => {
-      if (!requestAllowed(req, expectedPort)) {
+      if (!requestAllowed(req, expectedPort())) {
         sendJson(res, 403, { error: 'market request authority rejected' })
         return
       }
@@ -934,7 +958,7 @@ export function registerMarketRoutes(
       }
     }}),
     ctx.webServer.register({ kind: 'exact', path: ROUTE_SOURCES, handler: async (req, res) => {
-      if (req.method !== 'POST' || !mutationAllowed(req, expectedPort)) {
+      if (req.method !== 'POST' || !mutationAllowed(req, expectedPort())) {
         sendJson(res, 405, { error: 'source changes require a local same-origin POST' })
         return
       }
@@ -957,7 +981,7 @@ export function registerMarketRoutes(
   if (desktopActionsProvider !== undefined) {
     routes.push(
       ctx.webServer.register({ kind: 'exact', path: ROUTE_OPEN_TERMINAL, handler: async (req, res) => {
-        if (req.method !== 'POST' || !mutationAllowed(req, expectedPort)) {
+        if (req.method !== 'POST' || !mutationAllowed(req, expectedPort())) {
           sendJson(res, 405, { error: 'opening DSH Terminal requires a local same-origin POST' })
           return
         }
@@ -985,7 +1009,7 @@ export function registerMarketRoutes(
   if (installProvider !== undefined) {
     routes.push(
       ctx.webServer.register({ kind: 'exact', path: ROUTE_INSTALLABLE, handler: async (req, res) => {
-        if (req.method !== 'GET' || !requestAllowed(req, expectedPort)) {
+        if (req.method !== 'GET' || !requestAllowed(req, expectedPort())) {
           sendJson(res, 405, { error: 'market installable catalog requires a local GET' })
           return
         }
@@ -1069,7 +1093,7 @@ export function registerMarketRoutes(
         }
       }}),
       ctx.webServer.register({ kind: 'exact', path: ROUTE_INSTALLATIONS, handler: async (req, res) => {
-        if (req.method !== 'GET' || !requestAllowed(req, expectedPort)) {
+        if (req.method !== 'GET' || !requestAllowed(req, expectedPort())) {
           sendJson(res, 405, { error: 'market installations require a local GET' })
           return
         }
@@ -1086,7 +1110,7 @@ export function registerMarketRoutes(
         }
       }}),
       ctx.webServer.register({ kind: 'exact', path: ROUTE_OPERATION_PREVIEW, handler: async (req, res) => {
-        if (req.method !== 'POST' || !mutationAllowed(req, expectedPort)) {
+        if (req.method !== 'POST' || !mutationAllowed(req, expectedPort())) {
           sendJson(res, 405, { error: 'market package previews require a local same-origin POST' })
           return
         }
@@ -1119,7 +1143,7 @@ export function registerMarketRoutes(
         }
       }}),
       ctx.webServer.register({ kind: 'exact', path: ROUTE_OPERATION_EXECUTE, handler: async (req, res) => {
-        if (req.method !== 'POST' || !mutationAllowed(req, expectedPort)) {
+        if (req.method !== 'POST' || !mutationAllowed(req, expectedPort())) {
           sendJson(res, 405, { error: 'market package execution requires a local same-origin POST' })
           return
         }
@@ -1146,7 +1170,7 @@ export function registerMarketRoutes(
   }
   if (desktopActionsProvider !== undefined) {
     routes.push(ctx.webServer.register({ kind: 'exact', path: ROUTE_REQUEST_RESTART, handler: async (req, res) => {
-      if (req.method !== 'POST' || !mutationAllowed(req, expectedPort)) {
+      if (req.method !== 'POST' || !mutationAllowed(req, expectedPort())) {
         sendJson(res, 405, { error: 'requesting a restart requires a local same-origin POST' })
         return
       }
@@ -1194,8 +1218,21 @@ export function registerMarketRoutes(
   }
 }
 
-export function registerMarketSettings(ctx: Context): SettingsScope<MarketSettingsDocument> {
-  return ctx.settings.register(MARKET_SETTINGS_NAMESPACE, SETTINGS_SCHEMA, { applies: 'live' })
+export function registerMarketSettings(ctx: Context): MarketSettingsScope {
+  return {
+    get: () => {
+      const descriptor = ctx.settings
+        .describe()
+        .find(entry => String(entry.ns) === MARKET_SETTINGS_NAMESPACE)
+      // A profile entry publishes its form only once active; before that the
+      // schema defaults are the value the service would resolve anyway.
+      return descriptor === undefined
+        ? settingsDefaults()
+        : descriptor.value as MarketSettingsDocument
+    },
+    update: patch => ctx.settings.update(MARKET_SETTINGS_NAMESPACE, patch),
+    replace: section => ctx.settings.replace(MARKET_SETTINGS_NAMESPACE, section),
+  }
 }
 
 export const marketRoutes = {

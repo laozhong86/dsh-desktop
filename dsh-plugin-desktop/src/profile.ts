@@ -1,28 +1,17 @@
 /** Compatibility profile composition over the official Web bundle and user plugins. */
 
-import { createRequire } from 'node:module'
 import {
   existsSync,
-  lstatSync,
   readFileSync,
-  readdirSync,
-  readlinkSync,
-  rmSync,
-  rmdirSync,
-  statSync,
-  type Dirent,
-  unlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { isIP } from 'node:net'
-import { dirname, isAbsolute, join, resolve } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { evaluate, isJsExpr, type EntryOptions } from '@deepseek-ai/cordis-plugin-loader'
 import type { PatchOptions } from '@deepseek-ai/cordis-plugin-include'
 import {
   composeEntries,
-  DEFAULT_PROFILE_PATCH_RELOAD,
-  healProfilesModuleFallback,
   initProfile,
   loadOptionalPatches,
   loadOverlayPatches,
@@ -33,17 +22,11 @@ import {
   writeProfileManifest,
   type Profile,
   type ProfileManifest,
-  type ProfileTemplate,
 } from '@deepseek-ai/dsh-app-boot'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
-import FileSettingsProvider, {
-  resolveSpec as resolveSettingsFileSpec,
-  type Config as SettingsFileConfig,
-} from '@deepseek-ai/dsh-settings-file'
 import { parseAllDocuments, parseDocument } from 'yaml'
 import { findOverlayPackage, resolveOverlayPackage } from './package-overlay.ts'
 import { DESKTOP_DEFAULT_WEB_PORT, defaultDesktopWebPort } from './desktop-port.ts'
-import { withAsarModuleResolver } from './asar-module-resolver-state.ts'
 import {
   desktopBrowserAccessEnabled,
   desktopLanExposureAvailable,
@@ -103,17 +86,19 @@ const PWSH_SANDBOX_ROW_ID = 'pwsh-sandbox'
 const UPSTREAM_PWSH_SANDBOX_PACKAGE = '@deepseek-ai/dsh-pwsh-sandbox'
 const DESKTOP_WINDOWS_PWSH_SANDBOX_ROW_ID = 'desktop-windows-pwsh-sandbox'
 const DESKTOP_WINDOWS_PWSH_SANDBOX_PACKAGE = `${DESKTOP_PACKAGE_NAME}/windows-pwsh-sandbox`
-const OMNIMUX_PROFILE_NAME = 'omnimux'
-const AGENT_PRESETS_ROW_ID = 'agent-presets'
+const SANDBOX_ROW_ID = 'sandbox'
+const UPSTREAM_SANDBOX_PACKAGE = '@deepseek-ai/dsh-sandbox-local'
+const DESKTOP_WINDOWS_ACL_SANDBOX_ROW_ID = 'desktop-windows-acl-sandbox'
+const DESKTOP_WINDOWS_ACL_SANDBOX_PACKAGE = `${DESKTOP_PACKAGE_NAME}/windows-acl-sandbox-provider`
 /** Harness-home directory holding locally authored presets (`agent-presets/discovery`). */
-const USER_PRESET_DIRNAME = '.agent-presets'
 export { defaultDesktopShellMode }
 const DEFAULT_DESKTOP_PORT = DESKTOP_DEFAULT_WEB_PORT
 const DESKTOP_WEB_SERVER_ROW_ID = 'desktop-webserver'
 const DESKTOP_WEB_SERVER_PACKAGE = `${DESKTOP_PACKAGE_NAME}/webserver`
-const SETTINGS_FILE_PACKAGE = '@deepseek-ai/dsh-settings-file'
-const DESKTOP_SETTINGS_NAMESPACE = 'dsh-desktop'
-const MAX_FALLBACK_MANIFEST_BYTES = 1024 * 1024
+const SETTINGS_DOCUMENT_FILENAME = 'settings.yaml'
+const AGENT_PRESET_REGISTRY_ROW_ID = 'agent-preset-registry'
+const PRODUCT_DEFAULT_AGENT_PRESET = 'minimal'
+const DESKTOP_SETTINGS_NAMESPACE = 'desktop-shell'
 const UI_LAYOUT_PACKAGE = '@deepseek-ai/dsh-client-ui-layout'
 const UI_SIDEBAR_PACKAGE = '@deepseek-ai/dsh-client-ui-sidebar'
 const UI_CONVERSATION_PACKAGE = '@deepseek-ai/dsh-client-ui-conversation'
@@ -215,37 +200,56 @@ export function desktopShellModeFromSettings(document: unknown): DesktopShellMod
 }
 
 /**
- * Read startup settings from the same file resolved by the settings provider.
- * @param config - validated settings-file row config.
- * @returns the values projected into the startup Loader graph.
+ * Read one settings document, or an empty document when it does not exist yet.
+ * @param path - absolute settings document path.
+ * @returns the parsed document root.
  */
-export function readDesktopStartupSettings(config: SettingsFileConfig): DesktopStartupSettings {
-  const spec = resolveSettingsFileSpec(config)
+function readSettingsDocument(path: string): unknown {
   let text: string
   try {
-    text = readFileSync(spec.filename, 'utf8')
+    text = readFileSync(path, 'utf8')
   } catch (cause) {
-    if ((cause as NodeJS.ErrnoException).code === 'ENOENT') {
-      return { ...defaultDesktopStartupSettings() }
-    }
+    if ((cause as NodeJS.ErrnoException).code === 'ENOENT') return {}
     throw cause
   }
-  let document: unknown
-  if (spec.format === 'yaml') {
-    const parsed = parseDocument(text, { prettyErrors: true })
-    if (parsed.errors.length > 0) {
-      throw new Error(`${BIN_NAME}: invalid settings document at ${spec.filename}: ${parsed.errors.map(error => error.message).join('; ')}`)
-    }
-    document = parsed.toJS() ?? {}
-  } else {
-    document = text.trim().length === 0 ? {} : JSON.parse(text)
+  if (text.trim().length === 0) return {}
+  const parsed = parseDocument(text, { prettyErrors: true })
+  if (parsed.errors.length > 0) {
+    throw new Error(`${BIN_NAME}: invalid settings document at ${path}: ${parsed.errors.map(error => error.message).join('; ')}`)
   }
-  return desktopStartupSettingsFromSettings(document)
+  return parsed.toJS() ?? {}
 }
 
-/** Read only the shell mode from the settings provider's resolved file. */
-export function readDesktopShellMode(config: SettingsFileConfig): DesktopShellMode {
-  return readDesktopStartupSettings(config).mode
+/**
+ * Read the Desktop settings section of one settings document.
+ * @param path - absolute settings document path.
+ * @returns the section's own entries, or an empty map.
+ */
+export function settingsSectionFromDocument(path: string): Record<string, unknown> {
+  const document = readSettingsDocument(path)
+  if (typeof document !== 'object' || document === null || Array.isArray(document)) {
+    throw new Error(`${BIN_NAME}: settings document must be a map of namespace sections`)
+  }
+  const section = (document as Record<string, unknown>)[DESKTOP_SETTINGS_NAMESPACE]
+  if (section === undefined) return {}
+  if (typeof section !== 'object' || section === null || Array.isArray(section)) {
+    throw new Error(`${BIN_NAME}: ${DESKTOP_SETTINGS_NAMESPACE} settings must be a map`)
+  }
+  return section as Record<string, unknown>
+}
+
+/**
+ * Read startup settings from one settings document.
+ * @param path - absolute settings document path.
+ * @returns the values projected into the startup Loader graph.
+ */
+export function readDesktopStartupSettings(path: string): DesktopStartupSettings {
+  return desktopStartupSettingsFromSettings(readSettingsDocument(path))
+}
+
+/** Read only the shell mode from one settings document. */
+export function readDesktopShellMode(path: string): DesktopShellMode {
+  return readDesktopStartupSettings(path).mode
 }
 
 /** Resolve the public Web template once and reject an incompatible DSH release. */
@@ -255,15 +259,6 @@ function requiredWebBundles(): string[] {
     throw new Error(`${BIN_NAME}: installed dsh-app-boot has no web profile template`)
   }
   return [...template.bundles]
-}
-
-/** User patch lifecycle inherited from the matching upstream Web profile. */
-function requiredWebPatchReload(): ProfileTemplate['patchReload'] {
-  const template = PROFILE_TEMPLATES.web
-  if (template === undefined) {
-    throw new Error(`${BIN_NAME}: installed dsh-app-boot has no web profile template`)
-  }
-  return template.patchReload
 }
 
 /** Prepared profile inputs consumed by app-boot. */
@@ -350,7 +345,7 @@ function sameList(left: readonly string[], right: readonly string[]): boolean {
 export function ensureDesktopProfile(home: string = resolveDshHome()): string {
   const dir = resolveProfileDir(DESKTOP_PROFILE_NAME, home)
   if (!existsSync(join(dir, 'package.json'))) {
-    initProfile(dir, REQUIRED_BUNDLES, requiredWebPatchReload())
+    initProfile(dir, REQUIRED_BUNDLES)
   }
   const manifest = readProfileManifest(BIN_NAME, dir)
   const rawBundles = (manifest.dsh?.profile as { bundles?: unknown } | undefined)?.bundles
@@ -360,8 +355,7 @@ export function ensureDesktopProfile(home: string = resolveDshHome()): string {
   }
   const current = rawBundles === undefined ? [] : rawBundles as string[]
   const bundles = desktopBundleList(current)
-  const patchReload = requiredWebPatchReload()
-  if (!sameList(current, bundles) || manifest.dsh?.profile?.patchReload !== patchReload) {
+  if (!sameList(current, bundles)) {
     writeProfileManifest(dir, {
       ...manifest,
       dsh: {
@@ -369,7 +363,6 @@ export function ensureDesktopProfile(home: string = resolveDshHome()): string {
         profile: {
           ...manifest.dsh?.profile,
           bundles,
-          patchReload,
         },
       },
     })
@@ -505,7 +498,7 @@ function loadRecoveryFilteredProfile(
     if (template === undefined) {
       throw new Error(`${BIN_NAME}: profile ${JSON.stringify(profileName)} does not exist`)
     }
-    initProfile(profileDir, template.bundles, template.patchReload)
+    initProfile(profileDir, template.bundles)
   }
   const manifest = readProfileManifest(BIN_NAME, profileDir)
   const rawBundles = (manifest.dsh?.profile as { bundles?: unknown } | undefined)?.bundles
@@ -514,11 +507,6 @@ function loadRecoveryFilteredProfile(
     throw new Error(`${BIN_NAME}: dsh.profile.bundles must be an array of package names`)
   }
   const bundles = (rawBundles ?? []) as string[]
-  const rawPatchReload: unknown = manifest.dsh?.profile?.patchReload
-  if (rawPatchReload !== undefined && rawPatchReload !== 'live' && rawPatchReload !== 'startup') {
-    throw new Error(`${BIN_NAME}: dsh.profile.patchReload must be "live" or "startup"`)
-  }
-  const patchReload = rawPatchReload ?? PROFILE_TEMPLATES[profileName]?.patchReload ?? DEFAULT_PROFILE_PATCH_RELOAD
   const selectedBundles = bundles.filter(packageName =>
     (aaEnabled || packageName !== AA_PACKAGE_NAME) &&
     packageName !== DESKTOP_MARKET_IDENTITIES.community.packageName
@@ -553,15 +541,19 @@ function loadRecoveryFilteredProfile(
       const declared = bundleManifest !== null && typeof bundleManifest === 'object'
         ? (bundleManifest as { dsh?: { bundle?: { patch?: unknown } } }).dsh?.bundle?.patch
         : undefined
-      if (typeof declared !== 'string' || declared.length === 0) {
+      // A bundle may declare one patch file or an ordered list of them.
+      const declaredFiles = typeof declared === 'string' ? [declared] : declared
+      if (!Array.isArray(declaredFiles)
+        || declaredFiles.length === 0
+        || !declaredFiles.every(file => typeof file === 'string' && file.length > 0)) {
         throw new Error(`${BIN_NAME}: profile bundle ${JSON.stringify(packageName)} declares no dsh.bundle in its package.json`)
       }
-      const patchPath = join(packageDir, declared)
+      const patchPaths = (declaredFiles as string[]).map(file => join(packageDir, file))
       layers.push({
         packageName,
         packageDir,
-        patchPath,
-        patches: loadOverlayPatches(BIN_NAME, patchPath),
+        patchPaths,
+        patches: patchPaths.flatMap(path => loadOverlayPatches(BIN_NAME, path)),
       })
     } catch (cause) {
       if (isAa) aaFailure = marketFailureMessage(cause)
@@ -577,19 +569,11 @@ function loadRecoveryFilteredProfile(
       layers,
       patchPath,
       patches: existsSync(patchPath) ? loadOverlayPatches(BIN_NAME, patchPath) : [],
-      patchReload,
+      skippedBundles: [],
     },
     ...(dshMarketFailure === undefined ? {} : { dshMarketFailure }),
     ...(aaFailure === undefined ? {} : { aaFailure }),
   }
-}
-
-/** Resolve the agent presets shipped by the matching presets dependency. */
-export function shippedPresetRoot(moduleUrl: string = import.meta.url): string {
-  const require = createRequire(moduleUrl)
-  // Preset inputs are archived read-only data, so the root stays logical and
-  // Electron's ASAR filesystem answers the presets plugin's reads.
-  return join(dirname(require.resolve('@deepseek-ai/dsh-agent-presets/package.json')), 'presets')
 }
 
 /** Resolve the product presets staged beside the seed, unpacked with `preset/**`. */
@@ -999,15 +983,11 @@ export function prepareDesktopProfile(
   for (const row of composedRows) {
     if (typeof row.id === 'string') rows.set(row.id, row)
   }
-  const settings = rows.get('settings')
-  if (settings?.name !== SETTINGS_FILE_PACKAGE) {
-    throw new Error(`${BIN_NAME}: desktop profile must use ${SETTINGS_FILE_PACKAGE} in the settings row`)
+  const shellRow = rows.get(DESKTOP_SETTINGS_NAMESPACE)
+  if (shellRow === undefined) {
+    throw new Error(`${BIN_NAME}: desktop profile has no ${DESKTOP_SETTINGS_NAMESPACE} row`)
   }
-  const settingsConfig = FileSettingsProvider.Config({
-    dshHome: home,
-    ...rowConfig(settings),
-  } as SettingsFileConfig)
-  const settingsDocument = resolveSettingsFileSpec(settingsConfig).filename
+  const settingsDocument = join(home, SETTINGS_DOCUMENT_FILENAME)
   hooks.onSettingsDocumentResolved?.(settingsDocument)
   const {
     mode,
@@ -1016,10 +996,26 @@ export function prepareDesktopProfile(
     windowsMaterial,
     openBrowser,
     networkExposure,
-  } = readDesktopStartupSettings(settingsConfig)
+  } = desktopStartupSettingsFromSettings({
+    // The shipped preset and the setup wizard write the document; the settings
+    // service persists later edits into the profile patch, which wins here.
+    [DESKTOP_SETTINGS_NAMESPACE]: {
+      ...settingsSectionFromDocument(settingsDocument),
+      ...rowConfig(shellRow),
+    },
+  })
+  // The document is the base layer and the profile patch is the user layer, so
+  // the composed row carries the resolved values instead of a static placeholder.
   patches.push({
-    id: 'settings',
-    config: settingsConfig,
+    id: DESKTOP_SETTINGS_NAMESPACE,
+    config: {
+      mode,
+      macosMaterial,
+      windowsMaterial,
+      port,
+      openBrowser,
+      networkExposure,
+    },
   })
   const webRuntime = rows.get('web-runtime')
   if (webRuntime === undefined) {
@@ -1052,23 +1048,12 @@ export function prepareDesktopProfile(
       { id: 'ui-conversation', disabled: false },
     )
   }
-  const presets = rows.get(AGENT_PRESETS_ROW_ID)
-  if (presets !== undefined) {
-    const isOmnimuxProfile = profileName === OMNIMUX_PROFILE_NAME
-    const roots: Array<{ path: string, trust: 'system' | 'user' }> = [
-      // Staged product presets define the product's official preset set.
-      { path: stagedPresetRoot(), trust: 'system' },
-      { path: join(home, USER_PRESET_DIRNAME), trust: 'user' },
-    ]
-    patches.push({
-      id: AGENT_PRESETS_ROW_ID,
-      config: {
-        ...rowConfig(presets),
-        roots,
-        includeShippedRoot: !isOmnimuxProfile,
-        includeUserRoot: false,
-      },
-    })
+  // The upstream agent-preset registry owns the roster now: it ships the built-in
+  // presets itself and exposes a default/selection config, so the shell no longer
+  // injects a preset root. It still pins the product default, and its Cordis
+  // skills keep coming from the packaged preset root.
+  if (rows.get(AGENT_PRESET_REGISTRY_ROW_ID) !== undefined) {
+    patches.push({ id: AGENT_PRESET_REGISTRY_ROW_ID, config: { default: PRODUCT_DEFAULT_AGENT_PRESET } })
   }
   const webserver = rows.get('webserver')
   if (webserver === undefined) {
@@ -1091,6 +1076,27 @@ export function prepareDesktopProfile(
               name: DESKTOP_WINDOWS_PWSH_SANDBOX_PACKAGE,
               ...(pwshSandbox.disabled === undefined ? {} : { disabled: pwshSandbox.disabled }),
               config: rowConfig(pwshSandbox),
+            },
+          ],
+        },
+      )
+    }
+    const sandboxProvider = rows.get(SANDBOX_ROW_ID)
+    if (sandboxProvider?.name === UPSTREAM_SANDBOX_PACKAGE
+      && !rowDisabledOnPlatform(sandboxProvider, platform)) {
+      patches.push(
+        {
+          id: SANDBOX_ROW_ID,
+          name: UPSTREAM_SANDBOX_PACKAGE,
+          disabled: true,
+        },
+        {
+          insert: [
+            {
+              id: DESKTOP_WINDOWS_ACL_SANDBOX_ROW_ID,
+              name: DESKTOP_WINDOWS_ACL_SANDBOX_PACKAGE,
+              ...(sandboxProvider.disabled === undefined ? {} : { disabled: sandboxProvider.disabled }),
+              config: rowConfig(sandboxProvider),
             },
           ],
         },
@@ -1177,114 +1183,6 @@ export function prepareDesktopProfile(
     requiresDependencyMigration,
     ...(marketFailure === undefined ? {} : { marketFailure }),
   }
-}
-
-/** Maintain the upstream module fallback for one fully resolved Desktop profile. */
-export function healDesktopProfileModuleFallback(home: string, profile?: Profile): Promise<void> {
-  const heal = () => healProfilesModuleFallback({
-    installAnchor: INSTALL_ANCHOR,
-    home,
-    ...(profile === undefined ? {} : { profile }),
-  })
-  if (!/([\\/])app\.asar\1/u.test(INSTALL_ANCHOR)) return heal()
-  removeObsoleteDesktopSharedModuleFallback(home)
-  return withAsarModuleResolver(heal)
-}
-
-function isDshManagedModuleProxy(directory: string): boolean {
-  const manifestPath = join(directory, 'package.json')
-  try {
-    if (statSync(manifestPath).size > MAX_FALLBACK_MANIFEST_BYTES) return false
-    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
-      dsh?: { moduleFallback?: { targets?: unknown } }
-    }
-    const targets = manifest.dsh?.moduleFallback?.targets
-    return targets !== null && typeof targets === 'object' && !Array.isArray(targets)
-      && Object.keys(targets).length > 0
-      && Object.values(targets).every((target) => {
-        if (typeof target !== 'string') return false
-        try {
-          const url = new URL(target)
-          return url.protocol === 'file:'
-            && /(^|[\\/])app\.asar(?:\.unpacked)?([\\/]|$)/iu.test(fileURLToPath(url))
-        } catch {
-          return false
-        }
-      })
-  } catch {
-    return false
-  }
-}
-
-function removeManagedFallbackEntry(entryPath: string): boolean {
-  let stat: ReturnType<typeof lstatSync>
-  try {
-    stat = lstatSync(entryPath)
-  } catch (cause) {
-    if ((cause as NodeJS.ErrnoException).code === 'ENOENT') return false
-    return false
-  }
-  try {
-    if (stat.isSymbolicLink()) {
-      const target = readlinkSync(entryPath)
-      const absoluteTarget = isAbsolute(target) ? target : resolve(dirname(entryPath), target)
-      // Desktop releases that mirrored the whole dependency graph produced
-      // links into app.asar(.unpacked). No ordinary user Profile installation
-      // needs such a shared parent link.
-      if (!/(^|[\\/])app\.asar(?:\.unpacked)?([\\/]|$)/iu.test(absoluteTarget)) return false
-      unlinkSync(entryPath)
-      return true
-    }
-    if (!stat.isDirectory() || !isDshManagedModuleProxy(entryPath)) return false
-    rmSync(entryPath, { recursive: true, force: true })
-    return true
-  } catch {
-    // A locked legacy link must not make Desktop startup fail. The resolver
-    // also refuses shared/legacy ASAR results, so leaving it is safe.
-    return false
-  }
-}
-
-/**
- * Remove only provably DSH-generated installation fallbacks from releases
- * predating the ASAR resolver. Unknown files and directories are preserved.
- */
-export function removeObsoleteDesktopSharedModuleFallback(home: string): number {
-  const modulesDirectory = join(home, 'profiles', 'node_modules')
-  let entries: Dirent<string>[]
-  try {
-    entries = readdirSync(modulesDirectory, { withFileTypes: true, encoding: 'utf8' })
-  } catch (cause) {
-    if ((cause as NodeJS.ErrnoException).code === 'ENOENT') return 0
-    return 0
-  }
-  let removed = 0
-  for (const entry of entries) {
-    const entryPath = join(modulesDirectory, entry.name)
-    if (entry.name.startsWith('@') && entry.isDirectory()) {
-      let scopedEntries: typeof entries
-      try {
-        scopedEntries = readdirSync(entryPath, { withFileTypes: true, encoding: 'utf8' })
-      } catch {
-        continue
-      }
-      let removedFromScope = 0
-      for (const scopedEntry of scopedEntries) {
-        if (removeManagedFallbackEntry(join(entryPath, scopedEntry.name))) removedFromScope += 1
-      }
-      removed += removedFromScope
-      if (removedFromScope > 0) {
-        try {
-          rmdirSync(entryPath)
-        } catch {
-          // The scope still contains unknown/user-owned data or another writer.
-        }
-      }
-      continue
-    }
-    if (removeManagedFallbackEntry(entryPath)) removed += 1
-  }
-  return removed
 }
 
 /** Expose the package anchor for focused resolution tests. */

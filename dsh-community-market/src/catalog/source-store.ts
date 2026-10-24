@@ -1,4 +1,4 @@
-import type { SettingsScope } from '@deepseek-ai/dsh-settings'
+import type { MarketSettingsScope } from '../host/routes.js'
 import type { CatalogSnapshot } from '../contracts/generated/catalog-snapshot.js'
 import { validateLocalSourceRecords } from '../contracts/validate.js'
 import type { CatalogSourceStore, LocalSourceRecord } from '../contracts/types.js'
@@ -37,7 +37,7 @@ export function normalizeActiveSourceRecords(
 }
 
 export class SettingsCatalogSourceStore implements CatalogSourceStore {
-  constructor(private readonly scope: SettingsScope<MarketSettingsDocument>) {}
+  constructor(private readonly scope: MarketSettingsScope) {}
 
   async load(): Promise<readonly LocalSourceRecord[]> {
     const records = [...this.scope.get().sources]

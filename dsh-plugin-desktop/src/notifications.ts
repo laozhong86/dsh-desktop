@@ -1,7 +1,8 @@
 /** Privacy-safe desktop attention for completed user turns and background jobs. */
 
 import type { Context } from '@deepseek-ai/cordis'
-import type { JobSnapshot } from '@deepseek-ai/dsh-jobs'
+import type { JobView } from '@deepseek-ai/dsh-jobs'
+import { readSettingsValue } from './settings-access.ts'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import z from '@deepseek-ai/schemastery'
 import type { DesktopLocale, DesktopNotification } from './runtime.ts'
@@ -9,7 +10,7 @@ import type { DesktopLocale, DesktopNotification } from './runtime.ts'
 export const name = 'desktop-notifications'
 export const inject = ['desktopRuntime']
 
-export const DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE = 'dsh-desktop-notifications'
+export const DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE = 'desktop-notifications'
 
 export interface DesktopNotificationSettings {
   enabled: boolean
@@ -54,12 +55,12 @@ interface OpenTurn {
 function notifyJob(
   runtime: Context['desktopRuntime'],
   settings: DesktopNotificationSettings,
-  snapshot: JobSnapshot,
+  view: JobView,
 ): void {
   if (!settings.enabled) return
-  if (snapshot.status === 'completed' && settings.notifyOnJobCompletion) {
+  if (view.status === 'completed' && settings.notifyOnJobCompletion) {
     runtime.notifyAttention(NOTIFICATION_COPY[runtime.locale]['job-completed'])
-  } else if (snapshot.status === 'failed' && settings.notifyOnJobFailure) {
+  } else if (view.status === 'failed' && settings.notifyOnJobFailure) {
     runtime.notifyAttention(NOTIFICATION_COPY[runtime.locale]['job-failed'])
   }
 }
@@ -105,15 +106,16 @@ export function apply(ctx: Context): void {
 
   ctx.inject(['settings'], (settingsCtx) => {
     settingsCtx.effect(() => {
-      const scope = settingsCtx.settings.register(
-        DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE,
-        DesktopNotificationSettingsSchema,
-        { applies: 'live' },
-      )
-      settings = scope.get()
-      const stopWatching = scope.watch((next) => { settings = next })
+      const read = (): DesktopNotificationSettings =>
+        readSettingsValue<DesktopNotificationSettings>(settingsCtx, DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE)
+        ?? DEFAULT_SETTINGS
+      settings = read()
+      const stopEvents = settingsCtx.on('settings/document-updated', (namespace) => {
+        if (String(namespace) !== DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE) return
+        settings = read()
+      })
       return () => {
-        stopWatching()
+        stopEvents()
         settings = DEFAULT_SETTINGS
       }
     }, 'dsh-plugin-desktop: native notification settings')
@@ -121,7 +123,10 @@ export function apply(ctx: Context): void {
 
   ctx.inject(['jobs'], (jobsCtx) => {
     jobsCtx.effect(
-      () => jobsCtx.jobs.onJobDone(snapshot => { notifyJob(jobsCtx.desktopRuntime, settings, snapshot) }),
+      () => jobsCtx.jobs.events.subscribe({ owners: 'all' }, (event) => {
+        if (event.type !== 'settled') return
+        notifyJob(jobsCtx.desktopRuntime, settings, event.job)
+      }),
       'dsh-plugin-desktop: background job attention',
     )
   })

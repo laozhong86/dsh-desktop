@@ -21,7 +21,7 @@ it.each([false, true])('boots a separate Web Host with client plugins (AA enable
   let pnpm: ReturnType<typeof installDesktopPnpmRuntime> | undefined
   let stderr = ''
   try {
-    writeFileSync(join(home, 'settings.yaml'), 'dsh-desktop:\n  mode: advanced\nagent-presets:\n  default: minimal\n')
+    writeFileSync(join(home, 'settings.yaml'), 'desktop-shell:\n  mode: advanced\nagent-presets:\n  default: minimal\n')
     const prepared = prepareDesktopProfile('1', home, 'win32', undefined, undefined, undefined, { aaEnabled })
     if (aaEnabled) prepared.patches.push({ id: 'agents-anywhere-bridge-next', config: { dshHome: home, stateRoot: join(home, 'aa-state') } })
     prepared.port = 0
@@ -103,6 +103,8 @@ it.each([false, true])('boots a separate Web Host with client plugins (AA enable
   } catch (error) {
     throw new Error(`${error instanceof Error ? error.stack : String(error)}\n${stderr}`)
   } finally {
+    // A timeout aborts the body, so surface the child log here as well.
+    if (stderr !== '') console.error(stderr)
     await releaseNative?.()
     rpc?.close()
     if (child && child.exitCode === null) { const exit = once(child, 'exit'); child.kill(); await exit }

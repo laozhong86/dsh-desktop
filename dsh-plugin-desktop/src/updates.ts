@@ -8,6 +8,7 @@ import { DESKTOP_UPDATE_CHECK_PATH } from './desktop-settings-contract.ts'
 import { handleDesktopUpdateCheckRequest } from './desktop-settings-route.ts'
 import type {} from './runtime.ts'
 import { startDesktopUpdateLifecycle } from './update-lifecycle.ts'
+import { requireWebServerPort } from './web-server-port.ts'
 
 /** Stable Cordis plugin name. */
 export const name = 'desktop-updates'
@@ -50,7 +51,7 @@ export function apply(ctx: Context, config: Config): void {
       locale: () => ctx.desktopRuntime.locale,
       registerTrayItem: item => ctx.desktopRuntime.registerTrayItem(item),
     })
-    const rendererOrigin = `http://127.0.0.1:${String(ctx.webServer.port)}`
+    const rendererOrigin = `http://127.0.0.1:${String(requireWebServerPort(ctx))}`
     const unregister = ctx.webServer.register({
       kind: 'exact',
       path: DESKTOP_UPDATE_CHECK_PATH,

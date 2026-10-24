@@ -23,6 +23,8 @@ import type { DesktopRuntime } from './runtime.ts'
 import type { DesktopStartupGenerationHost } from './startup-generation.ts'
 import { FileExporter } from './file-exporter.ts'
 import { LogFileSink } from './log-files.ts'
+import { readSettingsValue } from './settings-access.ts'
+import { requireWebServerPort } from './web-server-port.ts'
 
 function desktopProfileMarketSnapshot(market: DesktopMarketProvider): DesktopMarketSnapshot {
   return Object.freeze({
@@ -200,7 +202,7 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
               : []
             return {
               localUrl: hostCtx.connection.authenticatedUrl(
-                desktopLoopbackBrowserUrl(hostCtx.webServer.port),
+                desktopLoopbackBrowserUrl(requireWebServerPort(hostCtx)),
               ),
               lanUrls: lanOrigins.map(url => hostCtx.connection.authenticatedUrl(url)),
               lanState: lan.state,
@@ -250,20 +252,21 @@ export async function bootDesktopHost(options: DesktopHostOptions, runtime: Desk
       throw cause
     })
     bindHost(ctx)
-    fileExporter?.setThreshold((ctx.settings.get(DESKTOP_SETTINGS_NAMESPACE) as DesktopSettings | undefined)?.logLevel ?? 'info')
-    ctx.on('settings/updated', (namespace, next) => {
-      if (namespace === DESKTOP_SETTINGS_NAMESPACE) {
-        fileExporter?.setThreshold((next as DesktopSettings).logLevel)
+    fileExporter?.setThreshold((readSettingsValue<DesktopSettings>(ctx, DESKTOP_SETTINGS_NAMESPACE))?.logLevel ?? 'info')
+    ctx.on('settings/document-updated', (namespace) => {
+      // The service reports the committed namespace, not the new value, so each
+      // branch re-reads the resolved settings it needs.
+      const changed = String(namespace)
+      if (changed === DESKTOP_SETTINGS_NAMESPACE) {
+        fileExporter?.setThreshold(
+          readSettingsValue<DesktopSettings>(ctx, DESKTOP_SETTINGS_NAMESPACE)?.logLevel ?? 'info',
+        )
       }
-      if (namespace !== DESKTOP_SETTINGS_NAMESPACE
-        && namespace !== DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE) return
+      if (changed !== DESKTOP_SETTINGS_NAMESPACE
+        && changed !== DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE) return
       const write = enqueueProfilePreferencesWrite(current => desktopProfilePreferencesFromSettings(
-        namespace === DESKTOP_SETTINGS_NAMESPACE
-          ? next as DesktopSettings
-          : ctx.settings.get(DESKTOP_SETTINGS_NAMESPACE) as DesktopSettings,
-        namespace === DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE
-          ? next as DesktopNotificationSettings
-          : ctx.settings.get(DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE) as DesktopNotificationSettings,
+        readSettingsValue<DesktopSettings>(ctx, DESKTOP_SETTINGS_NAMESPACE) as DesktopSettings,
+        readSettingsValue<DesktopNotificationSettings>(ctx, DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE) as DesktopNotificationSettings,
         current.market,
         current.aaEnabled === true,
       ))

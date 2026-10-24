@@ -35,8 +35,13 @@ describe('community market launcher', () => {
       useStore,
       t,
       useSessions: (() => undefined) as MarketLauncherProps['useSessions'],
-      useSessionPendingInteraction: (() => undefined) as MarketLauncherProps['useSessionPendingInteraction'],
       useWorkspaces: (() => undefined) as MarketLauncherProps['useWorkspaces'],
+      useRemoteAccess: (() => false) as MarketLauncherProps['useRemoteAccess'],
+      useSessionStatus: (() => false) as MarketLauncherProps['useSessionStatus'],
+      // Overloaded hook; the launcher under test never reads it.
+      useSessionRetainInfo: (() => undefined) as unknown as MarketLauncherProps['useSessionRetainInfo'],
+      useSessionAccess: (() => false) as MarketLauncherProps['useSessionAccess'],
+      useWorkspaceAccess: (() => false) as MarketLauncherProps['useWorkspaceAccess'],
       usePanelInfo: (select => select({ activePanelId: null })) as MarketLauncherProps['usePanelInfo'],
     } satisfies MarketLauncherProps
 

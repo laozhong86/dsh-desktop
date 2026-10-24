@@ -18,6 +18,21 @@ import { fileURLToPath } from 'node:url'
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 const rootManifest = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'))
 
+/**
+ * Accept one SPDX identifier or an OR expression whose alternatives are all
+ * acceptable: the redistributor may pick any allowed branch.
+ */
+function licenseAccepted(license) {
+  if (ALLOWED_LICENSES.has(license) || NOTICE_LICENSES.has(license)) return true
+  const alternatives = license
+    .replace(/[()]/gu, '')
+    .split(/\s+OR\s+/iu)
+    .map(part => part.trim())
+    .filter(part => part !== '')
+  return alternatives.length > 1
+    && alternatives.every(part => ALLOWED_LICENSES.has(part) || NOTICE_LICENSES.has(part))
+}
+
 /** Licenses accepted for redistribution inside the desktop installers. */
 const ALLOWED_LICENSES = new Set([
   'MIT',
@@ -101,7 +116,7 @@ for (let index = 0; index < queue.length; index += 1) {
       if (!hasLicenseFile) {
         failures.push(`${current.name}: license refers to ${JSON.stringify(license)} but no LICENSE file is shipped`)
       }
-    } else if (license !== undefined && !ALLOWED_LICENSES.has(license) && !NOTICE_LICENSES.has(license)) {
+    } else if (license !== undefined && !licenseAccepted(license)) {
       failures.push(`${current.name}: license ${JSON.stringify(license)} is not on the redistribution allowlist`)
     }
     manifests.push({ name: current.name, version: manifest.version, license: license ?? 'SEE LICENSE FILE' })

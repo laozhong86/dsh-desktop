@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-cmdline'
+import type {} from '@deepseek-ai/dsh-settings'
 import {
   LOCALE_SETTINGS_NAMESPACE,
   type LocaleSettings,
@@ -12,6 +13,7 @@ import {
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import {
+  DEFAULT_PREFERENCE,
   THEME_SETTINGS_NAMESPACE,
   type ThemeSettings,
 } from '@deepseek-ai/dsh-client-ui-theme'
@@ -79,15 +81,17 @@ import {
   windowsSupportsMica,
 } from './window-material.ts'
 import { DESKTOP_PRODUCT_NAME } from './product-identity.ts'
+import { configValue, readSettingsValue } from './settings-access.ts'
+import { requireWebServerPort } from './web-server-port.ts'
 
 /** Stable Cordis plugin name. */
 export const name = 'desktop-shell'
 
 /** Services required by the desktop shell; `desktopRuntime` is probed, not required. */
-export const inject = ['webServer', 'webRuntime', 'appExit', 'settings', 'connection']
+export const inject = ['webServer', 'webApp', 'appExit', 'connection']
 
 /** Standard settings namespace shared by tray and configuration surfaces. */
-export const DESKTOP_SETTINGS_NAMESPACE = 'dsh-desktop'
+export const DESKTOP_SETTINGS_NAMESPACE = 'desktop-shell'
 
 const UI_THEME_SETTINGS_NAMESPACE = THEME_SETTINGS_NAMESPACE
 const UI_LOCALE_SETTINGS_NAMESPACE = LOCALE_SETTINGS_NAMESPACE
@@ -128,17 +132,6 @@ export interface DesktopSettings {
   logLevel: 'debug' | 'info' | 'warn' | 'error'
 }
 
-/** Schema registered with the standard settings service. */
-export const DesktopSettingsSchema: z<DesktopSettings> = z.object({
-  mode: z.union(['compatibility', 'extended', 'advanced'] as const).default('compatibility'),
-  macosMaterial: z.union(['off', 'transparent'] as const).default(DEFAULT_MACOS_WINDOW_MATERIAL),
-  windowsMaterial: z.union(['off', 'acrylic', 'mica'] as const).default(DEFAULT_WINDOWS_WINDOW_MATERIAL),
-  port: z.number().step(1).min(0).max(65_535).default(DESKTOP_DEFAULT_WEB_PORT),
-  openBrowser: z.boolean().default(false),
-  networkExposure: z.union(['loopback', 'lan'] as const).default('loopback'),
-  logLevel: z.union(['debug', 'info', 'warn', 'error'] as const).default('info'),
-})
-
 /** Native window configuration. */
 export interface Config {
   /** Native presentation mode selected before BrowserWindow construction. */
@@ -151,6 +144,10 @@ export interface Config {
   port: number
   /** Configured listener exposure used to detect restart-applied settings changes. */
   networkExposure: DesktopNetworkExposure
+  /** Whether Desktop advertises its marker-free compatibility client for browser use. */
+  openBrowser: boolean
+  /** Host log threshold applied by the next generation. */
+  logLevel: 'debug' | 'info' | 'warn' | 'error'
   /** Initial window width in CSS pixels. */
   width: number
   /** Initial window height in CSS pixels. */
@@ -161,18 +158,60 @@ export interface Config {
   minHeight: number
 }
 
-/** Validated native window configuration. */
-export const Config: z<Config> = z.object({
-  mode: z.union(['compatibility', 'extended', 'advanced'] as const).default('compatibility'),
-  macosMaterial: z.union(['off', 'transparent'] as const).default(DEFAULT_MACOS_WINDOW_MATERIAL),
-  windowsMaterial: z.union(['off', 'acrylic', 'mica'] as const).default(DEFAULT_WINDOWS_WINDOW_MATERIAL),
-  port: z.number().step(1).min(0).max(65_535).default(DESKTOP_DEFAULT_WEB_PORT),
-  networkExposure: z.union(['loopback', 'lan'] as const).default('loopback'),
+/**
+ * Validated native window configuration.
+ *
+ * The settings service derives the Desktop settings form from this entry, so the
+ * user-editable fields carry `volatile`: window geometry stays composition-only.
+ */
+export const Config = z.object({
+  mode: z.union(['compatibility', 'extended', 'advanced'] as const).default('compatibility').volatile(),
+  macosMaterial: z.union(['off', 'transparent'] as const).default(DEFAULT_MACOS_WINDOW_MATERIAL).volatile(),
+  windowsMaterial: z.union(['off', 'acrylic', 'mica'] as const).default(DEFAULT_WINDOWS_WINDOW_MATERIAL).volatile(),
+  port: z.number().step(1).min(0).max(65_535).default(DESKTOP_DEFAULT_WEB_PORT).volatile(),
+  networkExposure: z.union(['loopback', 'lan'] as const).default('loopback').volatile(),
+  openBrowser: z.boolean().default(false).volatile(),
+  logLevel: z.union(['debug', 'info', 'warn', 'error'] as const).default('info').volatile(),
   width: z.number().step(1).min(800).default(1280),
   height: z.number().step(1).min(600).default(840),
   minWidth: z.number().step(1).min(640).default(900),
   minHeight: z.number().step(1).min(480).default(640),
 })
+
+/**
+ * Reject a Desktop settings combination the shell cannot honour.
+ *
+ * The settings service writes what the settings page sends, so the shell keeps
+ * this guard where it consumes the values: an unsupported combination fails at
+ * startup instead of launching a window the platform cannot render.
+ * @param value - effective Desktop settings.
+ * @param platform - active runtime platform.
+ */
+export function validateDesktopSettings(
+  value: Pick<DesktopSettings, 'mode' | 'networkExposure'>,
+  platform: NodeJS.Platform,
+): void {
+  if (value.networkExposure === 'lan' && !desktopLanExposureAvailable(value.mode)) {
+    throw new Error('dsh-plugin-desktop: LAN exposure requires compatibility mode')
+  }
+  if (value.mode !== 'compatibility' && platform !== 'darwin' && platform !== 'win32') {
+    throw new Error('dsh-plugin-desktop: custom desktop shell modes are supported on macOS and Windows')
+  }
+}
+
+/** Default Desktop settings, projected from the entry schema. */
+function desktopSettingsDefaults(): DesktopSettings {
+  const config = Config({} as Config)
+  return {
+    mode: configValue(config.mode),
+    macosMaterial: configValue(config.macosMaterial),
+    windowsMaterial: configValue(config.windowsMaterial),
+    port: configValue(config.port),
+    openBrowser: configValue(config.openBrowser),
+    networkExposure: configValue(config.networkExposure),
+    logLevel: configValue(config.logLevel),
+  }
+}
 
 /**
  * Construct the unmodified upstream Web root URL.
@@ -232,10 +271,19 @@ export function apply(ctx: Context, config: Config): void {
   if (lanHttps === undefined) {
     throw new Error('dsh-plugin-desktop: the launcher did not provide ctx.desktopLanHttps')
   }
-  if (ctx.webServer.host !== desktopWebServerHost(config.networkExposure)) {
+  // Volatile-marked fields arrive as live references from the settings service;
+  // the shell reads them once here and re-reads committed values on each change.
+  const configMode = configValue(config.mode)
+  const configPort = configValue(config.port)
+  const configMacosMaterial = configValue(config.macosMaterial)
+  const configWindowsMaterial = configValue(config.windowsMaterial)
+  const configNetworkExposure = configValue(config.networkExposure)
+
+  if (ctx.webServer.host !== desktopWebServerHost(configNetworkExposure)) {
     throw new Error('dsh-plugin-desktop: desktop shell WebServer host does not match networkExposure')
   }
-  lanHttps.attach(ctx.webServer.port)
+  lanHttps.attach(requireWebServerPort(ctx))
+  validateDesktopSettings(config, runtime.platform)
   const iconFilename = runtime.platform === 'darwin'
     ? 'app-icon-mac.png'
     : 'app-icon.png'
@@ -244,22 +292,11 @@ export function apply(ctx: Context, config: Config): void {
     templatePath: fileURLToPath(new URL('../build/tray-iconTemplate.png', import.meta.url)),
     bluePath: fileURLToPath(new URL('../build/tray-icon-blue.png', import.meta.url)),
   }
-  const settings = ctx.settings.register(
-    DESKTOP_SETTINGS_NAMESPACE,
-    DesktopSettingsSchema,
-    {
-      applies: 'restart',
-      validate: (value) => {
-        if (value.networkExposure === 'lan' && !desktopLanExposureAvailable(value.mode)) {
-          throw new Error('dsh-plugin-desktop: LAN exposure requires compatibility mode')
-        }
-        if (value.mode !== 'compatibility' && runtime.platform === 'linux') {
-          throw new Error('dsh-plugin-desktop: custom desktop shell modes are supported on macOS and Windows')
-        }
-      },
-    },
-  )
-  const rendererOrigin = `http://127.0.0.1:${String(ctx.webServer.port)}`
+  // The settings service derives the Desktop settings form from this entry, so
+  // the schema lives in `Config`; the shell reads and writes that namespace.
+  const readSettings = (): DesktopSettings =>
+    readSettingsValue<DesktopSettings>(ctx, DESKTOP_SETTINGS_NAMESPACE) ?? desktopSettingsDefaults()
+  const rendererOrigin = `http://127.0.0.1:${String(requireWebServerPort(ctx))}`
   ctx.effect(
     () => ctx.webServer.register({
       kind: 'exact',
@@ -409,8 +446,10 @@ export function apply(ctx: Context, config: Config): void {
         )
       })
     }
-    updateLiveWebAccess(browserAccess.ordinaryBrowserEnabled, config.networkExposure)
-    const stopWatching = settings.watch((next) => {
+    updateLiveWebAccess(browserAccess.ordinaryBrowserEnabled, configNetworkExposure)
+    const stopWatching = ctx.on('settings/document-updated', (namespace) => {
+      if (String(namespace) !== DESKTOP_SETTINGS_NAMESPACE) return
+      const next = readSettings()
       const nextBrowserAccess = desktopBrowserAccessEnabled(
         next.mode,
         next.openBrowser,
@@ -421,10 +460,10 @@ export function apply(ctx: Context, config: Config): void {
         next.networkExposure,
       )
       updateLiveWebAccess(nextBrowserAccess, nextNetworkExposure)
-      if (next.mode === config.mode
-        && next.port === config.port
-        && next.macosMaterial === config.macosMaterial
-        && next.windowsMaterial === config.windowsMaterial) {
+      if (next.mode === configMode
+        && next.port === configPort
+        && next.macosMaterial === configMacosMaterial
+        && next.windowsMaterial === configWindowsMaterial) {
         if (pending !== undefined) clearImmediate(pending)
         pending = undefined
         return
@@ -444,34 +483,44 @@ export function apply(ctx: Context, config: Config): void {
     }
   }, 'dsh-plugin-desktop: live browser access and restart-applied native settings')
   if (runtime.platform !== 'linux') {
-    ctx.on('settings/updated', (namespace, next) => {
-      if (namespace !== UI_THEME_SETTINGS_NAMESPACE) return
-      runtime.setThemeSource((next as ThemeSettings).preference)
+    ctx.on('settings/document-updated', (namespace) => {
+      if (String(namespace) !== UI_THEME_SETTINGS_NAMESPACE) return
+      const theme = readSettingsValue<ThemeSettings>(ctx, UI_THEME_SETTINGS_NAMESPACE)
+      if (theme !== undefined) runtime.setThemeSource(theme.preference)
     })
   }
-  ctx.on('settings/updated', (namespace, next) => {
-    if (namespace !== UI_LOCALE_SETTINGS_NAMESPACE) return
-    runtime.setLocalePreference(desktopLocalePreference((next as LocaleSettings).preference))
+  ctx.on('settings/document-updated', (namespace) => {
+    if (String(namespace) !== UI_LOCALE_SETTINGS_NAMESPACE) return
+    const locale = readSettingsValue<LocaleSettings>(ctx, UI_LOCALE_SETTINGS_NAMESPACE)
+    runtime.setLocalePreference(desktopLocalePreference(locale?.preference))
   })
   ctx.effect(
     () => {
       const material = effectiveDesktopWindowMaterial(
-        config.mode,
+        configMode,
         runtime.platform,
-        config.macosMaterial,
-        config.windowsMaterial,
+        configMacosMaterial,
+        configWindowsMaterial,
         runtime.windowsBuild,
       )
       const url = desktopRendererUrl(
-        ctx.webServer.port,
-        config.mode,
+        requireWebServerPort(ctx),
+        configMode,
         runtime.platform,
         runtime.updates.currentVersion,
         material,
         runtime.windowsBuild,
       )
       return runtime.schedule({
-        ...config,
+        // The config carries live settings references, which cannot cross the
+        // process boundary; the spec receives unwrapped values.
+        mode: configMode,
+        macosMaterial: configMacosMaterial,
+        windowsMaterial: configWindowsMaterial,
+        width: config.width,
+        height: config.height,
+        minWidth: config.minWidth,
+        minHeight: config.minHeight,
         material,
         ...(runtime.windowsBuild === undefined ? {} : { windowsBuild: runtime.windowsBuild }),
         url,
@@ -483,15 +532,15 @@ export function apply(ctx: Context, config: Config): void {
         trayIcons,
         readLocalePreference: () => {
           return desktopLocalePreference(
-            (ctx.settings.get(UI_LOCALE_SETTINGS_NAMESPACE) as LocaleSettings | undefined)?.preference,
+            (readSettingsValue<LocaleSettings>(ctx, UI_LOCALE_SETTINGS_NAMESPACE))?.preference,
           )
         },
         readThemeSource: () => {
-          const theme = ctx.settings.get(UI_THEME_SETTINGS_NAMESPACE) as ThemeSettings | undefined
-          if (theme === undefined) {
-            throw new Error('dsh-plugin-desktop: custom shell requires the ui-theme settings namespace')
-          }
-          return theme.preference
+          // The settings service lists active entries only, so this startup read
+          // can precede the theme plugin; the durable default stands in until the
+          // document-updated subscription delivers the committed preference.
+          const theme = readSettingsValue<ThemeSettings>(ctx, UI_THEME_SETTINGS_NAMESPACE)
+          return theme?.preference ?? DEFAULT_PREFERENCE
         },
         ...(desktopSettings === undefined ? {} : {
           readRemoteControl: async () => {
@@ -505,10 +554,12 @@ export function apply(ctx: Context, config: Config): void {
         }),
         requestQuit: appExit,
         requestModeChange: async mode => {
-          const current = settings.get()
+          const current = readSettings()
           // Browser access survives a window-mode switch; only the compatibility-only
           // LAN exposure has to fall back to loopback.
-          await settings.update(!desktopLanExposureAvailable(mode) && current.networkExposure === 'lan'
+          const settings = ctx.get('settings')
+          if (settings === undefined) return
+          await settings.update(DESKTOP_SETTINGS_NAMESPACE, !desktopLanExposureAvailable(mode) && current.networkExposure === 'lan'
             ? { mode, networkExposure: 'loopback' }
             : { mode })
         },

@@ -69,7 +69,7 @@ const workspaceManifest = JSON.parse(readFileSync(new URL('package.json', worksp
 }
 const ciWorkflow = readFileSync(new URL('.github/workflows/ci.yml', workspaceRoot), 'utf8')
 const main = readFileSync(new URL('src/main.ts', packageRoot), 'utf8')
-const runtimeVersion = '0.1.5-rc.3'
+const runtimeVersion = '0.2.1-rc.3'
 const dshResolution = (name: string): unknown =>
   workspaceManifest.resolutions?.[`${name}@npm:${runtimeVersion}`]
 
@@ -195,7 +195,7 @@ describe('published package surface', () => {
   })
 
   it('patches the browse panel with the Windows native-picker icon bridge', () => {
-    const patchPath = './patches/dsh-client-ui-directory-picker-browse@0.1.5-rc.3.patch'
+    const patchPath = './patches/dsh-client-ui-directory-picker-browse@0.2.1-rc.3.patch'
     expect(dshResolution('@deepseek-ai/dsh-client-ui-directory-picker-browse'))
       .toContain(patchPath)
     const patch = readFileSync(new URL(patchPath, workspaceRoot), 'utf8')
@@ -219,7 +219,7 @@ describe('published package surface', () => {
   })
 
   it('patches the browse backend to skip unreadable directory-looking entries', () => {
-    const patchPath = './patches/dsh-host-directory-picker-browse@0.1.5-rc.3.patch'
+    const patchPath = './patches/dsh-host-directory-picker-browse@0.2.1-rc.3.patch'
     expect(dshResolution('@deepseek-ai/dsh-host-directory-picker-browse'))
       .toContain(patchPath)
     const patch = readFileSync(new URL(patchPath, workspaceRoot), 'utf8')
@@ -238,7 +238,7 @@ describe('published package surface', () => {
   })
 
   it('gives the Desktop settings section a dedicated display icon', () => {
-    const patchPath = './patches/dsh-client-ui-settings-general@0.1.5-rc.3.patch'
+    const patchPath = './patches/dsh-client-ui-settings-general@0.2.1-rc.3.patch'
     expect(dshResolution('@deepseek-ai/dsh-client-ui-settings-general'))
       .toContain(patchPath)
     const patch = readFileSync(new URL(patchPath, workspaceRoot), 'utf8')
@@ -257,7 +257,7 @@ describe('published package surface', () => {
   })
 
   it('keeps wide Markdown table scrollbars visible without hover', () => {
-    const patchPath = './patches/dsh-client-ui-primitives@0.1.5-rc.3.patch'
+    const patchPath = './patches/dsh-client-ui-primitives@0.2.1-rc.3.patch'
     expect(dshResolution('@deepseek-ai/dsh-client-ui-primitives')).toContain(patchPath)
     const patch = readFileSync(new URL(patchPath, workspaceRoot), 'utf8')
     const installedStyles = readFileSync(new URL(
@@ -287,19 +287,18 @@ describe('published package surface', () => {
     expect(runtimeResolutions.length).toBeGreaterThan(0)
     expect(runtimeResolutions.length).toBe(dshResolutions.length)
     for (const [selector, resolution] of runtimeResolutions) {
-      expect(selector).toMatch(/@npm:\^?0\.1\.5-rc\.3$/u)
+      expect(selector).toMatch(/@npm:\^?0\.2\.1-rc\.3$/u)
       expect(String(resolution)).toContain(runtimeVersion)
     }
   })
 
   it('keeps the canonical web profile configurable while Desktop disables browser opening', () => {
-    const patchPath = './patches/dsh-web-app@0.1.5-rc.3.patch'
-    const openPatchPath = './patches/open@11.0.1.patch'
-    const openPatchResolution = `patch:open@npm%3A11.0.1#${openPatchPath}`
+    const patchPath = './patches/dsh-web-app@0.2.1-rc.3.patch'
+    const openPatchPath = './patches/open@11.0.4.patch'
+    const openPatchResolution = `patch:open@npm%3A11.0.4#${openPatchPath}`
     expect(dshResolution('@deepseek-ai/dsh-web-app')).toContain(patchPath)
     expect(workspaceManifest.resolutions).toMatchObject({
-      'open@npm:11.0.1': openPatchResolution,
-      'open@npm:^11.0.0': openPatchResolution,
+      'open@npm:^11.0.2': openPatchResolution,
     })
     const patch = readFileSync(new URL(patchPath, workspaceRoot), 'utf8')
     const openPatch = readFileSync(new URL(openPatchPath, workspaceRoot), 'utf8')
@@ -321,11 +320,10 @@ describe('published package surface', () => {
       expect(patch).toContain(marker)
       expect(installedWebApp).toContain(marker)
     }
-    expect(patch).toContain('+\t\twindowsHide: true,')
     expect(installedWebApp).toMatch(
       /function spawnBrowserLauncher\(url\) \{\s+return spawn\(process\.execPath, \[[\s\S]*?\], \{\s+windowsHide: true,\s+env:/u,
     )
-    expect(lockfile).toContain('open@patch:open@npm%3A11.0.1#./patches/open@11.0.1.patch')
+    expect(lockfile).toContain('open@patch:open@npm%3A11.0.4#./patches/open@11.0.4.patch')
     expect(openPatch).toContain('+\t\t\tchildProcessOptions.windowsHide = true;')
     expect(installedOpen).toMatch(
       /if \(!isWsl\) \{\s+childProcessOptions\.windowsVerbatimArguments = true;\s+childProcessOptions\.windowsHide = true;\s+\}/u,
@@ -616,8 +614,8 @@ describe('published package surface', () => {
     const marketLegacyMirror = main.indexOf('await selectDesktopMarketProvider(marketUserDataDir, provider)', marketStateWrite)
     const deleteProfile = main.indexOf('await deleteDesktopProfile({')
     const clearPreferences = main.indexOf('await clearDesktopProfilePreferences(', deleteProfile)
-    const captureDesktop = main.indexOf('namespace !== DESKTOP_SETTINGS_NAMESPACE', marketLegacyMirror)
-    const captureNotifications = main.indexOf('namespace !== DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE', captureDesktop)
+    const captureDesktop = main.indexOf('changed === DESKTOP_SETTINGS_NAMESPACE', marketLegacyMirror)
+    const captureNotifications = main.indexOf('changed !== DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE', captureDesktop)
     const captureFailure = main.indexOf('failed to capture active Profile settings', captureNotifications)
 
     const aaController = main.indexOf('selectAa: async enabled => {')
@@ -1129,58 +1127,11 @@ describe('published package surface', () => {
     expect(runner.PATH).toBe('target-path')
     expect(runner.DSH_SUBPROCESS_RUNNER).toBe('windows')
     expect(target).toEqual({ PATH: 'target-path', electron_run_as_node: '0', NODE_OPTIONS: '--trace-warnings' })
+    // Upstream now starts the private runner in Node mode for every Electron host,
+    // not only the Windows one, and never for a plain Node host.
     expect(evaluate('win32')).not.toHaveProperty('ELECTRON_RUN_AS_NODE')
-    expect(evaluate('darwin', '43.3.0')).not.toHaveProperty('ELECTRON_RUN_AS_NODE')
-    expect(evaluate('linux', '43.3.0', '/request')).not.toHaveProperty('ELECTRON_RUN_AS_NODE')
-  })
-
-  it('hides official plugin-manager and general subprocess consoles on Windows', () => {
-    const dshPatchPath = './patches/dsh@0.1.5-rc.3.patch'
-    const subprocessPatchPath = './patches/dsh-subprocess-local@0.1.5-rc.3.patch'
-    const lockfile = readFileSync(new URL('yarn.lock', workspaceRoot), 'utf8')
-    const dshPatch = readFileSync(new URL(dshPatchPath, workspaceRoot), 'utf8')
-    const workspaceRequire = createRequire(new URL('package.json', packageRoot))
-    const dshManifest = workspaceRequire.resolve('@deepseek-ai/dsh/package.json')
-    const dshBin = readFileSync(join(dirname(dshManifest), 'lib/bin.js'), 'utf8')
-    const pluginEntry = /const \{ runPlugin \} = await import\("(\.\/plugin-[^"/]+\.js)"\)/u.exec(dshBin)?.[1]
-    expect(pluginEntry).toBeDefined()
-    if (pluginEntry === undefined) throw new Error('Cannot find the CLI plugin command entry')
-    const dshPluginRuntime = readFileSync(join(dirname(dshManifest), 'lib', pluginEntry), 'utf8')
-    const subprocessManifest = workspaceRequire.resolve('@deepseek-ai/dsh-subprocess-local/package.json')
-    const subprocessIndex = readFileSync(join(dirname(subprocessManifest), 'lib/index.js'), 'utf8')
-    const runnerEntry = /from "(\.\/runner-launch-[^"/]+\.js)"/u.exec(subprocessIndex)?.[1]
-    expect(runnerEntry).toBeDefined()
-    if (runnerEntry === undefined) throw new Error('Cannot find the subprocess runner entry')
-    const subprocessRuntime = readFileSync(join(dirname(subprocessManifest), 'lib', runnerEntry), 'utf8')
-
-    expect(dshResolution('@deepseek-ai/dsh')).toContain(dshPatchPath)
-    expect(dshResolution('@deepseek-ai/dsh-subprocess-local')).toContain(subprocessPatchPath)
-    expect(lockfile).toContain(dshPatchPath)
-    expect(lockfile).toContain(subprocessPatchPath)
-    expect(dshPatch).toContain('+\t\twindowsHide: true')
-    expect(dshPluginRuntime).toMatch(/spawnSync\("pnpm"[\s\S]*?shell: process\.platform === "win32",\s+windowsHide: true/u)
-    let spawnCalls = 0
-    const exitCode = runInNewContext(
-      `${dshPluginRuntime.replace(/^import .+;\r?$/gmu, '').replace(/^export .+;\r?$/gmu, '')}\nrunPlugin('default', ['add', 'example-plugin'])`,
-      {
-        existsSync: () => true,
-        resolveProfileDir: () => 'C:/profiles/default',
-        readProfileManifest: () => ({}),
-        join,
-        process: { platform: 'win32', cwd: () => 'C:/workspace', stderr: { write: () => {} } },
-        spawnSync: (command: string, args: string[], options: Record<string, unknown>) => {
-          spawnCalls += 1
-          expect(command).toBe('pnpm')
-          expect(args).toEqual(['add', 'example-plugin'])
-          expect(options).toEqual({ cwd: 'C:/profiles/default', stdio: 'inherit', shell: true, windowsHide: true })
-          return { status: 17 }
-        },
-      },
-    )
-    expect(spawnCalls).toBe(1)
-    expect(exitCode).toBe(17)
-    expect(subprocessRuntime.match(/windowsHide: true/gu)).toHaveLength(2)
-    expect(subprocessRuntime).toContain('windowsHide: platform === "win32"')
+    expect(evaluate('darwin', '43.3.0')).toHaveProperty('ELECTRON_RUN_AS_NODE', '1')
+    expect(evaluate('linux', '43.3.0', '/request')).toHaveProperty('ELECTRON_RUN_AS_NODE', '1')
   })
 
   it('resolves electron-builder through the pinned app-builder-lib keychain patch', () => {
@@ -1243,19 +1194,13 @@ describe('published package surface', () => {
   })
 
   it('starts restricted Windows shells with a hidden console show state', () => {
-    const patchPath = './patches/dsh-win32-process@0.1.5-rc.3.patch'
-    const lockfile = readFileSync(new URL('yarn.lock', workspaceRoot), 'utf8')
-    const patch = readFileSync(new URL('patches/dsh-win32-process@0.1.5-rc.3.patch', workspaceRoot), 'utf8')
+    // Upstream owns this behaviour now; the shell no longer patches the package.
     const workspaceRequire = createRequire(new URL('package.json', packageRoot))
     const sandboxManifest = workspaceRequire.resolve('@deepseek-ai/dsh-sandbox-windows-acl/package.json')
     const sandboxRequire = createRequire(sandboxManifest)
     const processManifest = sandboxRequire.resolve('@deepseek-ai/dsh-win32-process/package.json')
     const installedRuntime = readFileSync(join(dirname(processManifest), 'lib/index.js'), 'utf8')
 
-    expect(dshResolution('@deepseek-ai/dsh-win32-process')).toContain(patchPath)
-    expect(lockfile).toContain(patchPath)
-    expect(patch.match(/^\+\s*dwFlags: 257,\r?$/gmu)).toHaveLength(2)
-    expect(patch.match(/^\+\s*wShowWindow: 0,\r?$/gmu)).toHaveLength(2)
     expect(installedRuntime.match(/dwFlags: 257,/gu)).toHaveLength(2)
     expect(installedRuntime.match(/wShowWindow: 0,/gu)).toHaveLength(2)
     expect(installedRuntime).toContain('createRestrictedProcess(api, options, buildCommandLine(options.command, options.args), 0')

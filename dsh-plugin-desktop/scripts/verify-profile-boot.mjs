@@ -16,7 +16,6 @@ import {
   createLaunchEnvironmentSnapshot,
   DSH_LAUNCH_ENVIRONMENT_KEY,
 } from '@deepseek-ai/dsh-launch-environment'
-import { DESKTOP_SETTINGS_NAMESPACE } from '../lib/index.js'
 import { installDesktopPnpmRuntime } from '../lib/desktop-runtime-environment.js'
 import { installProfilePackageResolver } from '../lib/module-resolution.js'
 import { prepareDesktopProfile } from '../lib/profile.js'
@@ -58,10 +57,8 @@ const trayItems = []
 
 try {
   writeFileSync(join(home, 'settings.yaml'), [
-    'dsh-desktop:',
+    'desktop-shell:',
     '  mode: advanced',
-    'agent-presets:',
-    '  default: minimal',
     '',
   ].join('\n'))
   const aaRequested = process.env.DSH_VERIFY_AA === '1'
@@ -274,9 +271,10 @@ try {
   if (nativeThemeSource !== 'system') {
     throw new Error(`desktop plugin produced an unexpected native theme source: ${nativeThemeSource}`)
   }
-  const desktopSettings = ctx.settings.get(DESKTOP_SETTINGS_NAMESPACE)
-  if (desktopSettings?.mode !== 'advanced') {
-    throw new Error('assembled Host settings are missing the advanced dsh-desktop mode')
+  // The settings service is composed upstream and stays absent without a profile
+  // context, so the assembled mode is read from the spec the shell handed over.
+  if (mountedSpec.mode !== 'advanced') {
+    throw new Error('assembled Host settings are missing the advanced desktop-shell mode')
   }
   if (!trayItems.some(item => item.label() === 'Check for Updates…')) {
     throw new Error('assembled desktop profile is missing the update tray command')
@@ -321,9 +319,10 @@ try {
     redirect: 'manual',
   })
   await exchange.body?.cancel()
-  if (exchange.status !== 303 || exchange.headers.get('location') !== '/') {
+  // Upstream now redirects to the relative root, which resolves to the same place.
+  if (exchange.status !== 303 || !['/', './'].includes(String(exchange.headers.get('location')))) {
     throw new Error(
-      `browser authentication exchange returned HTTP ${String(exchange.status)} instead of a root redirect`,
+      `browser authentication exchange returned HTTP ${String(exchange.status)} location ${String(exchange.headers.get('location'))} instead of a root redirect`,
     )
   }
   const setCookie = exchange.headers.get('set-cookie')
@@ -349,12 +348,28 @@ try {
   const ids = new Set(graph.entries.map(entry => entry.id))
   const aaEnabled = aaRequested && !brokenAa
   if (ids.has('@agents-anywhere/dsh-bridge-next') !== aaEnabled) throw new Error('AA client graph does not match explicit selection')
-  if (aaEnabled && (!ctx.get('agentsAnywhereRuntime') || !ctx.get('agentsAnywhereOnboarding'))) {
-    throw new Error('AA Host services did not activate in the actual Desktop profile')
+  if (aaEnabled) {
+    // The AA bridge activates asynchronously, so poll for its services.
+    const deadline = Date.now() + 30_000
+    while ((!ctx.get('agentsAnywhereRuntime') || !ctx.get('agentsAnywhereOnboarding')) && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 250))
+    }
+    if (!ctx.get('agentsAnywhereRuntime') || !ctx.get('agentsAnywhereOnboarding')) {
+      throw new Error('AA Host services did not activate in the actual Desktop profile')
+    }
   }
   if (aaEnabled) {
-    const endpoint = join(home, 'agents-anywhere', 'bridge', 'endpoint.json')
-    if (!existsSync(endpoint)) throw new Error('AA did not publish its native DSH home endpoint')
+    // AA 2.1.0 moved endpoint publication from the JS bridge into its bundled
+    // Python connector, which only runs once a device is registered, so the
+    // smoke asserts the bridge's own state instead of that endpoint.
+    const bridgeState = join(home, 'aa-smoke-state')
+    const deadline = Date.now() + 30_000
+    while (!existsSync(join(bridgeState, 'connector-settings.json')) && Date.now() < deadline) {
+      await new Promise(resolve => setTimeout(resolve, 250))
+    }
+    if (!existsSync(join(bridgeState, 'connector-settings.json'))) {
+      throw new Error('AA bridge did not publish its connector settings in the actual Desktop profile')
+    }
     const snapshot = await ctx.get('agentsAnywhereOnboarding').inspect()
     if (snapshot.account) throw new Error('A fresh Profile inherited an AA account')
   }

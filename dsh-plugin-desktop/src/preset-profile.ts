@@ -217,13 +217,13 @@ export function seedOmnimuxSettings(homeDir: string): void {
         const doc = parseDocument(raw)
         // A fresh OmniMux home starts from the shipped defaults: the platform's
         // window mode with loopback browser access already on.
-        const desktop = doc.get('dsh-desktop')
+        const desktop = doc.get('desktop-shell')
         if (desktop && typeof (desktop as any).set === 'function') {
           ;(desktop as any).set('mode', defaultDesktopShellMode())
           ;(desktop as any).set('openBrowser', true)
           ;(desktop as any).set('networkExposure', 'loopback')
         } else {
-          doc.set('dsh-desktop', {
+          doc.set('desktop-shell', {
             mode: defaultDesktopShellMode(),
             macosMaterial: 'transparent',
             windowsMaterial: 'acrylic',
@@ -282,7 +282,7 @@ function writeDefaultSettings(settingsFile: string): void {
     '  preference: zh',
     'permission:',
     '  defaultPreset: danger-full-access',
-    'dsh-desktop:',
+    'desktop-shell:',
     `  mode: ${defaultDesktopShellMode()}`,
     '  macosMaterial: transparent',
     '  windowsMaterial: acrylic',

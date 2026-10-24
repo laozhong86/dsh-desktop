@@ -16,6 +16,9 @@ import {
 
 export const name = 'community-market'
 export const inject = ['webServer', 'settings']
+// The settings service derives a namespace's form from its profile entry, so
+// the market's schema is declared here as the entry's config.
+export { SETTINGS_SCHEMA as Config } from './host/routes.js'
 
 interface DesktopProfilesCapability {
   readonly current: MarketDesktopProfile

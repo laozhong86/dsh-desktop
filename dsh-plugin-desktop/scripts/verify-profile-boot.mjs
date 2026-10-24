@@ -58,10 +58,8 @@ const trayItems = []
 
 try {
   writeFileSync(join(home, 'settings.yaml'), [
-    'dsh-desktop:',
+    'desktop-shell:',
     '  mode: advanced',
-    'agent-presets:',
-    '  default: minimal',
     '',
   ].join('\n'))
   const aaRequested = process.env.DSH_VERIFY_AA === '1'
@@ -274,9 +272,11 @@ try {
   if (nativeThemeSource !== 'system') {
     throw new Error(`desktop plugin produced an unexpected native theme source: ${nativeThemeSource}`)
   }
-  const desktopSettings = ctx.settings.get(DESKTOP_SETTINGS_NAMESPACE)
-  if (desktopSettings?.mode !== 'advanced') {
-    throw new Error('assembled Host settings are missing the advanced dsh-desktop mode')
+  const desktopSettings = ctx.settings
+    .describe()
+    .find(entry => String(entry.ns) === DESKTOP_SETTINGS_NAMESPACE)
+  if (desktopSettings?.value?.mode !== 'advanced') {
+    throw new Error('assembled Host settings are missing the advanced desktop-shell mode')
   }
   if (!trayItems.some(item => item.label() === 'Check for Updates…')) {
     throw new Error('assembled desktop profile is missing the update tray command')

@@ -58,7 +58,7 @@ const config: DesktopConfig = {
 }
 
 /** Project a schema result onto plain values; volatile fields arrive as references. */
-function plainConfig(value: DesktopConfig): Record<string, unknown> {
+function plainConfig(value: object): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(value).map(([key, item]) => [key, configValue(item as never)]),
   )
@@ -104,7 +104,7 @@ function createHarness(
     request: ConnectionTrustRequest,
   ) => ConnectionRequestRejection>(() => undefined)
   const routes = new Map<string, WebRoute>()
-  const settingsUpdated = new Set<(namespace: unknown, next: unknown) => void>()
+  const settingsUpdated = new Set<(namespace: unknown) => void>()
   let localePreference: LocaleId | undefined
   let themePreference: ThemePreference = 'system'
   const browserAccess = createDesktopBrowserAccess(

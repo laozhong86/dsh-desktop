@@ -13,6 +13,7 @@ import {
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-client-connection'
 import {
+  DEFAULT_PREFERENCE,
   THEME_SETTINGS_NAMESPACE,
   type ThemeSettings,
 } from '@deepseek-ai/dsh-client-ui-theme'
@@ -87,7 +88,7 @@ import { requireWebServerPort } from './web-server-port.ts'
 export const name = 'desktop-shell'
 
 /** Services required by the desktop shell; `desktopRuntime` is probed, not required. */
-export const inject = ['webServer', 'webRuntime', 'appExit', 'settings', 'connection']
+export const inject = ['webServer', 'webApp', 'appExit', 'connection']
 
 /** Standard settings namespace shared by tray and configuration surfaces. */
 export const DESKTOP_SETTINGS_NAMESPACE = 'desktop-shell'
@@ -511,7 +512,15 @@ export function apply(ctx: Context, config: Config): void {
         runtime.windowsBuild,
       )
       return runtime.schedule({
-        ...config,
+        // The config carries live settings references, which cannot cross the
+        // process boundary; the spec receives unwrapped values.
+        mode: configMode,
+        macosMaterial: configMacosMaterial,
+        windowsMaterial: configWindowsMaterial,
+        width: config.width,
+        height: config.height,
+        minWidth: config.minWidth,
+        minHeight: config.minHeight,
         material,
         ...(runtime.windowsBuild === undefined ? {} : { windowsBuild: runtime.windowsBuild }),
         url,
@@ -527,11 +536,11 @@ export function apply(ctx: Context, config: Config): void {
           )
         },
         readThemeSource: () => {
+          // The settings service lists active entries only, so this startup read
+          // can precede the theme plugin; the durable default stands in until the
+          // document-updated subscription delivers the committed preference.
           const theme = readSettingsValue<ThemeSettings>(ctx, UI_THEME_SETTINGS_NAMESPACE)
-          if (theme === undefined) {
-            throw new Error('dsh-plugin-desktop: custom shell requires the ui-theme settings namespace')
-          }
-          return theme.preference
+          return theme?.preference ?? DEFAULT_PREFERENCE
         },
         ...(desktopSettings === undefined ? {} : {
           readRemoteControl: async () => {
@@ -548,7 +557,9 @@ export function apply(ctx: Context, config: Config): void {
           const current = readSettings()
           // Browser access survives a window-mode switch; only the compatibility-only
           // LAN exposure has to fall back to loopback.
-          await ctx.settings.update(DESKTOP_SETTINGS_NAMESPACE, !desktopLanExposureAvailable(mode) && current.networkExposure === 'lan'
+          const settings = ctx.get('settings')
+          if (settings === undefined) return
+          await settings.update(DESKTOP_SETTINGS_NAMESPACE, !desktopLanExposureAvailable(mode) && current.networkExposure === 'lan'
             ? { mode, networkExposure: 'loopback' }
             : { mode })
         },

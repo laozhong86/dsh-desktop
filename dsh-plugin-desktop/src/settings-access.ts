@@ -22,7 +22,11 @@ export function configValue<T>(value: Volatile<T> | T): T {
 
 /** The resolved value of one settings namespace, or undefined when it has none. */
 export function readSettingsValue<T>(ctx: Context, namespace: string): T | undefined {
-  const descriptor = ctx.settings
+  // The settings service is composed upstream and stays absent without a profile
+  // context, so the shell reads it when present instead of waiting for it.
+  const settings = ctx.get('settings')
+  if (settings === undefined) return undefined
+  const descriptor = settings
     .describe()
     .find(entry => String(entry.ns) === namespace)
   return descriptor?.value as T | undefined

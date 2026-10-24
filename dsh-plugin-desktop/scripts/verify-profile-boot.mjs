@@ -359,17 +359,16 @@ try {
     }
   }
   if (aaEnabled) {
-    const endpoint = join(home, 'agents-anywhere', 'bridge', 'endpoint.json')
-    // The bridge publishes the endpoint once its connector is up, which is
-    // asynchronous, so poll instead of sampling once.
+    // AA 2.1.0 moved endpoint publication from the JS bridge into its bundled
+    // Python connector, which only runs once a device is registered, so the
+    // smoke asserts the bridge's own state instead of that endpoint.
+    const bridgeState = join(home, 'aa-smoke-state')
     const deadline = Date.now() + 30_000
-    while (!existsSync(endpoint) && Date.now() < deadline) {
+    while (!existsSync(join(bridgeState, 'connector-settings.json')) && Date.now() < deadline) {
       await new Promise(resolve => setTimeout(resolve, 250))
     }
-    if (!existsSync(endpoint)) {
-      const { readdirSync } = await import('node:fs')
-      const walk = (dir) => { try { return readdirSync(dir).join(', ') } catch { return '<absent>' } }
-      throw new Error(`AA did not publish its native DSH home endpoint; home=${walk(join(home, 'agents-anywhere'))} state=${walk(join(home, 'aa-smoke-state'))}`)
+    if (!existsSync(join(bridgeState, 'connector-settings.json'))) {
+      throw new Error('AA bridge did not publish its connector settings in the actual Desktop profile')
     }
     const snapshot = await ctx.get('agentsAnywhereOnboarding').inspect()
     if (snapshot.account) throw new Error('A fresh Profile inherited an AA account')

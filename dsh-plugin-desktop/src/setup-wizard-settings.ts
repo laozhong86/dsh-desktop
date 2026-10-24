@@ -33,8 +33,8 @@ import type {
 } from './setup-wizard-contract.ts'
 
 const BIN_NAME = 'dsh-plugin-desktop'
-const DESKTOP_NAMESPACE = 'dsh-desktop'
-const NOTIFICATIONS_NAMESPACE = 'dsh-desktop-notifications'
+const DESKTOP_NAMESPACE = 'desktop-shell'
+const NOTIFICATIONS_NAMESPACE = 'desktop-notifications'
 const MAX_DOCUMENT_BYTES = 4 * 1024 * 1024
 const DOCUMENT_FILE_MODE = 0o600
 const DOCUMENT_DIRECTORY_MODE = 0o700

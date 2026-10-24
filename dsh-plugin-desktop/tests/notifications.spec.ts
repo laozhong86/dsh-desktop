@@ -16,7 +16,7 @@ type OptionalService = 'jobs' | 'sessions' | 'settings'
 
 interface NotificationHarness {
   readonly notifyAttention: ReturnType<typeof vi.fn>
-  readonly registerSettings: ReturnType<typeof vi.fn>
+  readonly settingsService: { describe: ReturnType<typeof vi.fn> }
   readonly stopJobs: ReturnType<typeof vi.fn>
   readonly stopSessions: ReturnType<typeof vi.fn>
   jobDone(job: JobView): Promise<void>
@@ -39,9 +39,7 @@ function createHarness(available: readonly OptionalService[] = ['jobs', 'session
   let jobListener: ((event: JobEvent) => void | PromiseLike<void>) | undefined
   let sessionListener: ((session: Session, event: SessionEvent) => void | PromiseLike<void>) | undefined
   let sessionDisposedListener: ((session: Session) => void | PromiseLike<void>) | undefined
-  let settingsWatcher:
-    | ((next: DesktopNotificationSettings, previous: DesktopNotificationSettings) => void | Promise<void>)
-    | undefined
+  let settingsUpdatedListener: ((namespace: unknown) => void | Promise<void>) | undefined
   let currentSettings = DesktopNotificationSettingsSchema({} as DesktopNotificationSettings)
 
   const runtime = {
@@ -50,19 +48,18 @@ function createHarness(available: readonly OptionalService[] = ['jobs', 'session
     notifyAttention,
   } as unknown as DesktopRuntime
 
-  const registerSettings = vi.fn(() => ({
-    get: () => currentSettings,
-    watch: (watcher: typeof settingsWatcher) => {
-      settingsWatcher = watcher
-      return () => { settingsWatcher = undefined }
-    },
+  const describeSettings = vi.fn(() => [
+    { ns: DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE, value: currentSettings },
+  ])
+  const settingsService = {
+    describe: describeSettings,
     update: vi.fn(async () => {}),
     replace: vi.fn(async () => {}),
-  }))
+  }
 
   const ctx = {
     desktopRuntime: runtime,
-    settings: { register: registerSettings },
+    settings: settingsService,
     jobs: {
       events: {
         subscribe: (_filter: unknown, listener: typeof jobListener) => {
@@ -74,11 +71,16 @@ function createHarness(available: readonly OptionalService[] = ['jobs', 'session
         },
       },
     },
-    on: (event: string, listener: typeof sessionListener | typeof sessionDisposedListener) => {
-      if (event === 'session/event') sessionListener = listener as typeof sessionListener
+    on: (event: string, listener: typeof settingsUpdatedListener | typeof sessionListener | typeof sessionDisposedListener) => {
+      if (event === 'settings/document-updated') settingsUpdatedListener = listener as typeof settingsUpdatedListener
+      else if (event === 'session/event') sessionListener = listener as typeof sessionListener
       else if (event === 'session/disposed') sessionDisposedListener = listener as typeof sessionDisposedListener
       else return () => {}
       return () => {
+        if (event === 'settings/document-updated') {
+          settingsUpdatedListener = undefined
+          return
+        }
         if (event === 'session/event') sessionListener = undefined
         else sessionDisposedListener = undefined
         stopSessions()
@@ -111,7 +113,7 @@ function createHarness(available: readonly OptionalService[] = ['jobs', 'session
 
   return {
     notifyAttention,
-    registerSettings,
+    settingsService,
     stopJobs,
     stopSessions,
     async jobDone(job) {
@@ -120,9 +122,8 @@ function createHarness(available: readonly OptionalService[] = ['jobs', 'session
     async sessionEvent(session, event) { await sessionListener?.(session, event) },
     async sessionDisposed(session) { await sessionDisposedListener?.(session) },
     async updateSettings(next) {
-      const previous = currentSettings
       currentSettings = next
-      await settingsWatcher?.(next, previous)
+      await settingsUpdatedListener?.(DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE)
     },
     teardownSessions() { teardown('sessions') },
     reattachSessions() {
@@ -182,11 +183,8 @@ describe('desktop notifications Host plugin', () => {
       notifyOnJobCompletion: true,
       notifyOnJobFailure: true,
     })
-    expect(harness.registerSettings).toHaveBeenCalledWith(
-      DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE,
-      DesktopNotificationSettingsSchema,
-      { applies: 'live' },
-    )
+    // The settings form is derived from the entry, so the shell reads the namespace.
+    expect(harness.settingsService.describe).toHaveBeenCalled()
   })
 
   it('notifies for completed and failed jobs without exposing job details', async () => {

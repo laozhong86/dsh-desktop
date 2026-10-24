@@ -14,8 +14,8 @@ import type { DesktopClientEnvironment } from './environment.ts'
 export const DESKTOP_SETTINGS_LOCALE_NAMESPACE = 'desktop.settings'
 
 /** Host settings namespaces bound through the standard client settings service. */
-export const DESKTOP_SHELL_SETTINGS_NAMESPACE = 'dsh-desktop'
-export const DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE = 'dsh-desktop-notifications'
+export const DESKTOP_SHELL_SETTINGS_NAMESPACE = 'desktop-shell'
+export const DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE = 'desktop-notifications'
 
 /** Shared client controls consumed by settings and Desktop-owned window chrome. */
 export interface DesktopSettingsClientControl {

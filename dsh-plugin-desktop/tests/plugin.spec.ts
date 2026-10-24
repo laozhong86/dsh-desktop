@@ -9,6 +9,7 @@ import type { LocaleId } from '@deepseek-ai/dsh-client-locale'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import type { ThemePreference } from '@deepseek-ai/dsh-client-ui-theme'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { configValue } from '../src/settings-access.ts'
 import {
   apply,
   Config,
@@ -56,6 +57,13 @@ const config: DesktopConfig = {
   minHeight: 640,
 }
 
+/** Project a schema result onto plain values; volatile fields arrive as references. */
+function plainConfig(value: DesktopConfig): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [key, configValue(item as never)]),
+  )
+}
+
 afterEach(() => { vi.useRealTimers() })
 
 interface PluginHarness {
@@ -85,7 +93,6 @@ function createHarness(
   ordinaryBrowserEnabled = false,
 ): PluginHarness {
   let shell: DesktopShellSpec | undefined
-  let watcher: ((next: DesktopSettings, prev: DesktopSettings) => void | Promise<void>) | undefined
   const update = vi.fn(async (_patch: object) => {})
   const restart = vi.fn(async () => {})
   const setLocalePreference = vi.fn<(locale: LocaleId | undefined) => void>()
@@ -150,29 +157,23 @@ function createHarness(
     requestRecoveryRestart: restart,
     prepareToQuit: () => {},
   }
+  let desktopSettingsValue: DesktopSettings = {
+    mode: config.mode,
+    macosMaterial: config.macosMaterial,
+    windowsMaterial: config.windowsMaterial,
+    port: config.port,
+    openBrowser: ordinaryBrowserEnabled,
+    networkExposure: config.networkExposure,
+    logLevel: 'info',
+  }
   const settings = {
-    get: vi.fn((namespace: unknown) => {
-      if (String(namespace) === 'ui-theme') return { preference: themePreference }
-      if (String(namespace) === 'locale') return { preference: localePreference }
-      return undefined
-    }),
-    register: vi.fn(() => ({
-      get: () => ({
-        mode: config.mode,
-        macosMaterial: config.macosMaterial,
-        windowsMaterial: config.windowsMaterial,
-        port: config.port,
-        openBrowser: ordinaryBrowserEnabled,
-        networkExposure: config.networkExposure,
-        logLevel: 'info' as const,
-      }),
-      watch: (callback: typeof watcher) => {
-        watcher = callback
-        return () => { watcher = undefined }
-      },
-      update,
-      replace: vi.fn(async () => {}),
-    })),
+    describe: vi.fn(() => [
+      { ns: 'ui-theme', value: { preference: themePreference } },
+      { ns: 'locale', value: { preference: localePreference } },
+      { ns: DESKTOP_SETTINGS_NAMESPACE, value: desktopSettingsValue },
+    ]),
+    update,
+    replace: vi.fn(async () => {}),
   }
   const ctx = {
     desktopRuntime: runtime,
@@ -194,8 +195,8 @@ function createHarness(
       return () => {}
     }),
     effect: vi.fn((register: () => unknown) => register()),
-    on: vi.fn((event: string, listener: (namespace: unknown, next: unknown) => void) => {
-      if (event === 'settings/updated') settingsUpdated.add(listener)
+    on: vi.fn((event: string, listener: (namespace: unknown) => void) => {
+      if (event === 'settings/document-updated') settingsUpdated.add(listener)
       return () => { settingsUpdated.delete(listener) }
     }),
   } as unknown as Context
@@ -216,22 +217,25 @@ function createHarness(
     requestRejection,
     route: path => routes.get(path),
     routes: () => [...routes.values()],
-    notify: async (next, prev) => { await watcher?.(next, prev) },
+    notify: async (next) => {
+      desktopSettingsValue = next
+      for (const listener of settingsUpdated) listener(DESKTOP_SETTINGS_NAMESPACE)
+    },
     notifyLocale: (preference) => {
       localePreference = preference
-      for (const listener of settingsUpdated) listener('locale', { preference })
+      for (const listener of settingsUpdated) listener('locale')
     },
     notifyTheme: (preference) => {
       themePreference = preference
-      for (const listener of settingsUpdated) listener('ui-theme', { preference })
+      for (const listener of settingsUpdated) listener('ui-theme')
     },
   }
 }
 
 describe('desktop Host plugin', () => {
   it('defaults to compatibility mode and validates the entry schema', () => {
-    expect(Config({} as DesktopConfig)).toEqual(config)
-    expect(Config({ mode: 'advanced' } as DesktopConfig)).toEqual({ ...config, mode: 'advanced' })
+    expect(plainConfig(Config({} as DesktopConfig))).toEqual(config)
+    expect(plainConfig(Config({ mode: 'advanced' } as DesktopConfig))).toEqual({ ...config, mode: 'advanced' })
     expect(() => Config({ port: -1 } as DesktopConfig)).toThrow()
     expect(() => Config({ port: 1.5 } as DesktopConfig)).toThrow()
     expect(() => Config({ port: 65_536 } as DesktopConfig)).toThrow()
@@ -354,7 +358,7 @@ describe('desktop Host plugin', () => {
     expect(harness.setThemeSource).toHaveBeenCalledWith('dark')
 
     await harness.shell()?.requestModeChange('advanced')
-    expect(harness.update).toHaveBeenCalledWith({ mode: 'advanced' })
+    expect(harness.update).toHaveBeenCalledWith(DESKTOP_SETTINGS_NAMESPACE, { mode: 'advanced' })
   })
 
   it('keeps browser access and only withdraws the LAN listener when the native tray selects a custom mode', async () => {
@@ -363,7 +367,7 @@ describe('desktop Host plugin', () => {
 
     await harness.shell()?.requestModeChange('advanced')
 
-    expect(harness.update).toHaveBeenCalledWith({ mode: 'advanced' })
+    expect(harness.update).toHaveBeenCalledWith(DESKTOP_SETTINGS_NAMESPACE, { mode: 'advanced' })
   })
 
   it('forwards same-origin renderer boot reports through the Host route', async () => {

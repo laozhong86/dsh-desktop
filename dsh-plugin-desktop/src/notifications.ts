@@ -10,7 +10,7 @@ import type { DesktopLocale, DesktopNotification } from './runtime.ts'
 export const name = 'desktop-notifications'
 export const inject = ['desktopRuntime']
 
-export const DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE = 'dsh-desktop-notifications'
+export const DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE = 'desktop-notifications'
 
 export interface DesktopNotificationSettings {
   enabled: boolean

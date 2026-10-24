@@ -90,7 +90,7 @@ export const name = 'desktop-shell'
 export const inject = ['webServer', 'webRuntime', 'appExit', 'settings', 'connection']
 
 /** Standard settings namespace shared by tray and configuration surfaces. */
-export const DESKTOP_SETTINGS_NAMESPACE = 'dsh-desktop'
+export const DESKTOP_SETTINGS_NAMESPACE = 'desktop-shell'
 
 const UI_THEME_SETTINGS_NAMESPACE = THEME_SETTINGS_NAMESPACE
 const UI_LOCALE_SETTINGS_NAMESPACE = LOCALE_SETTINGS_NAMESPACE
@@ -270,11 +270,19 @@ export function apply(ctx: Context, config: Config): void {
   if (lanHttps === undefined) {
     throw new Error('dsh-plugin-desktop: the launcher did not provide ctx.desktopLanHttps')
   }
-  if (ctx.webServer.host !== desktopWebServerHost(config.networkExposure)) {
+  // Volatile-marked fields arrive as live references from the settings service;
+  // the shell reads them once here and re-reads committed values on each change.
+  const configMode = configValue(config.mode)
+  const configPort = configValue(config.port)
+  const configMacosMaterial = configValue(config.macosMaterial)
+  const configWindowsMaterial = configValue(config.windowsMaterial)
+  const configNetworkExposure = configValue(config.networkExposure)
+
+  if (ctx.webServer.host !== desktopWebServerHost(configNetworkExposure)) {
     throw new Error('dsh-plugin-desktop: desktop shell WebServer host does not match networkExposure')
   }
-  validateDesktopSettings(config, runtime.platform)
   lanHttps.attach(requireWebServerPort(ctx))
+  validateDesktopSettings(config, runtime.platform)
   const iconFilename = runtime.platform === 'darwin'
     ? 'app-icon-mac.png'
     : 'app-icon.png'
@@ -437,7 +445,7 @@ export function apply(ctx: Context, config: Config): void {
         )
       })
     }
-    updateLiveWebAccess(browserAccess.ordinaryBrowserEnabled, config.networkExposure)
+    updateLiveWebAccess(browserAccess.ordinaryBrowserEnabled, configNetworkExposure)
     const stopWatching = ctx.on('settings/document-updated', (namespace) => {
       if (String(namespace) !== DESKTOP_SETTINGS_NAMESPACE) return
       const next = readSettings()
@@ -451,10 +459,10 @@ export function apply(ctx: Context, config: Config): void {
         next.networkExposure,
       )
       updateLiveWebAccess(nextBrowserAccess, nextNetworkExposure)
-      if (next.mode === config.mode
-        && next.port === config.port
-        && next.macosMaterial === config.macosMaterial
-        && next.windowsMaterial === config.windowsMaterial) {
+      if (next.mode === configMode
+        && next.port === configPort
+        && next.macosMaterial === configMacosMaterial
+        && next.windowsMaterial === configWindowsMaterial) {
         if (pending !== undefined) clearImmediate(pending)
         pending = undefined
         return
@@ -488,15 +496,15 @@ export function apply(ctx: Context, config: Config): void {
   ctx.effect(
     () => {
       const material = effectiveDesktopWindowMaterial(
-        config.mode,
+        configMode,
         runtime.platform,
-        config.macosMaterial,
-        config.windowsMaterial,
+        configMacosMaterial,
+        configWindowsMaterial,
         runtime.windowsBuild,
       )
       const url = desktopRendererUrl(
         requireWebServerPort(ctx),
-        config.mode,
+        configMode,
         runtime.platform,
         runtime.updates.currentVersion,
         material,

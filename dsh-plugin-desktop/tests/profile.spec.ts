@@ -86,16 +86,9 @@ describe('desktop profile composition', {
   it('reads packaged Cordis skills from the archived preset root', () => {
     const home = temporaryHome()
     const resources = join(home, 'resources')
-    const archivedPresets = join(
-      resources,
-      'app.asar',
-      'node_modules',
-      '@deepseek-ai',
-      'dsh-agent-presets',
-    )
-    // Preset inputs are archived read-only data: the whole root, including the
-    // Cordis skills below it, must stay on the logical ASAR path.
-    const archivedPresetRoot = join(archivedPresets, 'presets')
+    // The staged preset root is product data inside the archive: the whole root,
+    // including the Cordis skills below it, must stay on the logical ASAR path.
+    const archivedPresetRoot = join(resources, 'app.asar', 'preset', 'agent-presets')
     const skillPath = join(
       archivedPresetRoot,
       'cordis',
@@ -103,19 +96,13 @@ describe('desktop profile composition', {
       'cordis-plugin-development',
       'SKILL.md',
     )
-    mkdirSync(join(resources, 'app.asar', 'lib'), { recursive: true })
-    mkdirSync(archivedPresets, { recursive: true })
     mkdirSync(dirname(skillPath), { recursive: true })
-    writeFileSync(join(archivedPresets, 'package.json'), JSON.stringify({
-      name: '@deepseek-ai/dsh-agent-presets',
-      exports: { './package.json': './package.json' },
-    }) + '\n')
     writeFileSync(skillPath, '# Cordis plugin development\n')
 
     const moduleUrl = pathToFileURL(join(resources, 'app.asar', 'lib', 'profile.js')).href
     const resolvedRoot = stagedPresetRoot(moduleUrl)
 
-    expect(resolvedRoot).toBe(realpathSync(archivedPresetRoot))
+    expect(resolvedRoot).toBe(archivedPresetRoot)
     expect(resolvedRoot).not.toContain('app.asar.unpacked')
     expect(readFileSync(join(
       resolvedRoot,
@@ -300,7 +287,7 @@ virtualStoreDirMaxLength: 60
 
   it('assembles the Host shell without replacing the upstream client shell in compatibility mode', () => {
     const home = temporaryHome()
-    writeFileSync(join(home, 'settings.yaml'), 'dsh-desktop:\n  mode: compatibility\n')
+    writeFileSync(join(home, 'settings.yaml'), 'desktop-shell:\n  mode: compatibility\n')
     const prepared = prepareDesktopProfile(undefined, home, 'darwin')
     const patches = prepared.patches as Array<Record<string, unknown>>
     const inserted = patches.flatMap((patch) => {
@@ -732,7 +719,7 @@ virtualStoreDirMaxLength: 60
   it('keeps a custom layout and withdraws incompatible browser and LAN access', () => {
     const home = temporaryHome()
     writeFileSync(join(home, 'settings.yaml'), [
-      'dsh-desktop:',
+      'desktop-shell:',
       '  mode: advanced',
       '  port: 43189',
       '  openBrowser: true',
@@ -762,9 +749,8 @@ virtualStoreDirMaxLength: 60
     expect(rows.find(row => row.id === 'web-runtime')).toEqual(expect.objectContaining({
       config: expect.objectContaining({ openBrowser: false }),
     }))
-    expect(rows.find(row => row.id === 'settings')).toEqual(expect.objectContaining({
-      config: expect.objectContaining({ dshHome: home }),
-    }))
+    // The settings service is composed upstream; the shell no longer configures it.
+    expect(rows.find(row => row.id === 'settings')?.name).toBe('@deepseek-ai/dsh-settings')
     expect(rows.find(row => row.id === 'ui-layout')?.disabled).toBe(true)
     expect(rows.find(row => row.id === 'ui-sidebar')?.disabled).toBe(false)
     expect(rows.find(row => row.id === 'ui-conversation')?.disabled).toBe(false)
@@ -773,7 +759,7 @@ virtualStoreDirMaxLength: 60
   it('keeps legacy browser intent but clamps LAN exposure when compatibility mode is selected', () => {
     const home = temporaryHome()
     writeFileSync(join(home, 'settings.yaml'), [
-      'dsh-desktop:',
+      'desktop-shell:',
       '  mode: compatibility',
       '  port: 43189',
       '  openBrowser: true',
@@ -800,7 +786,7 @@ virtualStoreDirMaxLength: 60
   it('replaces the official root layout for extended window mode while retaining its occupants', () => {
     const home = temporaryHome()
     writeFileSync(join(home, 'settings.yaml'), [
-      'dsh-desktop:',
+      'desktop-shell:',
       '  mode: extended',
       '  macosMaterial: off',
       '  windowsMaterial: mica',
@@ -901,7 +887,7 @@ virtualStoreDirMaxLength: 60
 
     const home = temporaryHome()
     const path = join(home, 'invalid.yaml')
-    writeFileSync(path, 'dsh-desktop: [\n')
+    writeFileSync(path, 'desktop-shell: [\n')
     expect(() => readDesktopShellMode(path)).toThrow('invalid settings document')
   })
 

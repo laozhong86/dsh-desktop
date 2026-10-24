@@ -1005,6 +1005,19 @@ export function prepareDesktopProfile(
       ...rowConfig(shellRow),
     },
   })
+  // The document is the base layer and the profile patch is the user layer, so
+  // the composed row carries the resolved values instead of a static placeholder.
+  patches.push({
+    id: DESKTOP_SETTINGS_NAMESPACE,
+    config: {
+      mode,
+      macosMaterial,
+      windowsMaterial,
+      port,
+      openBrowser,
+      networkExposure,
+    },
+  })
   const webRuntime = rows.get('web-runtime')
   if (webRuntime === undefined) {
     throw new Error(`${BIN_NAME}: desktop profile has no web-runtime row`)

@@ -1,4 +1,5 @@
 import type { ILayout, MainPanelId, PanelInfo } from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 
 /** Advanced-shell panel state shared by the root slot and layout-service adapter. */
 export interface DesktopLayoutSnapshot {
@@ -101,13 +102,23 @@ function clamp(value: number, min: number, max: number): number {
 
 /** Small observable panel controller used by the advanced root registration. */
 export class DesktopLayoutState implements ILayout {
-  private panelInfo: PanelInfo = Object.freeze({ activePanelId: null })
+  private panel: PanelInfo = Object.freeze({ activePanelId: null })
+  private readonly panelListeners = new Set<() => void>()
   private navigation = new AbortController()
 
   constructor(private readonly hasMainPanel: (id: MainPanelId) => boolean = () => false) {}
 
+  /** Selected global panel; the layout contract exposes it as an observable. */
+  readonly panelInfo: HostObservable<PanelInfo> = {
+    getSnapshot: () => this.panel,
+    subscribe: (listener: () => void) => {
+      this.panelListeners.add(listener)
+      return () => { this.panelListeners.delete(listener) }
+    },
+  }
+
   /** Root selection remains independent of the active Session and column geometry. */
-  getPanelInfo(): PanelInfo { return this.panelInfo }
+  getPanelInfo(): PanelInfo { return this.panel }
 
   /** Select a registered global panel, or return to the Conversation. */
   selectPanel(panelId: MainPanelId | null): void {
@@ -115,14 +126,14 @@ export class DesktopLayoutState implements ILayout {
       throw new Error(`layout.selectPanel: main panel "${panelId}" is not registered`)
     }
     this.navigation.abort()
-    if (this.panelInfo.activePanelId === panelId) return
-    this.panelInfo = Object.freeze({ activePanelId: panelId })
-    for (const listener of this.listeners) listener()
+    if (this.panel.activePanelId === panelId) return
+    this.panel = Object.freeze({ activePanelId: panelId })
+    for (const listener of this.panelListeners) listener()
   }
 
   /** Return to the Conversation when the selected plugin panel is unloaded. */
   retainMainPanels(): void {
-    const id = this.panelInfo.activePanelId
+    const id = this.panel.activePanelId
     if (id !== null && !this.hasMainPanel(id)) this.selectPanel(null)
   }
 

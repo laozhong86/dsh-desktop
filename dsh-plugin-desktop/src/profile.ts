@@ -90,10 +90,7 @@ const SANDBOX_ROW_ID = 'sandbox'
 const UPSTREAM_SANDBOX_PACKAGE = '@deepseek-ai/dsh-sandbox-local'
 const DESKTOP_WINDOWS_ACL_SANDBOX_ROW_ID = 'desktop-windows-acl-sandbox'
 const DESKTOP_WINDOWS_ACL_SANDBOX_PACKAGE = `${DESKTOP_PACKAGE_NAME}/windows-acl-sandbox-provider`
-const OMNIMUX_PROFILE_NAME = 'omnimux'
-const AGENT_PRESETS_ROW_ID = 'agent-presets'
 /** Harness-home directory holding locally authored presets (`agent-presets/discovery`). */
-const USER_PRESET_DIRNAME = '.agent-presets'
 export { defaultDesktopShellMode }
 const DEFAULT_DESKTOP_PORT = DESKTOP_DEFAULT_WEB_PORT
 const DESKTOP_WEB_SERVER_ROW_ID = 'desktop-webserver'
@@ -1049,24 +1046,10 @@ export function prepareDesktopProfile(
       { id: 'ui-conversation', disabled: false },
     )
   }
-  const presets = rows.get(AGENT_PRESETS_ROW_ID)
-  if (presets !== undefined) {
-    const isOmnimuxProfile = profileName === OMNIMUX_PROFILE_NAME
-    const roots: Array<{ path: string, trust: 'system' | 'user' }> = [
-      // Staged product presets define the product's official preset set.
-      { path: stagedPresetRoot(), trust: 'system' },
-      { path: join(home, USER_PRESET_DIRNAME), trust: 'user' },
-    ]
-    patches.push({
-      id: AGENT_PRESETS_ROW_ID,
-      config: {
-        ...rowConfig(presets),
-        roots,
-        includeShippedRoot: !isOmnimuxProfile,
-        includeUserRoot: false,
-      },
-    })
-  }
+  // The upstream agent-preset registry owns the roster now: it ships the
+  // built-in presets itself and exposes only a default/selection config, so the
+  // shell no longer injects a preset root. Its Cordis skills still come from the
+  // packaged preset root.
   const webserver = rows.get('webserver')
   if (webserver === undefined) {
     throw new Error(`${BIN_NAME}: desktop profile has no webserver row`)

@@ -311,17 +311,9 @@ virtualStoreDirMaxLength: 60
       name: 'dsh-plugin-desktop/webserver',
       config: { host: '127.0.0.1', port: 44_120 },
     }))
-    expect(patches).toContainEqual(expect.objectContaining({
-      id: 'agent-presets',
-      config: expect.objectContaining({
-        roots: [
-          { path: stagedPresetRoot(), trust: 'system' },
-          { path: join(home, '.agent-presets'), trust: 'user' },
-        ],
-        includeShippedRoot: true,
-        includeUserRoot: false,
-      }),
-    }))
+    // The upstream agent-preset registry owns the roster, so the shell injects no
+    // preset root of its own.
+    expect(patches.map(patch => patch.id)).not.toContain('agent-presets')
     expect(existsSync(join(
       prepared.profile.dir,
       'agent-preset-compat',
@@ -363,8 +355,8 @@ virtualStoreDirMaxLength: 60
       id: 'sandbox',
       name: '@deepseek-ai/dsh-sandbox-local',
     })
-    expect(rows.find(row => row.id === 'agent-presets')).toEqual(expect.objectContaining({
-      name: '@deepseek-ai/dsh-agent-presets',
+    expect(rows.find(row => row.id === 'agent-preset-registry')).toEqual(expect.objectContaining({
+      name: '@deepseek-ai/dsh-agent-preset-registry',
     }))
     expect(rows.map(row => row.id)).not.toContain('desktop-windows-agent-presets')
     expect(rows.find(row => row.id === 'pwsh-sandbox')).toEqual(expect.objectContaining({
@@ -392,7 +384,7 @@ virtualStoreDirMaxLength: 60
     }))
   })
 
-  it('isolates agent presets to product-staged roster and excludes upstream shipped root for omnimux profile', () => {
+  it('leaves the agent-preset roster to the upstream registry for every profile', () => {
     const home = temporaryHome()
     const omnimuxDir = join(home, 'profiles', 'omnimux')
     const template = PROFILE_TEMPLATES.web
@@ -400,19 +392,9 @@ virtualStoreDirMaxLength: 60
     initProfile(omnimuxDir, template.bundles)
     const prepared = prepareDesktopProfile(undefined, home, 'darwin', 'omnimux')
     const patches = prepared.patches as Array<Record<string, unknown>>
-    expect(patches).toContainEqual(expect.objectContaining({
-      id: 'agent-presets',
-      config: expect.objectContaining({
-        roots: [
-          { path: stagedPresetRoot(), trust: 'system' },
-          { path: join(home, '.agent-presets'), trust: 'user' },
-        ],
-        includeShippedRoot: false,
-        includeUserRoot: false,
-      }),
-    }))
+    // The registry ships its own roster, so no profile receives an injected root.
+    expect(patches.map(patch => patch.id)).not.toContain('agent-presets')
   })
-
   it('merges a frozen LAN IPv4 snapshot into existing Web runtime trust', () => {
     const home = temporaryHome()
     writeFileSync(join(home, 'cordis.patch.yml'), [
@@ -974,22 +956,16 @@ virtualStoreDirMaxLength: 60
       name: '@deepseek-ai/dsh-subprocess-local',
     })
     expect(rows.map(row => row.id)).not.toContain('desktop-windows-subprocess')
+    // Windows swaps in the shell provider, so the upstream row is disabled.
     expect(rows.find(row => row.id === 'sandbox')).toEqual({
       id: 'sandbox',
       name: '@deepseek-ai/dsh-sandbox-local',
+      disabled: true,
     })
-    expect(rows.find(row => row.id === 'agent-presets')).toEqual(expect.objectContaining({
-      name: '@deepseek-ai/dsh-agent-presets',
-      config: expect.objectContaining({
-        roots: [
-          { path: stagedPresetRoot(), trust: 'system' },
-          { path: join(home, '.agent-presets'), trust: 'user' },
-        ],
-        includeShippedRoot: true,
-        includeUserRoot: false,
-      }),
+    expect(rows.find(row => row.id === 'agent-preset-registry')).toEqual(expect.objectContaining({
+      name: '@deepseek-ai/dsh-agent-preset-registry',
     }))
-    expect(rows.find(row => row.id === 'agent-presets')?.disabled).toBeFalsy()
+    expect(rows.map(row => row.id)).not.toContain('agent-presets')
     expect(rows.map(row => row.id)).not.toContain('desktop-windows-agent-presets')
     expect(rows.find(row => row.id === 'pwsh-sandbox')).toEqual(expect.objectContaining({
       name: '@deepseek-ai/dsh-pwsh-sandbox',

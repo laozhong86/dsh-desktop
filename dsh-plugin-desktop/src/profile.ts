@@ -25,10 +25,6 @@ import {
   type ProfileManifest,
 } from '@deepseek-ai/dsh-app-boot'
 import { resolveDshHome } from '@deepseek-ai/dsh-home-paths'
-import FileSettingsProvider, {
-  resolveSpec as resolveSettingsFileSpec,
-  type Config as SettingsFileConfig,
-} from '@deepseek-ai/dsh-settings-file'
 import { parseAllDocuments, parseDocument } from 'yaml'
 import { findOverlayPackage, resolveOverlayPackage } from './package-overlay.ts'
 import { DESKTOP_DEFAULT_WEB_PORT, defaultDesktopWebPort } from './desktop-port.ts'
@@ -99,8 +95,8 @@ export { defaultDesktopShellMode }
 const DEFAULT_DESKTOP_PORT = DESKTOP_DEFAULT_WEB_PORT
 const DESKTOP_WEB_SERVER_ROW_ID = 'desktop-webserver'
 const DESKTOP_WEB_SERVER_PACKAGE = `${DESKTOP_PACKAGE_NAME}/webserver`
-const SETTINGS_FILE_PACKAGE = '@deepseek-ai/dsh-settings-file'
-const DESKTOP_SETTINGS_NAMESPACE = 'dsh-desktop'
+const SETTINGS_DOCUMENT_FILENAME = 'settings.yaml'
+const DESKTOP_SETTINGS_NAMESPACE = 'desktop-shell'
 const UI_LAYOUT_PACKAGE = '@deepseek-ai/dsh-client-ui-layout'
 const UI_SIDEBAR_PACKAGE = '@deepseek-ai/dsh-client-ui-sidebar'
 const UI_CONVERSATION_PACKAGE = '@deepseek-ai/dsh-client-ui-conversation'
@@ -202,37 +198,56 @@ export function desktopShellModeFromSettings(document: unknown): DesktopShellMod
 }
 
 /**
- * Read startup settings from the same file resolved by the settings provider.
- * @param config - validated settings-file row config.
- * @returns the values projected into the startup Loader graph.
+ * Read one settings document, or an empty document when it does not exist yet.
+ * @param path - absolute settings document path.
+ * @returns the parsed document root.
  */
-export function readDesktopStartupSettings(config: SettingsFileConfig): DesktopStartupSettings {
-  const spec = resolveSettingsFileSpec(config)
+function readSettingsDocument(path: string): unknown {
   let text: string
   try {
-    text = readFileSync(spec.filename, 'utf8')
+    text = readFileSync(path, 'utf8')
   } catch (cause) {
-    if ((cause as NodeJS.ErrnoException).code === 'ENOENT') {
-      return { ...defaultDesktopStartupSettings() }
-    }
+    if ((cause as NodeJS.ErrnoException).code === 'ENOENT') return {}
     throw cause
   }
-  let document: unknown
-  if (spec.format === 'yaml') {
-    const parsed = parseDocument(text, { prettyErrors: true })
-    if (parsed.errors.length > 0) {
-      throw new Error(`${BIN_NAME}: invalid settings document at ${spec.filename}: ${parsed.errors.map(error => error.message).join('; ')}`)
-    }
-    document = parsed.toJS() ?? {}
-  } else {
-    document = text.trim().length === 0 ? {} : JSON.parse(text)
+  if (text.trim().length === 0) return {}
+  const parsed = parseDocument(text, { prettyErrors: true })
+  if (parsed.errors.length > 0) {
+    throw new Error(`${BIN_NAME}: invalid settings document at ${path}: ${parsed.errors.map(error => error.message).join('; ')}`)
   }
-  return desktopStartupSettingsFromSettings(document)
+  return parsed.toJS() ?? {}
 }
 
-/** Read only the shell mode from the settings provider's resolved file. */
-export function readDesktopShellMode(config: SettingsFileConfig): DesktopShellMode {
-  return readDesktopStartupSettings(config).mode
+/**
+ * Read the Desktop settings section of one settings document.
+ * @param path - absolute settings document path.
+ * @returns the section's own entries, or an empty map.
+ */
+export function settingsSectionFromDocument(path: string): Record<string, unknown> {
+  const document = readSettingsDocument(path)
+  if (typeof document !== 'object' || document === null || Array.isArray(document)) {
+    throw new Error(`${BIN_NAME}: settings document must be a map of namespace sections`)
+  }
+  const section = (document as Record<string, unknown>)[DESKTOP_SETTINGS_NAMESPACE]
+  if (section === undefined) return {}
+  if (typeof section !== 'object' || section === null || Array.isArray(section)) {
+    throw new Error(`${BIN_NAME}: ${DESKTOP_SETTINGS_NAMESPACE} settings must be a map`)
+  }
+  return section as Record<string, unknown>
+}
+
+/**
+ * Read startup settings from one settings document.
+ * @param path - absolute settings document path.
+ * @returns the values projected into the startup Loader graph.
+ */
+export function readDesktopStartupSettings(path: string): DesktopStartupSettings {
+  return desktopStartupSettingsFromSettings(readSettingsDocument(path))
+}
+
+/** Read only the shell mode from one settings document. */
+export function readDesktopShellMode(path: string): DesktopShellMode {
+  return readDesktopStartupSettings(path).mode
 }
 
 /** Resolve the public Web template once and reject an incompatible DSH release. */
@@ -970,15 +985,11 @@ export function prepareDesktopProfile(
   for (const row of composedRows) {
     if (typeof row.id === 'string') rows.set(row.id, row)
   }
-  const settings = rows.get('settings')
-  if (settings?.name !== SETTINGS_FILE_PACKAGE) {
-    throw new Error(`${BIN_NAME}: desktop profile must use ${SETTINGS_FILE_PACKAGE} in the settings row`)
+  const shellRow = rows.get(DESKTOP_SETTINGS_NAMESPACE)
+  if (shellRow === undefined) {
+    throw new Error(`${BIN_NAME}: desktop profile has no ${DESKTOP_SETTINGS_NAMESPACE} row`)
   }
-  const settingsConfig = FileSettingsProvider.Config({
-    dshHome: home,
-    ...rowConfig(settings),
-  } as SettingsFileConfig)
-  const settingsDocument = resolveSettingsFileSpec(settingsConfig).filename
+  const settingsDocument = join(home, SETTINGS_DOCUMENT_FILENAME)
   hooks.onSettingsDocumentResolved?.(settingsDocument)
   const {
     mode,
@@ -987,10 +998,13 @@ export function prepareDesktopProfile(
     windowsMaterial,
     openBrowser,
     networkExposure,
-  } = readDesktopStartupSettings(settingsConfig)
-  patches.push({
-    id: 'settings',
-    config: settingsConfig,
+  } = desktopStartupSettingsFromSettings({
+    // The shipped preset and the setup wizard write the document; the settings
+    // service persists later edits into the profile patch, which wins here.
+    [DESKTOP_SETTINGS_NAMESPACE]: {
+      ...settingsSectionFromDocument(settingsDocument),
+      ...rowConfig(shellRow),
+    },
   })
   const webRuntime = rows.get('web-runtime')
   if (webRuntime === undefined) {

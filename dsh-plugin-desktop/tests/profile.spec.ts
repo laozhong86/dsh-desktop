@@ -869,10 +869,10 @@ virtualStoreDirMaxLength: 60
   it('reads JSON settings and defaults an absent desktop namespace to the platform default', () => {
     const home = temporaryHome()
     const path = join(home, 'desktop-settings.json')
-    writeFileSync(path, JSON.stringify({ 'dsh-desktop': { mode: 'advanced' } }))
+    writeFileSync(path, JSON.stringify({ 'desktop-shell': { mode: 'advanced' } }))
 
-    expect(readDesktopShellMode({ path })).toBe('advanced')
-    expect(desktopStartupSettingsFromSettings({ 'dsh-desktop': { mode: 'advanced', port: 43_189 } })).toEqual({
+    expect(readDesktopShellMode(path)).toBe('advanced')
+    expect(desktopStartupSettingsFromSettings({ 'desktop-shell': { mode: 'advanced', port: 43_189 } })).toEqual({
       mode: 'advanced',
       port: 43_189,
       macosMaterial: 'transparent',
@@ -880,7 +880,7 @@ virtualStoreDirMaxLength: 60
       openBrowser: false,
       networkExposure: 'loopback',
     })
-    expect(desktopStartupSettingsFromSettings({ 'dsh-desktop': { mode: 'advanced' } })).toEqual({
+    expect(desktopStartupSettingsFromSettings({ 'desktop-shell': { mode: 'advanced' } })).toEqual({
       mode: 'advanced',
       port: 44_120,
       macosMaterial: 'transparent',
@@ -893,7 +893,7 @@ virtualStoreDirMaxLength: 60
 
   it('treats legacy LAN exposure as browser access only in compatibility mode', () => {
     expect(desktopStartupSettingsFromSettings({
-      'dsh-desktop': {
+      'desktop-shell': {
         mode: 'advanced',
         openBrowser: false,
         networkExposure: 'lan',
@@ -904,7 +904,7 @@ virtualStoreDirMaxLength: 60
       networkExposure: 'loopback',
     })
     expect(desktopStartupSettingsFromSettings({
-      'dsh-desktop': {
+      'desktop-shell': {
         mode: 'compatibility',
         openBrowser: false,
         networkExposure: 'lan',
@@ -918,24 +918,24 @@ virtualStoreDirMaxLength: 60
 
   it('rejects invalid settings roots, sections, modes, and YAML', () => {
     expect(() => desktopShellModeFromSettings([])).toThrow('must be a map')
-    expect(() => desktopShellModeFromSettings({ 'dsh-desktop': true })).toThrow('settings must be a map')
-    expect(() => desktopShellModeFromSettings({ 'dsh-desktop': { mode: 'glass' } })).toThrow(
+    expect(() => desktopShellModeFromSettings({ 'desktop-shell': true })).toThrow('settings must be a map')
+    expect(() => desktopShellModeFromSettings({ 'desktop-shell': { mode: 'glass' } })).toThrow(
       'must be "compatibility", "extended", or "advanced"',
     )
     for (const port of [-1, 1.5, 65_536, '43189']) {
-      expect(() => desktopStartupSettingsFromSettings({ 'dsh-desktop': { port } })).toThrow(
+      expect(() => desktopStartupSettingsFromSettings({ 'desktop-shell': { port } })).toThrow(
         'port must be an integer from 0 through 65535',
       )
     }
-    expect(() => desktopStartupSettingsFromSettings({ 'dsh-desktop': { openBrowser: 'yes' } }))
+    expect(() => desktopStartupSettingsFromSettings({ 'desktop-shell': { openBrowser: 'yes' } }))
       .toThrow('openBrowser must be a boolean')
-    expect(() => desktopStartupSettingsFromSettings({ 'dsh-desktop': { networkExposure: 'internet' } }))
+    expect(() => desktopStartupSettingsFromSettings({ 'desktop-shell': { networkExposure: 'internet' } }))
       .toThrow('networkExposure must be "loopback" or "lan"')
 
     const home = temporaryHome()
     const path = join(home, 'invalid.yaml')
     writeFileSync(path, 'dsh-desktop: [\n')
-    expect(() => readDesktopShellMode({ path })).toThrow('invalid settings document')
+    expect(() => readDesktopShellMode(path)).toThrow('invalid settings document')
   })
 
   it('treats only YAML-null machine-wide patch documents as no desktop patches without rewriting them', () => {

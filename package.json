@@ -108,8 +108,6 @@
     "@deepseek-ai/dsh-hmr@npm:^0.2.1-rc.3": "patch:@deepseek-ai/dsh-hmr@file%3Avendor/dsh-runtime/0.2.1-rc.3/deepseek-ai-dsh-hmr-0.2.1-rc.3.tgz#./patches/dsh-hmr@0.2.1-rc.3.patch",
     "@deepseek-ai/dsh-config-editor@npm:0.2.1-rc.3": "file:vendor/dsh-runtime/0.2.1-rc.3/deepseek-ai-dsh-config-editor-0.2.1-rc.3.tgz",
     "@deepseek-ai/dsh-config-editor@npm:^0.2.1-rc.3": "file:vendor/dsh-runtime/0.2.1-rc.3/deepseek-ai-dsh-config-editor-0.2.1-rc.3.tgz",
-    "@deepseek-ai/dsh-settings@npm:0.2.1-rc.3": "file:vendor/dsh-runtime/0.2.1-rc.3/deepseek-ai-dsh-settings-0.2.1-rc.3.tgz",
-    "@deepseek-ai/dsh-settings@npm:^0.2.1-rc.3": "file:vendor/dsh-runtime/0.2.1-rc.3/deepseek-ai-dsh-settings-0.2.1-rc.3.tgz",
     "@deepseek-ai/dsh-agent-preset-registry@npm:0.2.1-rc.3": "file:vendor/dsh-runtime/0.2.1-rc.3/deepseek-ai-dsh-agent-preset-registry-0.2.1-rc.3.tgz",
     "@deepseek-ai/dsh-agent-preset-registry@npm:^0.2.1-rc.3": "file:vendor/dsh-runtime/0.2.1-rc.3/deepseek-ai-dsh-agent-preset-registry-0.2.1-rc.3.tgz",
     "@deepseek-ai/dsh-agent-preset@npm:0.2.1-rc.3": "file:vendor/dsh-runtime/0.2.1-rc.3/deepseek-ai-dsh-agent-preset-0.2.1-rc.3.tgz",

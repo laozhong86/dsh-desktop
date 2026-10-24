@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type {} from '@deepseek-ai/dsh-cmdline'
+import type {} from '@deepseek-ai/dsh-settings'
 import {
   LOCALE_SETTINGS_NAMESPACE,
   type LocaleSettings,
@@ -79,6 +80,8 @@ import {
   windowsSupportsMica,
 } from './window-material.ts'
 import { DESKTOP_PRODUCT_NAME } from './product-identity.ts'
+import { readSettingsValue } from './settings-access.ts'
+import { requireWebServerPort } from './web-server-port.ts'
 
 /** Stable Cordis plugin name. */
 export const name = 'desktop-shell'
@@ -235,7 +238,7 @@ export function apply(ctx: Context, config: Config): void {
   if (ctx.webServer.host !== desktopWebServerHost(config.networkExposure)) {
     throw new Error('dsh-plugin-desktop: desktop shell WebServer host does not match networkExposure')
   }
-  lanHttps.attach(ctx.webServer.port)
+  lanHttps.attach(requireWebServerPort(ctx))
   const iconFilename = runtime.platform === 'darwin'
     ? 'app-icon-mac.png'
     : 'app-icon.png'
@@ -259,7 +262,7 @@ export function apply(ctx: Context, config: Config): void {
       },
     },
   )
-  const rendererOrigin = `http://127.0.0.1:${String(ctx.webServer.port)}`
+  const rendererOrigin = `http://127.0.0.1:${String(requireWebServerPort(ctx))}`
   ctx.effect(
     () => ctx.webServer.register({
       kind: 'exact',
@@ -444,14 +447,16 @@ export function apply(ctx: Context, config: Config): void {
     }
   }, 'dsh-plugin-desktop: live browser access and restart-applied native settings')
   if (runtime.platform !== 'linux') {
-    ctx.on('settings/updated', (namespace, next) => {
-      if (namespace !== UI_THEME_SETTINGS_NAMESPACE) return
-      runtime.setThemeSource((next as ThemeSettings).preference)
+    ctx.on('settings/document-updated', (namespace) => {
+      if (String(namespace) !== UI_THEME_SETTINGS_NAMESPACE) return
+      const theme = readSettingsValue<ThemeSettings>(ctx, UI_THEME_SETTINGS_NAMESPACE)
+      if (theme !== undefined) runtime.setThemeSource(theme.preference)
     })
   }
-  ctx.on('settings/updated', (namespace, next) => {
-    if (namespace !== UI_LOCALE_SETTINGS_NAMESPACE) return
-    runtime.setLocalePreference(desktopLocalePreference((next as LocaleSettings).preference))
+  ctx.on('settings/document-updated', (namespace) => {
+    if (String(namespace) !== UI_LOCALE_SETTINGS_NAMESPACE) return
+    const locale = readSettingsValue<LocaleSettings>(ctx, UI_LOCALE_SETTINGS_NAMESPACE)
+    runtime.setLocalePreference(desktopLocalePreference(locale?.preference))
   })
   ctx.effect(
     () => {
@@ -463,7 +468,7 @@ export function apply(ctx: Context, config: Config): void {
         runtime.windowsBuild,
       )
       const url = desktopRendererUrl(
-        ctx.webServer.port,
+        requireWebServerPort(ctx),
         config.mode,
         runtime.platform,
         runtime.updates.currentVersion,
@@ -483,11 +488,11 @@ export function apply(ctx: Context, config: Config): void {
         trayIcons,
         readLocalePreference: () => {
           return desktopLocalePreference(
-            (ctx.settings.get(UI_LOCALE_SETTINGS_NAMESPACE) as LocaleSettings | undefined)?.preference,
+            (readSettingsValue<LocaleSettings>(ctx, UI_LOCALE_SETTINGS_NAMESPACE))?.preference,
           )
         },
         readThemeSource: () => {
-          const theme = ctx.settings.get(UI_THEME_SETTINGS_NAMESPACE) as ThemeSettings | undefined
+          const theme = readSettingsValue<ThemeSettings>(ctx, UI_THEME_SETTINGS_NAMESPACE)
           if (theme === undefined) {
             throw new Error('dsh-plugin-desktop: custom shell requires the ui-theme settings namespace')
           }

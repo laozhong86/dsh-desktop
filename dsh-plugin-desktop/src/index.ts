@@ -80,7 +80,7 @@ import {
   windowsSupportsMica,
 } from './window-material.ts'
 import { DESKTOP_PRODUCT_NAME } from './product-identity.ts'
-import { readSettingsValue } from './settings-access.ts'
+import { configValue, readSettingsValue } from './settings-access.ts'
 import { requireWebServerPort } from './web-server-port.ts'
 
 /** Stable Cordis plugin name. */
@@ -131,17 +131,6 @@ export interface DesktopSettings {
   logLevel: 'debug' | 'info' | 'warn' | 'error'
 }
 
-/** Schema registered with the standard settings service. */
-export const DesktopSettingsSchema: z<DesktopSettings> = z.object({
-  mode: z.union(['compatibility', 'extended', 'advanced'] as const).default('compatibility'),
-  macosMaterial: z.union(['off', 'transparent'] as const).default(DEFAULT_MACOS_WINDOW_MATERIAL),
-  windowsMaterial: z.union(['off', 'acrylic', 'mica'] as const).default(DEFAULT_WINDOWS_WINDOW_MATERIAL),
-  port: z.number().step(1).min(0).max(65_535).default(DESKTOP_DEFAULT_WEB_PORT),
-  openBrowser: z.boolean().default(false),
-  networkExposure: z.union(['loopback', 'lan'] as const).default('loopback'),
-  logLevel: z.union(['debug', 'info', 'warn', 'error'] as const).default('info'),
-})
-
 /** Native window configuration. */
 export interface Config {
   /** Native presentation mode selected before BrowserWindow construction. */
@@ -154,6 +143,10 @@ export interface Config {
   port: number
   /** Configured listener exposure used to detect restart-applied settings changes. */
   networkExposure: DesktopNetworkExposure
+  /** Whether Desktop advertises its marker-free compatibility client for browser use. */
+  openBrowser: boolean
+  /** Host log threshold applied by the next generation. */
+  logLevel: 'debug' | 'info' | 'warn' | 'error'
   /** Initial window width in CSS pixels. */
   width: number
   /** Initial window height in CSS pixels. */
@@ -164,18 +157,39 @@ export interface Config {
   minHeight: number
 }
 
-/** Validated native window configuration. */
-export const Config: z<Config> = z.object({
-  mode: z.union(['compatibility', 'extended', 'advanced'] as const).default('compatibility'),
-  macosMaterial: z.union(['off', 'transparent'] as const).default(DEFAULT_MACOS_WINDOW_MATERIAL),
-  windowsMaterial: z.union(['off', 'acrylic', 'mica'] as const).default(DEFAULT_WINDOWS_WINDOW_MATERIAL),
-  port: z.number().step(1).min(0).max(65_535).default(DESKTOP_DEFAULT_WEB_PORT),
-  networkExposure: z.union(['loopback', 'lan'] as const).default('loopback'),
+/**
+ * Validated native window configuration.
+ *
+ * The settings service derives the Desktop settings form from this entry, so the
+ * user-editable fields carry `volatile`: window geometry stays composition-only.
+ */
+export const Config = z.object({
+  mode: z.union(['compatibility', 'extended', 'advanced'] as const).default('compatibility').volatile(),
+  macosMaterial: z.union(['off', 'transparent'] as const).default(DEFAULT_MACOS_WINDOW_MATERIAL).volatile(),
+  windowsMaterial: z.union(['off', 'acrylic', 'mica'] as const).default(DEFAULT_WINDOWS_WINDOW_MATERIAL).volatile(),
+  port: z.number().step(1).min(0).max(65_535).default(DESKTOP_DEFAULT_WEB_PORT).volatile(),
+  networkExposure: z.union(['loopback', 'lan'] as const).default('loopback').volatile(),
+  openBrowser: z.boolean().default(false).volatile(),
+  logLevel: z.union(['debug', 'info', 'warn', 'error'] as const).default('info').volatile(),
   width: z.number().step(1).min(800).default(1280),
   height: z.number().step(1).min(600).default(840),
   minWidth: z.number().step(1).min(640).default(900),
   minHeight: z.number().step(1).min(480).default(640),
 })
+
+/** Default Desktop settings, projected from the entry schema. */
+function desktopSettingsDefaults(): DesktopSettings {
+  const config = Config({} as Config)
+  return {
+    mode: configValue(config.mode),
+    macosMaterial: configValue(config.macosMaterial),
+    windowsMaterial: configValue(config.windowsMaterial),
+    port: configValue(config.port),
+    openBrowser: configValue(config.openBrowser),
+    networkExposure: configValue(config.networkExposure),
+    logLevel: configValue(config.logLevel),
+  }
+}
 
 /**
  * Construct the unmodified upstream Web root URL.
@@ -247,21 +261,10 @@ export function apply(ctx: Context, config: Config): void {
     templatePath: fileURLToPath(new URL('../build/tray-iconTemplate.png', import.meta.url)),
     bluePath: fileURLToPath(new URL('../build/tray-icon-blue.png', import.meta.url)),
   }
-  const settings = ctx.settings.register(
-    DESKTOP_SETTINGS_NAMESPACE,
-    DesktopSettingsSchema,
-    {
-      applies: 'restart',
-      validate: (value) => {
-        if (value.networkExposure === 'lan' && !desktopLanExposureAvailable(value.mode)) {
-          throw new Error('dsh-plugin-desktop: LAN exposure requires compatibility mode')
-        }
-        if (value.mode !== 'compatibility' && runtime.platform === 'linux') {
-          throw new Error('dsh-plugin-desktop: custom desktop shell modes are supported on macOS and Windows')
-        }
-      },
-    },
-  )
+  // The settings service derives the Desktop settings form from this entry, so
+  // the schema lives in `Config`; the shell reads and writes that namespace.
+  const readSettings = (): DesktopSettings =>
+    readSettingsValue<DesktopSettings>(ctx, DESKTOP_SETTINGS_NAMESPACE) ?? desktopSettingsDefaults()
   const rendererOrigin = `http://127.0.0.1:${String(requireWebServerPort(ctx))}`
   ctx.effect(
     () => ctx.webServer.register({
@@ -413,7 +416,9 @@ export function apply(ctx: Context, config: Config): void {
       })
     }
     updateLiveWebAccess(browserAccess.ordinaryBrowserEnabled, config.networkExposure)
-    const stopWatching = settings.watch((next) => {
+    const stopWatching = ctx.on('settings/document-updated', (namespace) => {
+      if (String(namespace) !== DESKTOP_SETTINGS_NAMESPACE) return
+      const next = readSettings()
       const nextBrowserAccess = desktopBrowserAccessEnabled(
         next.mode,
         next.openBrowser,
@@ -510,10 +515,10 @@ export function apply(ctx: Context, config: Config): void {
         }),
         requestQuit: appExit,
         requestModeChange: async mode => {
-          const current = settings.get()
+          const current = readSettings()
           // Browser access survives a window-mode switch; only the compatibility-only
           // LAN exposure has to fall back to loopback.
-          await settings.update(!desktopLanExposureAvailable(mode) && current.networkExposure === 'lan'
+          await ctx.settings.update(DESKTOP_SETTINGS_NAMESPACE, !desktopLanExposureAvailable(mode) && current.networkExposure === 'lan'
             ? { mode, networkExposure: 'loopback' }
             : { mode })
         },

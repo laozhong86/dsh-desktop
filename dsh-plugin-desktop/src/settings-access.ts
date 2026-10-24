@@ -8,7 +8,17 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import { isVolatile, type Volatile } from '@deepseek-ai/cosmokit'
 import type {} from '@deepseek-ai/dsh-settings'
+
+/**
+ * Read a configuration value that the loader may publish as a volatile reference.
+ * @param value - a validated config value.
+ * @returns the current snapshot.
+ */
+export function configValue<T>(value: Volatile<T> | T): T {
+  return (isVolatile(value) ? value.get() : value) as T
+}
 
 /** The resolved value of one settings namespace, or undefined when it has none. */
 export function readSettingsValue<T>(ctx: Context, namespace: string): T | undefined {

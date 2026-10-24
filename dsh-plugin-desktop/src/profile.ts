@@ -1,6 +1,5 @@
 /** Compatibility profile composition over the official Web bundle and user plugins. */
 
-import { createRequire } from 'node:module'
 import {
   existsSync,
   readFileSync,
@@ -576,14 +575,6 @@ function loadRecoveryFilteredProfile(
     ...(dshMarketFailure === undefined ? {} : { dshMarketFailure }),
     ...(aaFailure === undefined ? {} : { aaFailure }),
   }
-}
-
-/** Resolve the agent presets shipped by the matching presets dependency. */
-export function shippedPresetRoot(moduleUrl: string = import.meta.url): string {
-  const require = createRequire(moduleUrl)
-  // Preset inputs are archived read-only data, so the root stays logical and
-  // Electron's ASAR filesystem answers the presets plugin's reads.
-  return join(dirname(require.resolve('@deepseek-ai/dsh-agent-presets/package.json')), 'presets')
 }
 
 /** Resolve the product presets staged beside the seed, unpacked with `preset/**`. */

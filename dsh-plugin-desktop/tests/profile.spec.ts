@@ -25,7 +25,6 @@ import {
   ensureDesktopProfile,
   prepareDesktopProfile,
   readDesktopShellMode,
-  shippedPresetRoot,
   stagedPresetRoot,
   validateDshMarketBundlePatches,
 } from '../src/profile.ts'
@@ -84,16 +83,6 @@ describe('desktop profile composition', {
   timeout: process.platform === 'win32' ? 10_000 : 5_000,
 }, () => {
 
-  it('ships a PowerShell-backed standard preset for Windows', () => {
-    const standardPreset = readFileSync(
-      join(shippedPresetRoot(), 'standard', 'agent.cordis.yml'),
-      'utf8',
-    )
-
-    expect(standardPreset).toContain("name: '@deepseek-ai/dsh-tool-pwsh'")
-    expect(standardPreset).toContain("disabled: !!js process.platform !== 'win32'")
-  })
-
   it('reads packaged Cordis skills from the archived preset root', () => {
     const home = temporaryHome()
     const resources = join(home, 'resources')
@@ -124,7 +113,7 @@ describe('desktop profile composition', {
     writeFileSync(skillPath, '# Cordis plugin development\n')
 
     const moduleUrl = pathToFileURL(join(resources, 'app.asar', 'lib', 'profile.js')).href
-    const resolvedRoot = shippedPresetRoot(moduleUrl)
+    const resolvedRoot = stagedPresetRoot(moduleUrl)
 
     expect(resolvedRoot).toBe(realpathSync(archivedPresetRoot))
     expect(resolvedRoot).not.toContain('app.asar.unpacked')

@@ -59,6 +59,7 @@ function createHarness(available: readonly OptionalService[] = ['jobs', 'session
 
   const ctx = {
     desktopRuntime: runtime,
+    get: (key: unknown) => (String(key) === 'settings' ? settingsService : undefined),
     settings: settingsService,
     jobs: {
       events: {
@@ -175,7 +176,7 @@ describe('desktop notifications Host plugin', () => {
 
     expect(name).toBe('desktop-notifications')
     expect(inject).toEqual(['desktopRuntime'])
-    expect(String(DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE)).toBe('dsh-desktop-notifications')
+    expect(String(DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE)).toBe('desktop-notifications')
     expect(DesktopNotificationSettingsSchema({} as DesktopNotificationSettings)).toEqual({
       enabled: true,
       notifyOnTurnCompletion: true,

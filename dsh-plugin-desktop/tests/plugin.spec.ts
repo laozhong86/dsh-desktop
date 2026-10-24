@@ -192,6 +192,7 @@ function createHarness(
       if (String(key) === 'desktopRuntime') return runtime
       if (String(key) === 'desktopBrowserAccess') return browserAccess
       if (String(key) === 'desktopLanHttps') return lanHttps
+      if (String(key) === 'settings') return settings
       return () => {}
     }),
     effect: vi.fn((register: () => unknown) => register()),
@@ -332,7 +333,7 @@ describe('desktop Host plugin', () => {
 
     apply(harness.ctx, config)
 
-    expect(inject).toContain('settings')
+    expect(inject).toContain('webApp')
     expect(inject).toContain('connection')
     expect(inject).not.toContain('loader')
     // The settings form is derived from the shell entry, so the namespace is its id.

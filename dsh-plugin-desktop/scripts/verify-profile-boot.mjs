@@ -16,7 +16,6 @@ import {
   createLaunchEnvironmentSnapshot,
   DSH_LAUNCH_ENVIRONMENT_KEY,
 } from '@deepseek-ai/dsh-launch-environment'
-import { DESKTOP_SETTINGS_NAMESPACE } from '../lib/index.js'
 import { installDesktopPnpmRuntime } from '../lib/desktop-runtime-environment.js'
 import { installProfilePackageResolver } from '../lib/module-resolution.js'
 import { prepareDesktopProfile } from '../lib/profile.js'
@@ -272,10 +271,9 @@ try {
   if (nativeThemeSource !== 'system') {
     throw new Error(`desktop plugin produced an unexpected native theme source: ${nativeThemeSource}`)
   }
-  const desktopSettings = ctx.settings
-    .describe()
-    .find(entry => String(entry.ns) === DESKTOP_SETTINGS_NAMESPACE)
-  if (desktopSettings?.value?.mode !== 'advanced') {
+  // The settings service is composed upstream and stays absent without a profile
+  // context, so the assembled mode is read from the spec the shell handed over.
+  if (mountedSpec.mode !== 'advanced') {
     throw new Error('assembled Host settings are missing the advanced desktop-shell mode')
   }
   if (!trayItems.some(item => item.label() === 'Check for Updates…')) {

@@ -10231,7 +10231,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"default-browser@npm:^5.4.0, default-browser@npm:^5.5.1":
+"default-browser@npm:^5.5.1":
   version: 5.5.1
   resolution: "default-browser@npm:5.5.1"
   dependencies:
@@ -13924,21 +13924,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"open@npm:11.0.1":
-  version: 11.0.1
-  resolution: "open@npm:11.0.1"
-  dependencies:
-    default-browser: "npm:^5.4.0"
-    define-lazy-prop: "npm:^3.0.0"
-    is-in-ssh: "npm:^1.0.0"
-    is-inside-container: "npm:^1.0.0"
-    powershell-utils: "npm:^0.2.0"
-    wsl-utils: "npm:^1.0.0"
-  checksum: 10c0/fd650ac10806a06bfe197af0ef143cd2a3127294721524972f04377fb1144da5e32a2d0507497e214385981ec5b6b4b43210e22d7ef22bc45c390771d80658a5
-  languageName: node
-  linkType: hard
-
-"open@npm:^11.0.2":
+"open@npm:11.0.4, open@npm:^11.0.0":
   version: 11.0.4
   resolution: "open@npm:11.0.4"
   dependencies:
@@ -13963,17 +13949,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"open@patch:open@npm%3A11.0.1#./patches/open@11.0.1.patch::locator=deepseek-harness-desktop%40workspace%3A.":
-  version: 11.0.1
-  resolution: "open@patch:open@npm%3A11.0.1#./patches/open@11.0.1.patch::version=11.0.1&hash=c5fcbe&locator=deepseek-harness-desktop%40workspace%3A."
+"open@patch:open@npm%3A11.0.4#./patches/open@11.0.4.patch::locator=deepseek-harness-desktop%40workspace%3A.":
+  version: 11.0.4
+  resolution: "open@patch:open@npm%3A11.0.4#./patches/open@11.0.4.patch::version=11.0.4&hash=8f5868&locator=deepseek-harness-desktop%40workspace%3A."
   dependencies:
-    default-browser: "npm:^5.4.0"
+    default-browser: "npm:^5.5.1"
     define-lazy-prop: "npm:^3.0.0"
     is-in-ssh: "npm:^1.0.0"
     is-inside-container: "npm:^1.0.0"
-    powershell-utils: "npm:^0.2.0"
+    powershell-utils: "npm:^0.2.1"
     wsl-utils: "npm:^1.0.0"
-  checksum: 10c0/933246cc069d9354799a3bcb55ec57e7ce1b2da419fdb820afbea4fde4ff977b4eb550489196560bc729f34e721beb258a9c20166889bdb34113d7ba13e6cc7d
+  checksum: 10c0/c7baa72a2f5109ece05beea07118628cabe30a7cb60e677f34512ad58c47b7d1e423d7347c4aaadc03454eceee158acd4721b9dd5a8219aeac1fdac5e06c22c7
   languageName: node
   linkType: hard
 
@@ -14358,13 +14344,6 @@ __metadata:
   version: 0.1.0
   resolution: "powershell-utils@npm:0.1.0"
   checksum: 10c0/a64713cf3583259c9ed6be211c06b4b19e8608bcb0f7f6287ffac0a95b8c7582b6b662eea0e201fd659492c8e9f9c5fd0bfc4579645c5add9c1a600075621c95
-  languageName: node
-  linkType: hard
-
-"powershell-utils@npm:^0.2.0":
-  version: 0.2.0
-  resolution: "powershell-utils@npm:0.2.0"
-  checksum: 10c0/0fa649e933800f33276262646cfb0d2ffcdfdb6a68ff80f5ab66e33c3197d3edf022e774502d5e458aee683702994e6d201fda85958c3cb7ccc413e0746b4373
   languageName: node
   linkType: hard
 

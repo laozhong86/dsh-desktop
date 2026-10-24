@@ -138,6 +138,12 @@ describe('Desktop WebServer browser gate', () => {
     await expect(fallback.text()).resolves.toBe('fallback')
   })
 
+  /** The bound test port; a missing port means the helper never listened. */
+  function boundPort(server: { port: number | undefined }): number {
+    if (server.port === undefined) throw new Error('the test WebServer did not bind a port')
+    return server.port
+  }
+
   it('allows marker-free browser routes but rejects Desktop marker impersonation', async () => {
     const access = createDesktopBrowserAccess(true, Buffer.alloc(32, 4).toString('base64url'))
     const server = await startWebServer(access)
@@ -168,8 +174,9 @@ describe('Desktop WebServer browser gate', () => {
       },
     })
 
-    await expect(requestUpgrade(server.port, '/socket')).resolves.toContain('403 Forbidden')
-    await expect(requestUpgrade(server.port, '/socket', {
+    const port = boundPort(server)
+    await expect(requestUpgrade(port, '/socket')).resolves.toContain('403 Forbidden')
+    await expect(requestUpgrade(port, '/socket', {
       [access.rendererHeader.name]: access.rendererHeader.value,
     })).resolves.toContain('101 Switching Protocols')
   })

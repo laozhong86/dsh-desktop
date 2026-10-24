@@ -1,5 +1,6 @@
 import type { ShellExecSpec } from '@deepseek-ai/dsh-shell'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { configValue } from '../src/settings-access.ts'
 import {
   adaptWindowsAclExecution,
   desktopWindowsPwshConfig,
@@ -14,6 +15,7 @@ function shellSpec(env?: Record<string, string>): ShellExecSpec {
     workdir: 'C:\\workspace',
     timeoutMs: 60_000,
     stdoutMaxBytes: 64_000,
+    onExpiry: 'kill',
     sandboxPolicy: undefined,
     ...(env === undefined ? {} : { env }),
   }
@@ -62,10 +64,10 @@ describe('Windows Electron PowerShell sandbox adaptation', () => {
       PATH: 'D:\\portable\\pwsh',
     }, 'win32', path => path === 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe')
 
-    expect(result).toEqual({
-      cwd: 'C:\\workspace',
-      pwshPath: 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
-    })
+    expect(result.cwd).toBe('C:\\workspace')
+    expect(configValue(result.pwshPath)).toBe(
+      'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+    )
   })
 
   it('adapts only the exact Electron-hosted win32 ACL runner argv', () => {

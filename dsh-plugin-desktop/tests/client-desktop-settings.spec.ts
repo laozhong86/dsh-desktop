@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import {
   DesktopDeveloperMenuItems,
   DesktopNativeActions,
@@ -242,7 +242,10 @@ describe('Desktop settings API', () => {
   it('hot-applies browser and LAN settings, then refreshes without a restart callback', async () => {
     const order: string[] = []
     const settings = {
-      set: vi.fn(async (key: string, value: unknown) => { order.push(`set:${key}:${String(value)}`) }),
+      set: vi.fn(async (key: string, value: unknown) => {
+        order.push(`set:${key}:${String(value)}`)
+        return true
+      }),
     }
     const refresh = vi.fn(async () => {
       order.push('read')
@@ -301,7 +304,7 @@ describe('Desktop settings API', () => {
   })
 
   it('keeps browser access and withdraws only the LAN listener before selecting a custom Desktop mode', async () => {
-    const set = vi.fn(async () => {})
+    const set = vi.fn(async () => true)
     const scope = {
       getSnapshot: () => ({
         status: 'ready' as const,
@@ -331,7 +334,7 @@ describe('Desktop settings API', () => {
   })
 
   it('keeps browser access and withdraws only the LAN listener while the settings mirror is still loading', async () => {
-    const set = vi.fn(async () => {})
+    const set = vi.fn(async () => true)
     const scope = {
       getSnapshot: () => ({
         status: 'loading' as const,
@@ -582,10 +585,10 @@ describe('Desktop settings Slot registration', () => {
         mode: 'host' as const,
       }),
       subscribe: () => () => {},
-      set: vi.fn(async () => {}),
-      unset: vi.fn(async () => {}),
-      mutate: vi.fn(async () => {}),
-    } satisfies SettingsScope<unknown>
+      set: vi.fn(async () => true),
+      unset: vi.fn(async () => true),
+      mutate: vi.fn(async () => true),
+    } satisfies ConfigForm<unknown>
     const bind = vi.fn(() => scope)
     const register = vi.fn(() => () => {})
     const inject = vi.fn((_name: string, mount: () => unknown) => mount())

@@ -5,7 +5,6 @@ import {
   readFileSync,
   realpathSync,
   rmSync,
-  symlinkSync,
   writeFileSync,
 } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -14,11 +13,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   composeEntries,
-  healProfilesModuleFallback,
   initProfile,
   PROFILE_TEMPLATES,
 } from '@deepseek-ai/dsh-app-boot'
-import { retainAsarModuleResolver } from '../src/asar-module-resolver-state.ts'
 import {
   DESKTOP_PACKAGE_NAME,
   desktopShellModeFromSettings,
@@ -53,7 +50,7 @@ function installWebClient(
   const webDir = join(home, 'profiles', 'web')
   const template = PROFILE_TEMPLATES.web
   if (template === undefined) throw new Error('test requires the shipped Web template')
-  initProfile(webDir, template.bundles, template.patchReload)
+  initProfile(webDir, template.bundles)
   const packageDir = join(webDir, 'node_modules', ...packageName.split('/'))
   mkdirSync(packageDir, { recursive: true })
   writeFileSync(join(packageDir, 'package.json'), JSON.stringify({
@@ -86,25 +83,6 @@ afterEach(() => {
 describe('desktop profile composition', {
   timeout: process.platform === 'win32' ? 10_000 : 5_000,
 }, () => {
-  it('does not recreate the shared Profile fallback while the packaged ASAR resolver is active', async () => {
-    const home = temporaryHome()
-    const installAnchor = join(
-      home,
-      'resources',
-      'app.asar',
-      'node_modules',
-      '@deepseek-ai',
-      'dsh',
-      'package.json',
-    )
-    const releaseResolver = retainAsarModuleResolver()
-    try {
-      await expect(healProfilesModuleFallback({ home, installAnchor })).resolves.toBeUndefined()
-      expect(existsSync(join(home, 'profiles', 'node_modules'))).toBe(false)
-    } finally {
-      releaseResolver()
-    }
-  })
 
   it('ships a PowerShell-backed standard preset for Windows', () => {
     const standardPreset = readFileSync(
@@ -444,7 +422,7 @@ virtualStoreDirMaxLength: 60
     const omnimuxDir = join(home, 'profiles', 'omnimux')
     const template = PROFILE_TEMPLATES.web
     if (template === undefined) throw new Error('test requires the shipped Web template')
-    initProfile(omnimuxDir, template.bundles, template.patchReload)
+    initProfile(omnimuxDir, template.bundles)
     const prepared = prepareDesktopProfile(undefined, home, 'darwin', 'omnimux')
     const patches = prepared.patches as Array<Record<string, unknown>>
     expect(patches).toContainEqual(expect.objectContaining({
@@ -733,7 +711,7 @@ virtualStoreDirMaxLength: 60
     const webDir = join(home, 'profiles', 'web')
     const template = PROFILE_TEMPLATES.web
     if (template === undefined) throw new Error('test requires the shipped Web template')
-    initProfile(webDir, template.bundles, template.patchReload)
+    initProfile(webDir, template.bundles)
     writeFileSync(join(webDir, 'cordis.patch.yml'), [
       '- id: ui-layout',
       "  name: '@deepseek-ai/dsh-client-ui-layout'",

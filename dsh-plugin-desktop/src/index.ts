@@ -177,6 +177,27 @@ export const Config = z.object({
   minHeight: z.number().step(1).min(480).default(640),
 })
 
+/**
+ * Reject a Desktop settings combination the shell cannot honour.
+ *
+ * The settings service writes what the settings page sends, so the shell keeps
+ * this guard where it consumes the values: an unsupported combination fails at
+ * startup instead of launching a window the platform cannot render.
+ * @param value - effective Desktop settings.
+ * @param platform - active runtime platform.
+ */
+export function validateDesktopSettings(
+  value: Pick<DesktopSettings, 'mode' | 'networkExposure'>,
+  platform: NodeJS.Platform,
+): void {
+  if (value.networkExposure === 'lan' && !desktopLanExposureAvailable(value.mode)) {
+    throw new Error('dsh-plugin-desktop: LAN exposure requires compatibility mode')
+  }
+  if (value.mode !== 'compatibility' && platform !== 'darwin' && platform !== 'win32') {
+    throw new Error('dsh-plugin-desktop: custom desktop shell modes are supported on macOS and Windows')
+  }
+}
+
 /** Default Desktop settings, projected from the entry schema. */
 function desktopSettingsDefaults(): DesktopSettings {
   const config = Config({} as Config)
@@ -252,6 +273,7 @@ export function apply(ctx: Context, config: Config): void {
   if (ctx.webServer.host !== desktopWebServerHost(config.networkExposure)) {
     throw new Error('dsh-plugin-desktop: desktop shell WebServer host does not match networkExposure')
   }
+  validateDesktopSettings(config, runtime.platform)
   lanHttps.attach(requireWebServerPort(ctx))
   const iconFilename = runtime.platform === 'darwin'
     ? 'app-icon-mac.png'

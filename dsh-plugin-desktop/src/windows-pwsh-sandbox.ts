@@ -6,7 +6,7 @@ import { win32 } from 'node:path'
 import type { ShellExecRequest, ShellExecSpec } from '@deepseek-ai/dsh-shell'
 import { SandboxPwshExecutor } from '@deepseek-ai/dsh-pwsh-sandbox'
 import type { Config as PwshConfig } from '@deepseek-ai/dsh-pwsh-local'
-import { createVolatile } from '@deepseek-ai/cosmokit'
+import { createVolatile, type Volatile } from '@deepseek-ai/cosmokit'
 import { configValue } from './settings-access.ts'
 
 const RUN_AS_NODE = 'ELECTRON_RUN_AS_NODE'
@@ -51,14 +51,21 @@ export function desktopWindowsPwshPath(
   return candidates.find(candidate => exists(candidate))
 }
 
-/** Keep explicit user config, otherwise avoid PATH-resolved portable pwsh in the Windows ACL sandbox. */
-export function desktopWindowsPwshConfig(
-  config: PwshConfig,
+/**
+ * Keep explicit user config, otherwise avoid PATH-resolved portable pwsh in the Windows ACL sandbox.
+ * @param config - parsed or caller-supplied pwsh configuration.
+ * @param env - host environment used to locate a system PowerShell.
+ * @param platform - host platform.
+ * @param exists - path probe, injectable for deterministic tests.
+ * @returns the same config when nothing changes, otherwise a config with a resolved pwsh path.
+ */
+export function desktopWindowsPwshConfig<T extends object>(
+  config: T,
   env: NodeJS.ProcessEnv,
   platform: NodeJS.Platform,
   exists: (path: string) => boolean = existsSync,
-): PwshConfig {
-  const configured = configValue(config.pwshPath)
+): T & { pwshPath?: Volatile<string | undefined> } {
+  const configured = configValue((config as { pwshPath?: unknown }).pwshPath as Volatile<string | undefined> | undefined)
   if (configured !== undefined && configured.length > 0) return config
   const pwshPath = desktopWindowsPwshPath(env, platform, exists)
   return pwshPath === undefined ? config : { ...config, pwshPath: createVolatile(pwshPath) }

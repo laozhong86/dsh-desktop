@@ -319,9 +319,10 @@ try {
     redirect: 'manual',
   })
   await exchange.body?.cancel()
-  if (exchange.status !== 303 || exchange.headers.get('location') !== '/') {
+  // Upstream now redirects to the relative root, which resolves to the same place.
+  if (exchange.status !== 303 || !['/', './'].includes(String(exchange.headers.get('location')))) {
     throw new Error(
-      `browser authentication exchange returned HTTP ${String(exchange.status)} instead of a root redirect`,
+      `browser authentication exchange returned HTTP ${String(exchange.status)} location ${String(exchange.headers.get('location'))} instead of a root redirect`,
     )
   }
   const setCookie = exchange.headers.get('set-cookie')

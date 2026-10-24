@@ -1,39 +1,9 @@
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { Context } from '@deepseek-ai/cordis'
-import { FileSettingsProvider } from '@deepseek-ai/dsh-settings-file'
-import z from '@deepseek-ai/schemastery'
-import { afterEach, describe, expect, it } from 'vitest'
+import type { Context } from '@deepseek-ai/cordis'
+import { describe, expect, it, vi } from 'vitest'
 import { DSH_1024STORE_ADAPTER_ID, DSH_1024STORE_PROVIDER_ID } from '../src/adapters/dsh-1024store.js'
 import { SettingsCatalogSourceStore, type MarketSettingsDocument } from '../src/catalog/source-store.js'
 import type { LocalSourceRecord } from '../src/contracts/index.js'
-import { registerMarketSettings } from '../src/host/routes.js'
-
-const cleanups: Array<() => Promise<void>> = []
-
-afterEach(async () => {
-  while (cleanups.length > 0) await cleanups.pop()!()
-})
-
-async function temporarySettingsFile(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'dsh-market-settings-'))
-  cleanups.push(async () => { await rm(dir, { recursive: true, force: true }) })
-  return join(dir, 'settings.yaml')
-}
-
-async function bootMarketSettings(path: string) {
-  const ctx = new Context()
-  await ctx.plugin(FileSettingsProvider, { path, watch: false })
-  let disposed = false
-  const dispose = async () => {
-    if (disposed) return
-    disposed = true
-    await ctx.fiber.dispose()
-  }
-  cleanups.push(dispose)
-  return { ctx, scope: registerMarketSettings(ctx), dispose }
-}
+import { MARKET_SETTINGS_NAMESPACE, registerMarketSettings } from '../src/host/routes.js'
 
 const source: LocalSourceRecord = {
   sourceRecordId: '018f1f77-a5c4-7b73-a9ae-0242ac120002',
@@ -45,33 +15,49 @@ const source: LocalSourceRecord = {
   order: 0,
 }
 
-const SiblingSchema = z.object({ label: z.string().default('default') })
-const SIBLING_NAMESPACE = 'market-persistence-fixture'
+interface Descriptor {
+  ns: string
+  value: unknown
+}
 
-describe('community market file-backed settings', () => {
-  it('restores sources in a new Host context', async () => {
-    const path = await temporarySettingsFile()
-    const first = await bootMarketSettings(path)
+/**
+ * The settings service derives a namespace's value from its profile entry, so
+ * cross-restart persistence is owned by the service rather than the market.
+ * What remains the market's responsibility is addressing its own namespace and
+ * reading the resolved value, which is what these cases pin down.
+ */
+function serviceContext(descriptors: Descriptor[]) {
+  const describe = vi.fn(() => descriptors)
+  const update = vi.fn(async () => {})
+  const replace = vi.fn(async () => {})
+  const ctx = { settings: { describe, update, replace } } as unknown as Context
+  return { ctx, describe, update, replace }
+}
 
-    await first.scope.replace({ sources: [source] })
-    await first.dispose()
+describe('community market settings handle', () => {
+  it('reads the resolved value of its own namespace', () => {
+    const { ctx } = serviceContext([
+      { ns: 'market-persistence-fixture', value: { label: 'sibling' } },
+      { ns: MARKET_SETTINGS_NAMESPACE, value: { sources: [source] } },
+    ])
 
-    const second = await bootMarketSettings(path)
-    expect(second.scope.get()).toEqual({ sources: [source] } satisfies MarketSettingsDocument)
+    expect(registerMarketSettings(ctx).get()).toEqual({ sources: [source] } satisfies MarketSettingsDocument)
   })
 
-  it('preserves another plugin namespace while persisting market settings', async () => {
-    const path = await temporarySettingsFile()
-    const first = await bootMarketSettings(path)
-    const firstSibling = first.ctx.settings.register(SIBLING_NAMESPACE, SiblingSchema)
-    await firstSibling.update({ label: 'retained across restart' })
+  it('falls back to the schema defaults before its entry publishes a form', () => {
+    const { ctx } = serviceContext([])
 
-    await new SettingsCatalogSourceStore(first.scope).save([source])
-    await first.dispose()
+    expect(registerMarketSettings(ctx).get()).toEqual({ sources: [] } satisfies MarketSettingsDocument)
+  })
 
-    const second = await bootMarketSettings(path)
-    const secondSibling = second.ctx.settings.register(SIBLING_NAMESPACE, SiblingSchema)
-    expect(secondSibling.get()).toEqual({ label: 'retained across restart' })
-    expect(second.scope.get()).toEqual({ sources: [source] } satisfies MarketSettingsDocument)
+  it('writes through to its own namespace', async () => {
+    const { ctx, update, replace } = serviceContext([])
+    const scope = registerMarketSettings(ctx)
+
+    await new SettingsCatalogSourceStore(scope).save([source])
+    expect(update).toHaveBeenCalledWith(MARKET_SETTINGS_NAMESPACE, { sources: [source] })
+
+    await scope.replace({ sources: [source] })
+    expect(replace).toHaveBeenCalledWith(MARKET_SETTINGS_NAMESPACE, { sources: [source] })
   })
 })

@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs'
-import type { SettingsScope } from '@deepseek-ai/dsh-settings'
 import { describe, expect, it, vi } from 'vitest'
 import {
   SettingsCatalogSourceStore,
   type MarketSettingsDocument,
 } from '../src/catalog/source-store.js'
 import type { CatalogSourceManifest, LocalSourceRecord } from '../src/contracts/index.js'
+import type { MarketSettingsScope } from '../src/host/routes.js'
 
 const manifest = JSON.parse(
   readFileSync(new URL('../docs/examples/catalog-source.example.json', import.meta.url), 'utf8'),
@@ -29,7 +29,7 @@ describe('settings-backed catalog source store', () => {
     const scope = {
       get: () => document,
       update,
-    } as unknown as SettingsScope<MarketSettingsDocument>
+    } as unknown as MarketSettingsScope
     const store = new SettingsCatalogSourceStore(scope)
 
     await store.save([source])
@@ -49,7 +49,7 @@ describe('settings-backed catalog source store', () => {
     const scope = {
       get: () => document,
       update,
-    } as unknown as SettingsScope<MarketSettingsDocument>
+    } as unknown as MarketSettingsScope
     const store = new SettingsCatalogSourceStore(scope)
 
     await store.save([source, secondSource])

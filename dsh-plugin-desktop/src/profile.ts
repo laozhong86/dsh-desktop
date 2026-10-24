@@ -96,6 +96,8 @@ const DEFAULT_DESKTOP_PORT = DESKTOP_DEFAULT_WEB_PORT
 const DESKTOP_WEB_SERVER_ROW_ID = 'desktop-webserver'
 const DESKTOP_WEB_SERVER_PACKAGE = `${DESKTOP_PACKAGE_NAME}/webserver`
 const SETTINGS_DOCUMENT_FILENAME = 'settings.yaml'
+const AGENT_PRESET_REGISTRY_ROW_ID = 'agent-preset-registry'
+const PRODUCT_DEFAULT_AGENT_PRESET = 'minimal'
 const DESKTOP_SETTINGS_NAMESPACE = 'desktop-shell'
 const UI_LAYOUT_PACKAGE = '@deepseek-ai/dsh-client-ui-layout'
 const UI_SIDEBAR_PACKAGE = '@deepseek-ai/dsh-client-ui-sidebar'
@@ -1046,10 +1048,13 @@ export function prepareDesktopProfile(
       { id: 'ui-conversation', disabled: false },
     )
   }
-  // The upstream agent-preset registry owns the roster now: it ships the
-  // built-in presets itself and exposes only a default/selection config, so the
-  // shell no longer injects a preset root. Its Cordis skills still come from the
-  // packaged preset root.
+  // The upstream agent-preset registry owns the roster now: it ships the built-in
+  // presets itself and exposes a default/selection config, so the shell no longer
+  // injects a preset root. It still pins the product default, and its Cordis
+  // skills keep coming from the packaged preset root.
+  if (rows.get(AGENT_PRESET_REGISTRY_ROW_ID) !== undefined) {
+    patches.push({ id: AGENT_PRESET_REGISTRY_ROW_ID, config: { default: PRODUCT_DEFAULT_AGENT_PRESET } })
+  }
   const webserver = rows.get('webserver')
   if (webserver === undefined) {
     throw new Error(`${BIN_NAME}: desktop profile has no webserver row`)

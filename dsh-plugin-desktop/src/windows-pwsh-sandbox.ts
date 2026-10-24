@@ -3,9 +3,11 @@
 import { fileURLToPath } from 'node:url'
 import { existsSync } from 'node:fs'
 import { win32 } from 'node:path'
-import type { ShellExecSpec, ShellProcess, ShellRunResult } from '@deepseek-ai/dsh-shell'
+import type { ShellExecRequest, ShellExecSpec } from '@deepseek-ai/dsh-shell'
 import { SandboxPwshExecutor } from '@deepseek-ai/dsh-pwsh-sandbox'
 import type { Config as PwshConfig } from '@deepseek-ai/dsh-pwsh-local'
+import { createVolatile } from '@deepseek-ai/cosmokit'
+import { configValue } from './settings-access.ts'
 
 const RUN_AS_NODE = 'ELECTRON_RUN_AS_NODE'
 const UPSTREAM_RUNNER = fileURLToPath(import.meta.resolve('@deepseek-ai/dsh-sandbox-windows-acl/runner'))
@@ -56,9 +58,41 @@ export function desktopWindowsPwshConfig(
   platform: NodeJS.Platform,
   exists: (path: string) => boolean = existsSync,
 ): PwshConfig {
-  if (config.pwshPath !== undefined && config.pwshPath.length > 0) return config
+  const configured = configValue(config.pwshPath)
+  if (configured !== undefined && configured.length > 0) return config
   const pwshPath = desktopWindowsPwshPath(env, platform, exists)
-  return pwshPath === undefined ? config : { ...config, pwshPath }
+  return pwshPath === undefined ? config : { ...config, pwshPath: createVolatile(pwshPath) }
+}
+
+/** Executable and runner identities for this Host. */
+export function desktopWindowsAclAdaptation(): WindowsAclAdaptation {
+  return {
+    platform: process.platform,
+    electron: process.versions.electron !== undefined,
+    execPath: process.execPath,
+    upstreamRunner: UPSTREAM_RUNNER,
+    trampoline: DESKTOP_TRAMPOLINE,
+  }
+}
+
+/**
+ * Insert the desktop Node-mode trampoline into one confined ACL runner argv.
+ * @param argv - argv after the upstream sandbox provider has confined it.
+ * @param adaptation - executable and runner identities for this Host.
+ * @returns the unchanged argv for every non-runner call, otherwise the trampoline launch.
+ */
+export function adaptWindowsAclArgv(
+  argv: readonly string[],
+  adaptation: WindowsAclAdaptation,
+): readonly string[] {
+  const [program, runner, ...args] = argv
+  if (adaptation.platform !== 'win32'
+    || !adaptation.electron
+    || program !== adaptation.execPath
+    || runner !== adaptation.upstreamRunner) {
+    return argv
+  }
+  return [adaptation.execPath, adaptation.trampoline, adaptation.upstreamRunner, ...args]
 }
 
 /**
@@ -73,49 +107,37 @@ export function adaptWindowsAclExecution(
   argv: readonly string[],
   adaptation: WindowsAclAdaptation,
 ): AdaptedWindowsAclExecution {
-  const [program, runner, ...args] = argv
-  if (adaptation.platform !== 'win32'
-    || !adaptation.electron
-    || program !== adaptation.execPath
-    || runner !== adaptation.upstreamRunner) {
-    return { spec, argv }
-  }
+  const adapted = adaptWindowsAclArgv(argv, adaptation)
+  if (adapted === argv) return { spec, argv }
 
   const env = { ...spec.env }
   for (const key of Object.keys(env)) {
     if (key.toUpperCase() === RUN_AS_NODE) delete env[key]
   }
   env[RUN_AS_NODE] = '1'
-  return {
-    spec: { ...spec, env },
-    argv: [adaptation.execPath, adaptation.trampoline, adaptation.upstreamRunner, ...args],
-  }
+  return { spec: { ...spec, env }, argv: adapted }
 }
 
-/** PowerShell sandbox provider that repairs only Electron-hosted Windows ACL launches. */
+/** PowerShell sandbox executor that repairs only Electron-hosted Windows ACL launches. */
 export class DesktopWindowsPwshSandbox extends SandboxPwshExecutor {
   constructor(ctx: ConstructorParameters<typeof SandboxPwshExecutor>[0], config: PwshConfig) {
     super(ctx, desktopWindowsPwshConfig(config, process.env, process.platform))
   }
 
-  private adapt(spec: ShellExecSpec, argv: readonly string[]): AdaptedWindowsAclExecution {
-    return adaptWindowsAclExecution(spec, argv, {
-      platform: process.platform,
-      electron: process.versions.electron !== undefined,
-      execPath: process.execPath,
-      upstreamRunner: UPSTREAM_RUNNER,
-      trampoline: DESKTOP_TRAMPOLINE,
-    })
-  }
-
-  protected override async runArgv(spec: ShellExecSpec, argv: readonly string[]): Promise<ShellRunResult> {
-    const adapted = this.adapt(spec, argv)
-    return super.runArgv(adapted.spec, adapted.argv)
-  }
-
-  protected override startArgv(spec: ShellExecSpec, argv: readonly string[]): ShellProcess {
-    const adapted = this.adapt(spec, argv)
-    return super.startArgv(adapted.spec, adapted.argv)
+  override resolve(request: ShellExecRequest): ShellExecSpec {
+    const spec = super.resolve(request)
+    const adaptation = desktopWindowsAclAdaptation()
+    // The trampoline runs after the provider confines the argv, so the Electron
+    // environment it needs has to be stamped here, while the spec is still ours to
+    // edit. The provider inserts the trampoline itself; this is the env half.
+    if (adaptation.platform !== 'win32' || !adaptation.electron) return spec
+    if (spec.sandboxPolicy === undefined || spec.sandboxPolicy.mode === 'danger-full-access') return spec
+    const env = { ...spec.env }
+    for (const key of Object.keys(env)) {
+      if (key.toUpperCase() === RUN_AS_NODE) delete env[key]
+    }
+    env[RUN_AS_NODE] = '1'
+    return { ...spec, env }
   }
 }
 

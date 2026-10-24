@@ -38,6 +38,10 @@
       "types": "./lib/types/windows-pwsh-sandbox.d.ts",
       "default": "./lib/windows-pwsh-sandbox.js"
     },
+    "./windows-acl-sandbox-provider": {
+      "types": "./lib/types/windows-acl-sandbox-provider.d.ts",
+      "default": "./lib/windows-acl-sandbox-provider.js"
+    },
     "./terminal": {
       "types": "./lib/types/terminal.d.ts",
       "default": "./lib/terminal.js"

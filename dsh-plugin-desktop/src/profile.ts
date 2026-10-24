@@ -87,6 +87,10 @@ const PWSH_SANDBOX_ROW_ID = 'pwsh-sandbox'
 const UPSTREAM_PWSH_SANDBOX_PACKAGE = '@deepseek-ai/dsh-pwsh-sandbox'
 const DESKTOP_WINDOWS_PWSH_SANDBOX_ROW_ID = 'desktop-windows-pwsh-sandbox'
 const DESKTOP_WINDOWS_PWSH_SANDBOX_PACKAGE = `${DESKTOP_PACKAGE_NAME}/windows-pwsh-sandbox`
+const SANDBOX_ROW_ID = 'sandbox'
+const UPSTREAM_SANDBOX_PACKAGE = '@deepseek-ai/dsh-sandbox-local'
+const DESKTOP_WINDOWS_ACL_SANDBOX_ROW_ID = 'desktop-windows-acl-sandbox'
+const DESKTOP_WINDOWS_ACL_SANDBOX_PACKAGE = `${DESKTOP_PACKAGE_NAME}/windows-acl-sandbox-provider`
 const OMNIMUX_PROFILE_NAME = 'omnimux'
 const AGENT_PRESETS_ROW_ID = 'agent-presets'
 /** Harness-home directory holding locally authored presets (`agent-presets/discovery`). */
@@ -1076,6 +1080,27 @@ export function prepareDesktopProfile(
               name: DESKTOP_WINDOWS_PWSH_SANDBOX_PACKAGE,
               ...(pwshSandbox.disabled === undefined ? {} : { disabled: pwshSandbox.disabled }),
               config: rowConfig(pwshSandbox),
+            },
+          ],
+        },
+      )
+    }
+    const sandboxProvider = rows.get(SANDBOX_ROW_ID)
+    if (sandboxProvider?.name === UPSTREAM_SANDBOX_PACKAGE
+      && !rowDisabledOnPlatform(sandboxProvider, platform)) {
+      patches.push(
+        {
+          id: SANDBOX_ROW_ID,
+          name: UPSTREAM_SANDBOX_PACKAGE,
+          disabled: true,
+        },
+        {
+          insert: [
+            {
+              id: DESKTOP_WINDOWS_ACL_SANDBOX_ROW_ID,
+              name: DESKTOP_WINDOWS_ACL_SANDBOX_PACKAGE,
+              ...(sandboxProvider.disabled === undefined ? {} : { disabled: sandboxProvider.disabled }),
+              config: rowConfig(sandboxProvider),
             },
           ],
         },

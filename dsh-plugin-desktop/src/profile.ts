@@ -543,15 +543,19 @@ function loadRecoveryFilteredProfile(
       const declared = bundleManifest !== null && typeof bundleManifest === 'object'
         ? (bundleManifest as { dsh?: { bundle?: { patch?: unknown } } }).dsh?.bundle?.patch
         : undefined
-      if (typeof declared !== 'string' || declared.length === 0) {
+      // A bundle may declare one patch file or an ordered list of them.
+      const declaredFiles = typeof declared === 'string' ? [declared] : declared
+      if (!Array.isArray(declaredFiles)
+        || declaredFiles.length === 0
+        || !declaredFiles.every(file => typeof file === 'string' && file.length > 0)) {
         throw new Error(`${BIN_NAME}: profile bundle ${JSON.stringify(packageName)} declares no dsh.bundle in its package.json`)
       }
-      const patchPath = join(packageDir, declared)
+      const patchPaths = (declaredFiles as string[]).map(file => join(packageDir, file))
       layers.push({
         packageName,
         packageDir,
-        patchPaths: [patchPath],
-        patches: loadOverlayPatches(BIN_NAME, patchPath),
+        patchPaths,
+        patches: patchPaths.flatMap(path => loadOverlayPatches(BIN_NAME, path)),
       })
     } catch (cause) {
       if (isAa) aaFailure = marketFailureMessage(cause)

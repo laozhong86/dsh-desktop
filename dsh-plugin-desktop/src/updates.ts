@@ -8,6 +8,7 @@ import { DESKTOP_UPDATE_CHECK_PATH } from './desktop-settings-contract.ts'
 import { handleDesktopUpdateCheckRequest } from './desktop-settings-route.ts'
 import type {} from './runtime.ts'
 import { startDesktopUpdateLifecycle } from './update-lifecycle.ts'
+import { requireWebServerPort } from './web-server-port.ts'
 
 /** Stable Cordis plugin name. */
 export const name = 'desktop-updates'

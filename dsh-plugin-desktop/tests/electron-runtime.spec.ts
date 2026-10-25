@@ -180,6 +180,7 @@ const electron = vi.hoisted(() => {
     readonly isFocused = vi.fn(() => false)
     readonly isVisible = vi.fn(() => false)
     readonly isMinimized = vi.fn(() => false)
+    readonly isMaximized = vi.fn(() => false)
     readonly isFullScreen = vi.fn(() => false)
     readonly getNormalBounds = vi.fn(() => ({ x: 120, y: 80, width: 1280, height: 840 }))
     readonly flashFrame = vi.fn()
@@ -782,11 +783,11 @@ describe('Electron desktop runtime', () => {
     move()
     expect(store.read()).toEqual({ x: 260, y: 140, width: 1440, height: 900 })
     await vi.advanceTimersByTimeAsync(250)
-    expect(store.read()).toEqual({ x: 320, y: 180, width: 1500, height: 920 })
+    expect(store.read()).toEqual({ x: 320, y: 180, width: 1500, height: 920, isMaximized: false, isFullScreen: false })
 
     window?.getNormalBounds.mockReturnValue({ x: 360, y: 220, width: 1520, height: 940 })
     close({ preventDefault: vi.fn() })
-    expect(store.read()).toEqual({ x: 360, y: 220, width: 1520, height: 940 })
+    expect(store.read()).toEqual({ x: 360, y: 220, width: 1520, height: 940, isMaximized: false, isFullScreen: false })
 
     await release()
     expect(electron.browserWindowOff).toHaveBeenCalledWith('move', move)

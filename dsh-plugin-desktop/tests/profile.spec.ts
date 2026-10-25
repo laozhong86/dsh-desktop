@@ -867,7 +867,9 @@ virtualStoreDirMaxLength: 60
 
     expect(prepared.mode).toBe('advanced')
     expect(prepared.port).toBe(43_189)
-    expect(prepared.openBrowser).toBe(false)
+    // OmniMux keeps the user's browser switch in a custom mode and withdraws LAN
+    // only, because the LAN listener stays a compatibility-shell feature.
+    expect(prepared.openBrowser).toBe(true)
     expect(prepared.networkExposure).toBe('loopback')
     expect(rows.find(row => row.id === 'desktop-shell')).toEqual(expect.objectContaining({
       disabled: false,
@@ -1406,9 +1408,11 @@ virtualStoreDirMaxLength: 60
       name: '@deepseek-ai/dsh-subprocess-local',
     })
     expect(rows.map(row => row.id)).not.toContain('desktop-windows-subprocess')
+    // Windows swaps in the shell-owned provider, so the upstream row is disabled.
     expect(rows.find(row => row.id === 'sandbox')).toEqual({
       id: 'sandbox',
       name: '@deepseek-ai/dsh-sandbox-local',
+      disabled: true,
     })
     // The registry row carries no Desktop override: 0.1.7 dropped `roots` and
     // `includeUserRoot` together with filesystem preset discovery.

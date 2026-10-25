@@ -250,7 +250,10 @@ function projectSettings(
     macosMaterial: parseMacosWindowMaterial(desktop.macosMaterial),
     windowsMaterial: parseWindowsWindowMaterial(desktop.windowsMaterial),
     openBrowser,
-    networkExposure: desktopNetworkExposureForBrowserAccess(openBrowser, networkExposure),
+    networkExposure: desktopNetworkExposureForBrowserAccess(
+      openBrowser,
+      desktopBrowserAccessAvailable(mode) ? networkExposure : 'loopback',
+    ),
     notifications: notificationSettings(notifications),
   })
 }

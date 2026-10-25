@@ -103,6 +103,10 @@ const PWSH_SANDBOX_ROW_ID = 'pwsh-sandbox'
 const UPSTREAM_PWSH_SANDBOX_PACKAGE = '@deepseek-ai/dsh-pwsh-sandbox'
 const DESKTOP_WINDOWS_PWSH_SANDBOX_ROW_ID = 'desktop-windows-pwsh-sandbox'
 const DESKTOP_WINDOWS_PWSH_SANDBOX_PACKAGE = `${DESKTOP_PACKAGE_NAME}/windows-pwsh-sandbox`
+const SANDBOX_ROW_ID = 'sandbox'
+const UPSTREAM_SANDBOX_PACKAGE = '@deepseek-ai/dsh-sandbox-local'
+const DESKTOP_WINDOWS_ACL_SANDBOX_ROW_ID = 'desktop-windows-acl-sandbox'
+const DESKTOP_WINDOWS_ACL_SANDBOX_PACKAGE = `${DESKTOP_PACKAGE_NAME}/windows-acl-sandbox-provider`
 /** Upstream Web rows that exist only to send Desktop product analytics to DeepSeek. */
 export const UPSTREAM_PRODUCT_ANALYTICS_ROW_IDS = ['desktop-product-telemetry', 'product-analytics'] as const
 const DEFAULT_DESKTOP_SHELL_MODE: DesktopShellMode = 'compatibility'
@@ -211,7 +215,12 @@ export function desktopStartupSettingsFromSettings(document: unknown): DesktopSt
     windowsMaterial: parseWindowsWindowMaterial(values.windowsMaterial),
     linuxMaterial: parseLinuxWindowMaterial(values.linuxMaterial),
     openBrowser,
-    networkExposure: desktopNetworkExposureForBrowserAccess(openBrowser, networkExposure),
+    // LAN stays a compatibility-shell feature: a custom mode keeps the user's
+    // browser switch on loopback instead of carrying the stored LAN intent.
+    networkExposure: desktopNetworkExposureForBrowserAccess(
+      openBrowser,
+      desktopBrowserAccessAvailable(mode) ? networkExposure : 'loopback',
+    ),
   }
 }
 
@@ -1895,6 +1904,31 @@ export function prepareDesktopProfile(
               name: DESKTOP_WINDOWS_PWSH_SANDBOX_PACKAGE,
               ...(pwshSandbox.disabled === undefined ? {} : { disabled: pwshSandbox.disabled }),
               config: rowConfig(pwshSandbox),
+            },
+          ],
+        },
+      )
+    }
+    // #3776: the trampoline moved off the pwsh executor onto the shell-owned
+    // sandbox provider, so the upstream provider row is disabled and the Desktop
+    // one is inserted beside it. No disabled guard is needed: the whole swap
+    // already sits in the win32 branch, so the row is active whenever it exists.
+    const sandboxProvider = rows.get(SANDBOX_ROW_ID)
+    if (sandboxProvider?.name === UPSTREAM_SANDBOX_PACKAGE
+      && !rowDisabledOnPlatform(sandboxProvider, platform)) {
+      patches.push(
+        {
+          id: SANDBOX_ROW_ID,
+          name: UPSTREAM_SANDBOX_PACKAGE,
+          disabled: true,
+        },
+        {
+          insert: [
+            {
+              id: DESKTOP_WINDOWS_ACL_SANDBOX_ROW_ID,
+              name: DESKTOP_WINDOWS_ACL_SANDBOX_PACKAGE,
+              ...(sandboxProvider.disabled === undefined ? {} : { disabled: sandboxProvider.disabled }),
+              config: rowConfig(sandboxProvider),
             },
           ],
         },

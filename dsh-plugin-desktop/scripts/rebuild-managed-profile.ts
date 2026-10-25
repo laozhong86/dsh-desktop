@@ -2,7 +2,7 @@
 /** Explicit, headless full-profile rebuild from one frozen OmniMux app. */
 
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readdirSync, realpathSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { isAbsolute, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -68,6 +68,22 @@ function candidateLayout(app: string): {
 }
 
 function listPackedFiles(pnpmCommand: string, sourceDir: string): string[] {
+  // Packages that ship through a staged "publish directory" (yarn monorepo
+  // convention, e.g. @smithy/*) point pnpm's packer at <dir>/.release/package,
+  // which a materialized snapshot never contains. The candidate directory is a
+  // disposable copy, so the publishConfig can be dropped from the copy before
+  // asking pnpm to enumerate its files.
+  const manifestPath = join(sourceDir, 'package.json')
+  let manifest: Record<string, unknown> | undefined
+  try {
+    manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as Record<string, unknown>
+  } catch {
+    manifest = undefined
+  }
+  if (manifest !== undefined && manifest['publishConfig'] !== undefined) {
+    delete manifest['publishConfig']
+    writeFileSync(manifestPath, JSON.stringify(manifest))
+  }
   const result = spawnSync(
     pnpmCommand,
     // A managed plugin may pin its own pnpm release (devEngines/packageManager).

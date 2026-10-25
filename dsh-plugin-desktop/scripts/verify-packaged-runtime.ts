@@ -66,7 +66,9 @@ const DSH_RUNTIME_VERSION = packageVersion(DSH_PACKAGE_ROOT)
 const PNPM_RUNTIME_VERSION = packageVersion(PNPM_PACKAGE_ROOT)
 
 /** Maximum physical file count accepted beside ASAR after smart unpack. */
-export const MAX_UNPACKED_RUNTIME_FILES = 1_500
+// The staged product plugin set ships more per-platform native payloads than the
+// previous roster, so the mirror-regression ceiling covers the larger surface.
+export const MAX_UNPACKED_RUNTIME_FILES = 3_000
 
 /**
  * Maximum physical payload accepted beside ASAR after smart unpack.
@@ -76,7 +78,10 @@ export const MAX_UNPACKED_RUNTIME_FILES = 1_500
  * (everything beside the staged preset seed) past the pre-uv 128 MB ceiling.
  * The budget still rejects a regression to the old full app.asar mirror.
  */
-export const MAX_UNPACKED_RUNTIME_BYTES = 192 * 1024 * 1024
+// The staged product plugin set also adds per-platform native payloads (the
+// office kit, the speech runtime and the call router), so the byte ceiling grows
+// with the roster while still failing on an accidental full mirror.
+export const MAX_UNPACKED_RUNTIME_BYTES = 768 * 1024 * 1024
 
 /** Narrow ceiling for pnpm's smart-unpacked native-helper package root. */
 export const MAX_PNPM_SMART_UNPACK_FILES = 32
@@ -91,6 +96,8 @@ export const ALLOWED_SMART_UNPACK_PACKAGE_ROOTS = [
   // pnpm embeds executable and native helper payloads.
   'node_modules/pnpm',
   'node_modules/sharp',
+  // The staged community market ships its own native payload.
+  'node_modules/dsh-community-market',
 ] as const
 
 /** Platform package families selected by native dependencies at package time. */
@@ -102,6 +109,10 @@ export const ALLOWED_SMART_UNPACK_PACKAGE_PREFIXES = [
   'node_modules/@koromix/koffi-',
   'node_modules/@vscode/ripgrep-',
   'node_modules/node-addon-require-builtin-',
+  // Product plugins staged into the preset bring their own native payloads.
+  'node_modules/@deepseek-ai/libreoffice-kit-',
+  'node_modules/meshcall-router-',
+  'node_modules/sherpa-onnx-',
 ] as const
 
 /** Every generated JavaScript file shipped by the installed DSH CLI package. */
@@ -112,10 +123,13 @@ export const REQUIRED_DSH_CLI_RUNTIME_ENTRIES = Object.freeze(
     .sort(),
 )
 
-/** PTC preset inputs selected by upstream's historical Session migration. */
+/**
+ * Agent-preset packages the rewritten registry composes. Upstream 0.2.1 ships
+ * the roster inside these packages instead of the retired preset YAML tree.
+ */
 export const REQUIRED_AGENT_PRESET_RUNTIME_ENTRIES = [
-  'node_modules/@deepseek-ai/dsh-agent-presets/presets/ptc/agent.cordis.yml',
-  'node_modules/@deepseek-ai/dsh-agent-presets/presets/ptc/preset.yml',
+  'node_modules/@deepseek-ai/dsh-agent-preset/package.json',
+  'node_modules/@deepseek-ai/dsh-agent-preset-registry/package.json',
 ] as const
 
 /**

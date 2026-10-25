@@ -1258,6 +1258,20 @@ index 9f97b7d..6ec66e3 100644
    statusCode: number
    writeHead(status: number, headers?: Record<string, string>): void
    end(body?: string | Uint8Array): void
+diff --git a/src/context-types.ts b/src/context-types.ts
+index 9f97b7d..add3daf 100644
+--- a/src/context-types.ts
++++ b/src/context-types.ts
+@@ -507,7 +507,7 @@ export interface SidebarContextShape {
+   /** The session store (host `.get`) and the client list feed (`.list`) faces. */
+   sessions: SidebarSessionStore & SidebarSessionsService
+   /** The web runtime trust list (bind-derived). */
+-  webRuntime: SidebarWebRuntime
++  webStartup: SidebarWebRuntime
+   /** The client slot registry (register/inject). */
+   slots: SidebarSlotsService
+   /** The settings service face (prefs persistence + namespace reads). */
+
 diff --git a/src/html-preview-document.ts b/src/html-preview-document.ts
 new file mode 100644
 index 0000000..efa20d0
@@ -2013,6 +2027,29 @@ index 9598be8..2c2ac5b 100644
        } catch (error) {
          writeError(res, error)
        }
+diff --git a/src/index.ts b/src/index.ts
+index 9598be8..fdde964 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -80,7 +80,7 @@ export type {
+ export const name = 'dsh-better-sidebar'
+ 
+ /** Services required before mounting: the webserver routes, the session store, the web runtime's trusted hosts, and the tool registry. */
+-export const inject = ['webServer', 'sessions', 'webRuntime', 'tools']
++export const inject = ['webServer', 'sessions', 'webStartup', 'tools']
+ 
+ /** Content types for the media route, by extension. */
+ const MEDIA_TYPES: Record<string, string> = {
+@@ -733,7 +733,7 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
+   // plus --trusted-host authorities) — the authoritative source the /api
+   // gateway fence derives its list from. Read per request from the live
+   // service value; a replaced list takes effect without a plugin restart.
+-  const fence = (req: SidebarHttpRequest): boolean => isTrustedApiRequest(req, ctx.webRuntime.trustedHosts)
++  const fence = (req: SidebarHttpRequest): boolean => isTrustedApiRequest(req, ctx.webStartup.trustedHosts)
+   // node-pty is loaded lazily, never at module top level (issue #140): a
+   // missing or broken install must degrade THIS plugin — terminal tab shows
+   // a repair command, agent terminal tools stay unregistered — instead of
+
 diff --git a/src/wire.ts b/src/wire.ts
 index 3002543..250ef6c 100644
 --- a/src/wire.ts

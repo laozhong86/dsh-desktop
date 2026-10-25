@@ -5,6 +5,7 @@ import {
   desktopBrowserAccessEnabled,
   desktopNetworkExposureForBrowserAccess,
 } from './desktop-network.ts'
+import { defaultDesktopShellMode } from './desktop-mode-default.ts'
 import {
   closeSync,
   constants,
@@ -209,7 +210,7 @@ function optionalBoolean(values: Record<string, unknown>, key: string, fallback:
 }
 
 function parseMode(value: unknown): DesktopSetupWizardMode {
-  if (value === undefined) return 'compatibility'
+  if (value === undefined) return defaultDesktopShellMode()
   if (value === 'compatibility' || value === 'extended' || value === 'advanced') return value
   throw invalid('dsh-desktop.mode must be compatibility, extended, or advanced')
 }
@@ -275,10 +276,12 @@ function normalizedUpdate(
   if (typeof value.openBrowser !== 'boolean') {
     throw new TypeError(`${BIN_NAME}: Setup Wizard openBrowser must be a boolean`)
   }
-  const openBrowser = desktopBrowserAccessAvailable(requestedMode) && value.openBrowser
+  // OmniMux keeps browser access on its own switch in every window mode; the LAN
+  // listener stays a compatibility-shell feature.
+  const openBrowser = value.openBrowser
   const networkExposure = desktopNetworkExposureForBrowserAccess(
     openBrowser,
-    parseExposure(value.networkExposure),
+    desktopBrowserAccessAvailable(requestedMode) ? parseExposure(value.networkExposure) : 'loopback',
   )
   if (!isRecord(value.notifications)) {
     throw new TypeError(`${BIN_NAME}: Setup Wizard notifications must be a map`)
@@ -480,7 +483,10 @@ export async function migrateDesktopBrowserAccessSettings(
     const storedOpenBrowser = optionalBoolean(desktop, 'openBrowser', false)
     const storedExposure = parseExposure(desktop.networkExposure)
     const browserAccess = desktopBrowserAccessEnabled(storedMode, storedOpenBrowser, storedExposure)
-    const networkExposure = desktopNetworkExposureForBrowserAccess(browserAccess, storedExposure)
+    const networkExposure = desktopNetworkExposureForBrowserAccess(
+      browserAccess,
+      desktopBrowserAccessAvailable(storedMode) ? storedExposure : 'loopback',
+    )
     return {
       browserAccess,
       needed: storedOpenBrowser !== browserAccess || storedExposure !== networkExposure,
@@ -607,7 +613,7 @@ export async function migrateLegacyAgentPresetSettings(
 export function defaultDesktopSetupWizardSettings(
 ): DesktopSetupWizardSettings {
   return Object.freeze({
-    mode: 'compatibility',
+    mode: defaultDesktopShellMode(),
     macosMaterial: DEFAULT_MACOS_WINDOW_MATERIAL,
     windowsMaterial: DEFAULT_WINDOWS_WINDOW_MATERIAL,
     openBrowser: false,

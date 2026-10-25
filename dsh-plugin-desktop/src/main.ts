@@ -94,6 +94,7 @@ import { packagedDependencyPath, unpackedAsarPath } from './packaged-runtime-pat
 import { isOmnimuxDevLaunch, applyOmnimuxDevEnvironment, resolveDevCdpPort } from './desktop-identity.ts'
 import { DesktopAnalyticsClient, extractStartupAnalyticsFromSummary } from './desktop-analytics.ts'
 import { completeOmnimuxProfileMaterialization, seedOmnimuxProfile } from './preset-profile.ts'
+import { settlesFirstRunSetup, defaultDesktopFirstRunSettings } from './desktop-first-run.ts'
 import { requireWebServerPort } from './web-server-port.ts'
 import {
   beginDesktopProfileStartup,
@@ -1537,6 +1538,44 @@ async function start(): Promise<void> {
       && desktopSetupWizardRequired(setupWizardState, setupWizardVersions)
       && (desktopSetupWizardPending(marketUserDataDir, prepared.profile.dir)
         || !hasDesktopProfileUsageHistory(releaseUserDataLocations, prepared.profile.dir, activeProfileName))
+    // OmniMux release builds ship working defaults instead of asking: browser
+    // access is on, the window mode is the platform default, and Setup is
+    // recorded as settled so no first-run window ever appears. It settles the
+    // upstream state machine rather than bypassing it, so `runtime.setupOnboarding`
+    // still reports a consistent, already-settled document and Dev builds keep the
+    // wizard reachable. (Approved decision 5, call site 5.)
+    if (settlesFirstRunSetup(setupPending)) {
+      const firstRunSettings = defaultDesktopFirstRunSettings()
+      profilePreferences = await writeDesktopProfilePreferences(
+        marketUserDataDir,
+        prepared.profile.dir,
+        {
+          ...desktopProfilePreferencesFromSettings(
+            firstRunSettings,
+            firstRunSettings.notifications,
+            marketSelection.requested,
+          ),
+          aaEnabled: false,
+        },
+      )
+      await mirrorDesktopProfilePreferences(prepared.settingsDocument, profilePreferences)
+      prepared = prepareDesktopProfile(
+        process.env.DSH_TELEMETRY_DISABLED,
+        homeDir,
+        process.platform,
+        activeProfileName,
+        pluginManagementStatePath,
+        marketSelection,
+        preparationHooks,
+      )
+      await completeOrSkipDesktopSetupWizard(
+        marketUserDataDir,
+        prepared.profile.dir,
+        'skipped',
+        setupWizardVersions,
+      )
+      setupPending = false
+    }
     if (setupPending) await beginDesktopSetupWizard(marketUserDataDir, prepared.profile.dir)
     const setupInput = { ...readDesktopSetupWizardSettings(prepared.settingsDocument), appVersion,
       profileName: activeProfileName, platform: runtime.platform,

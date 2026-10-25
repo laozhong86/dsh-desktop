@@ -25,12 +25,17 @@ interface Descriptor {
  * cross-restart persistence is owned by the service rather than the market.
  * What remains the market's responsibility is addressing its own namespace and
  * reading the resolved value, which is what these cases pin down.
+ *
+ * The stand-in mirrors the real Cordis context: `get(name)` is the lookup the
+ * market uses, because reading `ctx.settings` on a fiber-backed context without
+ * the inject requirement throws instead of returning undefined.
  */
 function serviceContext(descriptors: Descriptor[]) {
   const describe = vi.fn(() => descriptors)
   const update = vi.fn(async () => {})
   const replace = vi.fn(async () => {})
-  const ctx = { settings: { describe, update, replace } } as unknown as Context
+  const settings = { describe, update, replace }
+  const ctx = { get: (name: string) => (name === 'settings' ? settings : undefined) } as unknown as Context
   return { ctx, describe, update, replace }
 }
 
@@ -48,6 +53,19 @@ describe('community market settings handle', () => {
     const { ctx } = serviceContext([])
 
     expect(registerMarketSettings(ctx).get()).toEqual({ sources: [] } satisfies MarketSettingsDocument)
+  })
+
+  it('reads only the on-demand lookup, never a bare settings property', async () => {
+    // The Electron-managed desktop profile composes no settings entry, so the
+    // lookup has to stay non-blocking: schema defaults, and writes that no-op.
+    const describe = vi.fn(() => [{ ns: MARKET_SETTINGS_NAMESPACE, value: { sources: [source] } }])
+    const update = vi.fn(async () => {})
+    const ctx = { get: () => undefined, settings: { describe, update } } as unknown as Context
+    const scope = registerMarketSettings(ctx)
+
+    expect(scope.get()).toEqual({ sources: [] } satisfies MarketSettingsDocument)
+    await scope.update({ sources: [source] })
+    expect(update).not.toHaveBeenCalled()
   })
 
   it('writes through to its own namespace', async () => {

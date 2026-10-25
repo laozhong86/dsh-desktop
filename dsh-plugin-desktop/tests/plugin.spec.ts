@@ -231,6 +231,7 @@ function createHarness(
     toggleDeveloperTools: () => {},
     exportDiagnostics: async () => {},
     pickDirectory,
+    pickFiles: async () => [],
     validateDirectory,
     openProfileCreateWindow: () => {},
     reportRendererBoot: rendererBoot,

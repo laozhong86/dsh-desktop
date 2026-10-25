@@ -1,4 +1,3 @@
-import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ILayout, MainPanelId, PanelInfo } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
 
@@ -103,11 +102,6 @@ function clamp(value: number, min: number, max: number): number {
 
 /** Small observable panel controller used by the advanced root registration. */
 export class DesktopLayoutState implements ILayout {
-  private panelSnapshot: PanelInfo = Object.freeze({ activePanelId: null })
-  readonly panelInfo: HostObservable<PanelInfo> = {
-    getSnapshot: () => this.getPanelInfo(),
-    subscribe: listener => this.subscribe(listener),
-  }
   private panel: PanelInfo = Object.freeze({ activePanelId: null })
   private readonly panelListeners = new Set<() => void>()
   private navigation = new AbortController()
@@ -124,7 +118,6 @@ export class DesktopLayoutState implements ILayout {
   }
 
   /** Root selection remains independent of the active Session and column geometry. */
-  getPanelInfo(): PanelInfo { return this.panelSnapshot }
   getPanelInfo(): PanelInfo { return this.panel }
 
   /** Select a registered global panel, or return to the Conversation. */
@@ -133,17 +126,16 @@ export class DesktopLayoutState implements ILayout {
       throw new Error(`layout.selectPanel: main panel "${panelId}" is not registered`)
     }
     this.navigation.abort()
-    if (this.panelSnapshot.activePanelId === panelId) return
-    this.panelSnapshot = Object.freeze({ activePanelId: panelId })
     if (this.panel.activePanelId === panelId) return
     this.panel = Object.freeze({ activePanelId: panelId })
+    // The panel observable and the layout snapshot are separate channels, and
+    // both audiences must learn about a selection change.
     for (const listener of this.panelListeners) listener()
     for (const listener of this.listeners) listener()
   }
 
   /** Return to the Conversation when the selected plugin panel is unloaded. */
   retainMainPanels(): void {
-    const id = this.panelSnapshot.activePanelId
     const id = this.panel.activePanelId
     if (id !== null && !this.hasMainPanel(id)) this.selectPanel(null)
   }

@@ -91,8 +91,38 @@ export function desktopWindowsPwshConfig(
   }
 }
 
+/** Executable and runner identities for this Host. */
+export function desktopWindowsAclAdaptation(): WindowsAclAdaptation {
+  return {
+    platform: process.platform,
+    electron: process.versions.electron !== undefined,
+    execPath: process.execPath,
+    upstreamRunner: UPSTREAM_RUNNER,
+    trampoline: DESKTOP_TRAMPOLINE,
+  }
+}
+
 /**
- * Insert the desktop Node-mode trampoline for the exact upstream ACL runner.
+ * Insert the desktop Node-mode trampoline into one confined ACL runner argv.
+ * @param argv - argv after the upstream sandbox provider has confined it.
+ * @param adaptation - executable and runner identities for this Host.
+ * @returns the unchanged argv for every non-runner call, otherwise the trampoline launch.
+ */
+export function adaptWindowsAclArgv(
+  argv: readonly string[],
+  adaptation: WindowsAclAdaptation,
+): readonly string[] {
+  const [program, runner, ...args] = argv
+  if (adaptation.platform !== 'win32'
+    || !adaptation.electron
+    || program !== adaptation.execPath
+    || runner !== adaptation.upstreamRunner) {
+    return argv
+  }
+  return [adaptation.execPath, adaptation.trampoline, adaptation.upstreamRunner, ...args]
+}
+
+/**
  * @param spec - resolved PowerShell execution spec.
  * @param argv - argv after the upstream sandbox provider has confined it.
  * @param adaptation - executable and runner identities for this Host.
@@ -103,23 +133,15 @@ export function adaptWindowsAclExecution(
   argv: readonly string[],
   adaptation: WindowsAclAdaptation,
 ): AdaptedWindowsAclExecution {
-  const [program, runner, ...args] = argv
-  if (adaptation.platform !== 'win32'
-    || !adaptation.electron
-    || program !== adaptation.execPath
-    || runner !== adaptation.upstreamRunner) {
-    return { spec, argv }
-  }
+  const adapted = adaptWindowsAclArgv(argv, adaptation)
+  if (adapted === argv) return { spec, argv }
 
   const env = { ...spec.env }
   for (const key of Object.keys(env)) {
     if (key.toUpperCase() === RUN_AS_NODE) delete env[key]
   }
   env[RUN_AS_NODE] = '1'
-  return {
-    spec: { ...spec, env },
-    argv: [adaptation.execPath, adaptation.trampoline, adaptation.upstreamRunner, ...args],
-  }
+  return { spec: { ...spec, env }, argv: adapted }
 }
 
 /** PowerShell sandbox provider that repairs only Electron-hosted Windows ACL launches. */

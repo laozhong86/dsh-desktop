@@ -41,7 +41,7 @@ import {
   installDesktopPnpmRuntime,
 } from './desktop-runtime-environment.ts'
 import { desktopProductVersion, ElectronDesktopRuntime } from './electron-runtime.ts'
-import { getOrCreateDesktopInstallationId, getOrCreateDesktopInstallationIdentity } from './desktop-installation-id.ts'
+import { getOrCreateDesktopInstallationIdentity } from './desktop-installation-id.ts'
 import {
   createDesktopFailLoudProcess,
   describeDesktopChildProcess,

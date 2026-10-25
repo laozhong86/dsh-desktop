@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { BlockList, isIP } from 'node:net'
 import type { Context } from '@deepseek-ai/cordis'
-import z from '@deepseek-ai/schemastery'
 import type { CatalogSourceManifest } from '../contracts/index.js'
 import { parseCatalogSnapshot, parseCatalogSource, validateLocalSourceRecords } from '../contracts/validate.js'
 import type { CatalogHttpClient } from '../contracts/types.js'
@@ -12,7 +11,7 @@ import type {
   MarketCatalogMetadata,
   MarketCatalogResponse,
   MarketCatalogSourceResult,
-  MarketInstallationView,
+  MarketInstallationToggleRequest,
   MarketManualInstallHint,
   MarketSourceMutation,
   MarketStateResponse,
@@ -30,68 +29,16 @@ import {
   DSH_1024STORE_LEGACY_ADAPTER_ID,
   isDsh1024StoreAdapterId,
 } from '../adapters/dsh-1024store.js'
-import {
-  DSH_MARKETPLACE_ADAPTER_ID,
-  DSH_MARKETPLACE_HOSTNAME,
-  DSH_MARKETPLACE_KEY,
-  isDshMarketplaceSourceUrl,
-} from '../adapters/dsh-marketplace.js'
 import { DSHFIND_ADAPTER_ID, DSHFIND_HOSTNAME } from '../adapters/dshfind.js'
 import { assertStandardSourceTrustRoot } from '../adapters/standard-http.js'
 import { BUILT_IN_PROVIDERS, DefaultCatalogService, type CatalogFetchScope, type CatalogFullIndex } from '../catalog/service.js'
-import { SettingsCatalogSourceStore, type MarketCatalogCache, type MarketSettingsDocument } from '../catalog/source-store.js'
+import { PersistentCatalogSourceStore } from '../catalog/source-store.js'
+import type { MarketCatalogCache, MarketStateStore } from '../catalog/state-store.js'
 import { MARKET_MEDIA_ASSET_REF_PATTERN } from '../media/ref.js'
 import { createRestrictedImageFetcher } from '../media/restricted-image.js'
 import { createMarketMediaService } from '../media/service.js'
 import { MarketInstallError, type MarketInstallService } from '../install/service.js'
 import { manualInstallHints } from '../install/manual.js'
-
-export const MARKET_SETTINGS_NAMESPACE = 'dsh-community-market'
-const SOURCE_SCHEMA = z.object({
-  sourceRecordId: z.string().required(),
-  registrationKind: z.union(['user-added', 'built-in'] as const).required(),
-  adapterId: z.string().required(),
-  providerId: z.string().required(),
-  manifestUrl: z.string(),
-  manifest: z.any(),
-  builtInProviderKey: z.string(),
-  enabled: z.boolean().required(),
-  order: z.number().required(),
-})
-export const SETTINGS_SCHEMA = z.object({
-  sources: z.array(SOURCE_SCHEMA).default([]),
-  catalogCache: z.object({
-    version: z.number().step(1),
-    sourceRecordId: z.string(),
-    locale: z.string(),
-    savedAt: z.string(),
-    snapshot: z.any(),
-    categories: z.array(z.string()),
-    scannedAt: z.string(),
-    expiresAt: z.string(),
-    providerRevision: z.string(),
-  }).default(undefined as never),
-}) as unknown as z<MarketSettingsDocument>
-
-/**
- * Owner-facing handle for the market's own settings namespace. The settings
- * service no longer hands out a per-namespace scope: a namespace is a profile
- * entry id and its value is read from the schema-derived forms, so the market
- * keeps this narrow adapter over the shared service.
- */
-export interface MarketSettingsScope {
-  /** Current resolved value: schema defaults, then `base`, then the user layer. */
-  get(): MarketSettingsDocument
-  /** Merge a partial patch into this namespace's user layer and persist it. */
-  update(patch: object): Promise<void>
-  /** Replace this namespace's user section wholesale. */
-  replace(section: object): Promise<void>
-}
-
-/** Schema defaults for the market namespace, resolved from an empty config. */
-function settingsDefaults(): MarketSettingsDocument {
-  return (SETTINGS_SCHEMA as unknown as (value: object) => MarketSettingsDocument)({})
-}
 
 const ROUTE_STATE = '/api/community-market/state'
 const ROUTE_SOURCES = '/api/community-market/sources'
@@ -99,8 +46,8 @@ const ROUTE_CATALOG = '/api/community-market/catalog'
 const ROUTE_INSTALLABLE = '/api/community-market/installable'
 const ROUTE_ASSETS = '/api/community-market/assets'
 const ROUTE_INSTALLATIONS = '/api/community-market/installations'
+const ROUTE_INSTALLATION_ENABLED = '/api/community-market/installations/enabled'
 const ROUTE_OPEN_TERMINAL = '/api/community-market/desktop/open-terminal'
-const ROUTE_REQUEST_RESTART = '/api/community-market/desktop/request-restart'
 const ROUTE_OPERATION_PREVIEW = '/api/community-market/operations/preview'
 const ROUTE_OPERATION_EXECUTE = '/api/community-market/operations/execute'
 const MAX_BODY_BYTES = 16 * 1024
@@ -123,12 +70,6 @@ const dshfindHttpClient = createCachedCatalogHttpClient(
     // source hostnames must never inherit this local-proxy exception.
     syntheticProxyHostnames: [DSHFIND_HOSTNAME],
     maxBodyBytes: MAX_DSHFIND_BODY_BYTES,
-  }),
-)
-
-const dshMarketplaceHttpClient = createCachedCatalogHttpClient(
-  createRestrictedHttpClient({
-    syntheticProxyHostnames: [DSH_MARKETPLACE_HOSTNAME],
   }),
 )
 
@@ -348,7 +289,7 @@ export interface MarketRequestContext {
   readonly origin: string | undefined
   readonly host: string | undefined
   readonly secFetchSite?: string | undefined
-  readonly expectedPort: number | undefined
+  readonly expectedPort: number
 }
 
 function marketAuthority(context: MarketRequestContext): URL | undefined {
@@ -364,9 +305,6 @@ function marketAuthority(context: MarketRequestContext): URL | undefined {
   }
   if (
     authority.protocol !== 'http:'
-    // The server publishes its port only once bound; an unknown port cannot be
-    // checked, so the request is refused rather than trusted.
-    || context.expectedPort === undefined
     || Number(authority.port || '80') !== context.expectedPort
     || authority.hostname !== '127.0.0.1'
     || context.secFetchSite === 'cross-site'
@@ -389,7 +327,7 @@ export function marketMutationAllowed(context: MarketRequestContext): boolean {
   }
 }
 
-function requestContext(req: IncomingMessage, expectedPort: number | undefined): MarketRequestContext {
+function requestContext(req: IncomingMessage, expectedPort: number): MarketRequestContext {
   const secFetchSite = req.headers['sec-fetch-site']
   return {
     remoteAddress: req.socket.remoteAddress,
@@ -401,11 +339,11 @@ function requestContext(req: IncomingMessage, expectedPort: number | undefined):
 }
 
 function requestAllowed(req: IncomingMessage, expectedPort: number | undefined): boolean {
-  return marketRequestAllowed(requestContext(req, expectedPort))
+  return expectedPort !== undefined && marketRequestAllowed(requestContext(req, expectedPort))
 }
 
 function mutationAllowed(req: IncomingMessage, expectedPort: number | undefined): boolean {
-  return marketMutationAllowed({
+  return expectedPort !== undefined && marketMutationAllowed({
     ...requestContext(req, expectedPort),
   })
 }
@@ -436,7 +374,7 @@ function asMutation(value: unknown): MarketSourceMutation {
 
 type MarketOperationPreviewRequest =
   | { readonly action: 'install'; readonly sourceRecordId: string; readonly itemId: string }
-  | { readonly action: 'uninstall'; readonly bundleId: string }
+  | { readonly action: 'uninstall'; readonly packageName: string }
 
 function exactKeys(value: Record<string, unknown>, keys: readonly string[]): boolean {
   const actual = Object.keys(value).sort()
@@ -460,9 +398,9 @@ function asOperationPreview(value: unknown): MarketOperationPreviewRequest {
   ) return { action: 'install', sourceRecordId: request.sourceRecordId, itemId: request.itemId }
   if (
     request.action === 'uninstall'
-    && exactKeys(request, ['action', 'bundleId'])
-    && boundedIdentifier(request.bundleId)
-  ) return { action: 'uninstall', bundleId: request.bundleId }
+    && exactKeys(request, ['action', 'packageName'])
+    && boundedIdentifier(request.packageName)
+  ) return { action: 'uninstall', packageName: request.packageName }
   throw new MarketInstallError('invalid-request', 'Invalid package operation preview request.')
 }
 
@@ -483,15 +421,19 @@ function asEmptyDesktopAction(value: unknown): void {
   }
 }
 
-function asRestartToken(value: unknown): string {
+function asInstallationToggle(value: unknown): MarketInstallationToggleRequest {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    throw new MarketInstallError('invalid-request', 'The restart request was invalid.')
+    throw new MarketInstallError('invalid-request', 'Invalid plugin toggle request.')
   }
   const request = value as Record<string, unknown>
-  if (!exactKeys(request, ['restartToken']) || !boundedIdentifier(request.restartToken)) {
-    throw new MarketInstallError('invalid-request', 'The restart request was invalid.')
+  if (
+    !exactKeys(request, ['packageName', 'enabled'])
+    || !boundedIdentifier(request.packageName)
+    || typeof request.enabled !== 'boolean'
+  ) {
+    throw new MarketInstallError('invalid-request', 'Invalid plugin toggle request.')
   }
-  return request.restartToken
+  return { packageName: request.packageName, enabled: request.enabled }
 }
 
 async function readOperationJson(req: IncomingMessage, signal: AbortSignal): Promise<unknown> {
@@ -508,58 +450,11 @@ export interface MarketInstallServiceProvider {
 }
 
 export interface MarketDesktopActions {
-  openTerminal(): void
-  requestRestart(): Promise<void>
+  openTerminal?(): void
 }
 
 export interface MarketDesktopActionsProvider {
   get(): MarketDesktopActions | undefined
-}
-
-export interface MarketDesktopPluginBundle {
-  readonly bundleId: string
-  readonly packageName: string
-  readonly status: 'active' | 'disabled'
-  readonly mutable: boolean
-  readonly uninstallable: boolean
-}
-
-export interface MarketDesktopPlugins {
-  list(): readonly MarketDesktopPluginBundle[]
-}
-
-export interface MarketDesktopPluginsProvider {
-  get(): MarketDesktopPlugins | undefined
-}
-
-function validDesktopBundle(value: unknown): value is MarketDesktopPluginBundle {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
-  const bundle = value as Record<string, unknown>
-  return exactKeys(bundle, ['bundleId', 'packageName', 'status', 'mutable', 'uninstallable'])
-    && boundedIdentifier(bundle.bundleId)
-    && boundedIdentifier(bundle.packageName)
-    && (bundle.status === 'active' || bundle.status === 'disabled')
-    && typeof bundle.mutable === 'boolean'
-    && typeof bundle.uninstallable === 'boolean'
-}
-
-function reconcileInstallations(
-  value: readonly MarketDesktopPluginBundle[],
-): readonly MarketInstallationView[] {
-  if (!Array.isArray(value) || value.length > 4_096 || !value.every(validDesktopBundle)) {
-    throw new MarketInstallError('operation-failed', 'The desktop plugin inventory was invalid.')
-  }
-  const ids = new Set(value.map(bundle => bundle.bundleId))
-  if (ids.size !== value.length) {
-    throw new MarketInstallError('operation-failed', 'The desktop plugin inventory was invalid.')
-  }
-  return value.map(bundle => ({
-    kind: 'profile',
-    status: bundle.status,
-    action: bundle.uninstallable ? 'uninstall' : 'none',
-    bundleId: bundle.bundleId,
-    packageName: bundle.packageName,
-  }))
 }
 
 function viewBuiltIns(): readonly MarketBuiltInProvider[] {
@@ -582,7 +477,7 @@ export async function readStandardSourceManifest(
 }
 
 async function mutateSources(
-  scope: MarketSettingsScope,
+  state: MarketStateStore,
   mutation: MarketSourceMutation,
   signal: AbortSignal,
   onUnavailable?: (sourceRecordId: string) => void,
@@ -592,15 +487,11 @@ async function mutateSources(
   ) => Promise<CatalogSourceManifest> = readStandardSourceManifest,
 ): Promise<void> {
   signal.throwIfAborted()
-  const store = new SettingsCatalogSourceStore(scope)
+  const store = new PersistentCatalogSourceStore(state)
   const records = [...await store.load()]
   const unavailableSourceRecordIds = new Set<string>()
   const nextOrder = records.reduce((maximum, record) => Math.max(maximum, record.order), -1) + 1
-  const builtInKey = mutation.action === 'add-builtin'
-    ? mutation.key
-    : mutation.action === 'add-standard' && isDshMarketplaceSourceUrl(mutation.manifestUrl)
-      ? DSH_MARKETPLACE_KEY
-      : undefined
+  const builtInKey = mutation.action === 'add-builtin' ? mutation.key : undefined
   if (builtInKey !== undefined) {
     const provider = BUILT_IN_PROVIDERS.find(candidate => candidate.key === builtInKey)
     if (provider === undefined) throw new Error('built-in source unavailable')
@@ -665,7 +556,7 @@ async function mutateSources(
 }
 
 export function createMarketSourceMutator(
-  scope: MarketSettingsScope,
+  state: MarketStateStore,
   onUnavailable?: (sourceRecordId: string) => void,
   readManifest?: (manifestUrl: string, signal: AbortSignal) => Promise<CatalogSourceManifest>,
 ): (
@@ -676,7 +567,7 @@ export function createMarketSourceMutator(
   return (mutation, signal) => {
     const pending = tail.then(async () => {
       signal.throwIfAborted()
-      await mutateSources(scope, mutation, signal, onUnavailable, readManifest)
+      await mutateSources(state, mutation, signal, onUnavailable, readManifest)
     })
     tail = pending.catch(() => {})
     return pending
@@ -685,22 +576,18 @@ export function createMarketSourceMutator(
 
 export function registerMarketRoutes(
   ctx: Context,
-  scope: MarketSettingsScope,
+  state: MarketStateStore,
   installProvider?: MarketInstallServiceProvider,
   desktopActionsProvider?: MarketDesktopActionsProvider,
-  desktopPluginsProvider?: MarketDesktopPluginsProvider,
 ): () => void {
-  // Read per request: the web server publishes its port only once bound, and a
-  // route may be registered before that happens.
-  const expectedPort = (): number | undefined => ctx.webServer.port
+  const expectedPort = ctx.webServer.port
   const generationController = new AbortController()
-  const store = new SettingsCatalogSourceStore(scope)
+  const store = new PersistentCatalogSourceStore(state)
   const media = createMarketMediaService({
     fetchImage: createRestrictedImageFetcher({
       // These are compiled-in adapter hosts, not names supplied by a remote source.
       syntheticProxyHostnames: [
         DSH_1024STORE_HOSTNAME,
-        DSH_MARKETPLACE_HOSTNAME,
         'github.com',
         'avatars.githubusercontent.com',
       ],
@@ -710,7 +597,6 @@ export function registerMarketRoutes(
     adapterHttpClients: new Map([
       [DSH_1024STORE_ADAPTER_ID, dsh1024StoreHttpClient],
       [DSH_1024STORE_LEGACY_ADAPTER_ID, dsh1024StoreHttpClient],
-      [DSH_MARKETPLACE_ADAPTER_ID, dshMarketplaceHttpClient],
       [DSHFIND_ADAPTER_ID, dshfindHttpClient],
     ]),
     media,
@@ -718,7 +604,7 @@ export function registerMarketRoutes(
   })
   const servedCatalogPreviews = new Set<string>()
   const catalogPreviewKey = (sourceRecordId: string, locale: string) => `${sourceRecordId}\0${locale}`
-  const mutateSource = createMarketSourceMutator(scope, sourceRecordId => {
+  const mutateSource = createMarketSourceMutator(state, sourceRecordId => {
     service.invalidateSource(sourceRecordId)
     for (const key of servedCatalogPreviews) {
       if (key.startsWith(`${sourceRecordId}\0`)) servedCatalogPreviews.delete(key)
@@ -753,13 +639,21 @@ export function registerMarketRoutes(
     locale: string,
   ): Promise<void> => {
     const cache = catalogCacheFromResponse(response, sourceRecordId, locale)
-    if (cache !== undefined) await scope.update({ catalogCache: cache })
+    if (cache === undefined) return
+    try {
+      await state.setCatalogCache(cache)
+    } catch (cause) {
+      // Catalog browsing already succeeded; a failed cache write must not
+      // escalate into an unhandled rejection that terminates the host.
+      ctx.logger.error(`dsh-community-market: failed to persist the catalog cache: ${
+        cause instanceof Error ? cause.message : String(cause)
+      }`)
+    }
   }
-  const settingsScope = scope
   const routes = [
     ctx.webServer.register({ kind: 'exact', path: ROUTE_STATE, handler: async (_req, res) => {
       if (generationController.signal.aborted) return
-      if (!requestAllowed(_req, expectedPort())) {
+      if (!requestAllowed(_req, expectedPort)) {
         sendJson(res, 403, { error: 'market request authority rejected' })
         return
       }
@@ -769,9 +663,7 @@ export function registerMarketRoutes(
           sources: await service.listSources(),
           builtIns: viewBuiltIns(),
           desktopActions: {
-            openTerminal: desktopActions !== undefined,
-            requestRestart: desktopActions !== undefined
-              && installProvider?.get() !== undefined,
+            openTerminal: typeof desktopActions?.openTerminal === 'function',
           },
         }
         if (!generationController.signal.aborted && !res.destroyed) sendJson(res, 200, response)
@@ -780,7 +672,7 @@ export function registerMarketRoutes(
       }
     }}),
     ctx.webServer.register({ kind: 'exact', path: ROUTE_CATALOG, handler: async (req, res) => {
-      if (!requestAllowed(req, expectedPort())) {
+      if (!requestAllowed(req, expectedPort)) {
         sendJson(res, 403, { error: 'market request authority rejected' })
         return
       }
@@ -827,7 +719,6 @@ export function registerMarketRoutes(
           throw new Error('catalog source is not active')
         }
         const providerQuery = activeSource?.adapterId === DSHFIND_ADAPTER_ID
-          || (activeSource?.adapterId === DSH_MARKETPLACE_ADAPTER_ID && categories.length <= 1)
           || isDsh1024StoreAdapterId(activeSource?.adapterId)
         if (providerQuery) {
           let results: readonly MarketCatalogSourceResult[]
@@ -875,7 +766,7 @@ export function registerMarketRoutes(
         if (!force && previewKey !== undefined && !servedCatalogPreviews.has(previewKey)) {
           const cached = activeSource === undefined
             ? undefined
-            : cachedCatalogResponse(settingsScope.get().catalogCache, activeSource, localeKey)
+            : cachedCatalogResponse(state.getCatalogCache(), activeSource, localeKey)
           if (cached !== undefined) {
             servedCatalogPreviews.add(previewKey)
             if (!signal.aborted && !res.destroyed) sendJson(res, 200, cached)
@@ -909,7 +800,7 @@ export function registerMarketRoutes(
       }
     }}),
     ctx.webServer.register({ kind: 'exact', path: ROUTE_ASSETS, handler: async (req, res) => {
-      if (!requestAllowed(req, expectedPort())) {
+      if (!requestAllowed(req, expectedPort)) {
         sendJson(res, 403, { error: 'market request authority rejected' })
         return
       }
@@ -958,7 +849,7 @@ export function registerMarketRoutes(
       }
     }}),
     ctx.webServer.register({ kind: 'exact', path: ROUTE_SOURCES, handler: async (req, res) => {
-      if (req.method !== 'POST' || !mutationAllowed(req, expectedPort())) {
+      if (req.method !== 'POST' || !mutationAllowed(req, expectedPort)) {
         sendJson(res, 405, { error: 'source changes require a local same-origin POST' })
         return
       }
@@ -981,12 +872,12 @@ export function registerMarketRoutes(
   if (desktopActionsProvider !== undefined) {
     routes.push(
       ctx.webServer.register({ kind: 'exact', path: ROUTE_OPEN_TERMINAL, handler: async (req, res) => {
-        if (req.method !== 'POST' || !mutationAllowed(req, expectedPort())) {
+        if (req.method !== 'POST' || !mutationAllowed(req, expectedPort)) {
           sendJson(res, 405, { error: 'opening DSH Terminal requires a local same-origin POST' })
           return
         }
         const actions = desktopActionsProvider.get()
-        if (actions === undefined) {
+        if (actions?.openTerminal === undefined) {
           sendJson(res, 503, { error: 'desktop actions are unavailable' })
           return
         }
@@ -1009,7 +900,7 @@ export function registerMarketRoutes(
   if (installProvider !== undefined) {
     routes.push(
       ctx.webServer.register({ kind: 'exact', path: ROUTE_INSTALLABLE, handler: async (req, res) => {
-        if (req.method !== 'GET' || !requestAllowed(req, expectedPort())) {
+        if (req.method !== 'GET' || !requestAllowed(req, expectedPort)) {
           sendJson(res, 405, { error: 'market installable catalog requires a local GET' })
           return
         }
@@ -1058,7 +949,6 @@ export function registerMarketRoutes(
             ...(cursors[0] === undefined ? {} : { cursor: cursors[0] }),
           }
           const providerQuery = activeSource.adapterId === DSHFIND_ADAPTER_ID
-            || (activeSource.adapterId === DSH_MARKETPLACE_ADAPTER_ID && categories.length <= 1)
             || isDsh1024StoreAdapterId(activeSource.adapterId)
           let results: readonly MarketCatalogSourceResult[]
           let metadata: MarketCatalogMetadata | undefined
@@ -1093,24 +983,29 @@ export function registerMarketRoutes(
         }
       }}),
       ctx.webServer.register({ kind: 'exact', path: ROUTE_INSTALLATIONS, handler: async (req, res) => {
-        if (req.method !== 'GET' || !requestAllowed(req, expectedPort())) {
+        if (req.method !== 'GET' || !requestAllowed(req, expectedPort)) {
           sendJson(res, 405, { error: 'market installations require a local GET' })
           return
         }
-        const desktopPlugins = desktopPluginsProvider?.get()
-        if (desktopPlugins === undefined) {
+        const install = installProvider.get()
+        if (install === undefined) {
           sendJson(res, 503, { error: 'market package operations are unavailable' })
           return
         }
+        const controller = new AbortController()
+        const signal = AbortSignal.any([controller.signal, generationController.signal])
+        const stopWatching = abortOnDisconnect(req, res, controller)
         try {
-          const installations = reconcileInstallations(desktopPlugins.list())
-          if (!generationController.signal.aborted && !res.destroyed) sendJson(res, 200, { installations })
+          const installations = await install.listInstallations(signal)
+          if (!signal.aborted && !res.destroyed) sendJson(res, 200, { installations })
         } catch (cause) {
-          if (!generationController.signal.aborted && !res.destroyed) sendInstallError(res, cause)
+          if (!signal.aborted && !res.destroyed) sendInstallError(res, cause)
+        } finally {
+          stopWatching()
         }
       }}),
       ctx.webServer.register({ kind: 'exact', path: ROUTE_OPERATION_PREVIEW, handler: async (req, res) => {
-        if (req.method !== 'POST' || !mutationAllowed(req, expectedPort())) {
+        if (req.method !== 'POST' || !mutationAllowed(req, expectedPort)) {
           sendJson(res, 405, { error: 'market package previews require a local same-origin POST' })
           return
         }
@@ -1123,17 +1018,9 @@ export function registerMarketRoutes(
           if (install === undefined) {
             throw new MarketInstallError('not-available', 'Market package operations are unavailable.')
           }
-          let preview
-          if (request.action === 'install') {
-            preview = await install.previewInstall(request.sourceRecordId, request.itemId, signal)
-          } else {
-            const desktopPlugins = desktopPluginsProvider?.get()
-            const target = desktopPlugins?.list().find(bundle => bundle.bundleId === request.bundleId)
-            if (target === undefined || !target.uninstallable) {
-              throw new MarketInstallError('not-available', 'The selected Profile plugin can no longer be uninstalled.')
-            }
-            preview = await install.previewUninstallPackage(target.packageName, signal)
-          }
+          const preview = request.action === 'install'
+            ? await install.previewInstall(request.sourceRecordId, request.itemId, signal)
+            : await install.previewUninstallPackage(request.packageName, signal)
           const { intent, ...summary } = preview
           if (!signal.aborted && !res.destroyed) sendJson(res, 200, { ...summary, previewId: intent })
         } catch (cause) {
@@ -1143,7 +1030,7 @@ export function registerMarketRoutes(
         }
       }}),
       ctx.webServer.register({ kind: 'exact', path: ROUTE_OPERATION_EXECUTE, handler: async (req, res) => {
-        if (req.method !== 'POST' || !mutationAllowed(req, expectedPort())) {
+        if (req.method !== 'POST' || !mutationAllowed(req, expectedPort)) {
           sendJson(res, 405, { error: 'market package execution requires a local same-origin POST' })
           return
         }
@@ -1166,47 +1053,30 @@ export function registerMarketRoutes(
           stopWatching()
         }
       }}),
-    )
-  }
-  if (desktopActionsProvider !== undefined) {
-    routes.push(ctx.webServer.register({ kind: 'exact', path: ROUTE_REQUEST_RESTART, handler: async (req, res) => {
-      if (req.method !== 'POST' || !mutationAllowed(req, expectedPort())) {
-        sendJson(res, 405, { error: 'requesting a restart requires a local same-origin POST' })
-        return
-      }
-      const actions = desktopActionsProvider.get()
-      if (actions === undefined) {
-        sendJson(res, 503, { error: 'desktop restart is unavailable' })
-        return
-      }
-      const controller = new AbortController()
-      const signal = AbortSignal.any([controller.signal, generationController.signal])
-      const stopWatching = abortOnDisconnect(req, res, controller)
-      try {
-        const restartToken = asRestartToken(await readOperationJson(req, signal))
-        signal.throwIfAborted()
-        const install = installProvider?.get()
-        if (install === undefined) {
-          throw new MarketInstallError('intent-expired', 'The restart confirmation expired or was already used.')
+      ctx.webServer.register({ kind: 'exact', path: ROUTE_INSTALLATION_ENABLED, handler: async (req, res) => {
+        if (req.method !== 'POST' || !mutationAllowed(req, expectedPort)) {
+          sendJson(res, 405, { error: 'market plugin toggles require a local same-origin POST' })
+          return
         }
-        install.consumeRestartToken(restartToken)
-        // Once the Host consumes the one-shot grant it owns the restart. A
-        // renderer disconnect may drop the acknowledgement, but must not burn
-        // the token without performing the accepted action.
-        if (!res.destroyed) sendJson(res, 200, { ok: true })
+        const controller = new AbortController()
+        const signal = AbortSignal.any([controller.signal, generationController.signal])
+        const stopWatching = abortOnDisconnect(req, res, controller)
         try {
-          void actions.requestRestart().catch(() => {
-            ctx.logger.error('dsh-community-market: desktop restart request failed')
-          })
-        } catch {
-          ctx.logger.error('dsh-community-market: desktop restart request failed')
+          const request = asInstallationToggle(await readOperationJson(req, signal))
+          const install = installProvider.get()
+          if (install === undefined) {
+            throw new MarketInstallError('not-available', 'Market package operations are unavailable.')
+          }
+          // The selection write is Host-owned once accepted, like every package mutation.
+          const result = await install.setEnabled(request.packageName, request.enabled, generationController.signal)
+          if (!signal.aborted && !res.destroyed) sendJson(res, 200, result)
+        } catch (cause) {
+          if (!signal.aborted && !res.destroyed) sendInstallError(res, cause)
+        } finally {
+          stopWatching()
         }
-      } catch (cause) {
-        if (!signal.aborted && !res.destroyed) sendInstallError(res, cause)
-      } finally {
-        stopWatching()
-      }
-    }}))
+      }}),
+    )
   }
   let disposed = false
   return () => {
@@ -1218,38 +1088,6 @@ export function registerMarketRoutes(
   }
 }
 
-interface MarketSettingsService {
-  describe(): Array<{ ns: unknown; value: unknown }>
-  update(ns: string, patch: object): Promise<void> | unknown
-  replace(ns: string, section: object): Promise<void> | unknown
-}
-
-export function registerMarketSettings(ctx: Context, settings?: MarketSettingsService): MarketSettingsScope {
-  // The settings service is absent on hosts without a profile context (e.g. the
-  // Electron desktop shell); fall back to schema defaults rather than blocking.
-  const service = settings
-    ?? (typeof ctx.get === 'function' ? ctx.get('settings') as MarketSettingsService | undefined : undefined)
-    ?? undefined
-  return {
-    get: () => {
-      const descriptor = service === undefined
-        ? undefined
-        : service.describe().find(entry => String(entry.ns) === MARKET_SETTINGS_NAMESPACE)
-      // A profile entry publishes its form only once active; before that the
-      // schema defaults are the value the service would resolve anyway.
-      return descriptor === undefined
-        ? settingsDefaults()
-        : descriptor.value as MarketSettingsDocument
-    },
-    update: async patch => {
-      await service?.update(MARKET_SETTINGS_NAMESPACE, patch)
-    },
-    replace: async section => {
-      await service?.replace(MARKET_SETTINGS_NAMESPACE, section)
-    },
-  }
-}
-
 export const marketRoutes = {
   state: ROUTE_STATE,
   sources: ROUTE_SOURCES,
@@ -1257,8 +1095,8 @@ export const marketRoutes = {
   installable: ROUTE_INSTALLABLE,
   assets: ROUTE_ASSETS,
   installations: ROUTE_INSTALLATIONS,
+  installationEnabled: ROUTE_INSTALLATION_ENABLED,
   openTerminal: ROUTE_OPEN_TERMINAL,
-  requestRestart: ROUTE_REQUEST_RESTART,
   operationPreview: ROUTE_OPERATION_PREVIEW,
   operationExecute: ROUTE_OPERATION_EXECUTE,
 }

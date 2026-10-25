@@ -1,4 +1,5 @@
 import {
+  chmodSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -16,13 +17,11 @@ import {
   formatUnpackedRuntimeSummary,
   FORBIDDEN_UNPACKED_RUNTIME_ENTRIES,
   indexPackagedAsarHeader,
-  isPresetSeedStaged,
   listDesktopRuntimeEntries,
   MAX_PNPM_SMART_UNPACK_BYTES,
   MAX_PNPM_SMART_UNPACK_FILES,
   MAX_UNPACKED_RUNTIME_BYTES,
   MAX_UNPACKED_RUNTIME_FILES,
-  PRESET_SEED_NOT_STAGED_NOTICE,
   REQUIRED_AGENT_PRESET_RUNTIME_ENTRIES,
   REQUIRED_DSH_CLI_RUNTIME_ENTRIES,
   REQUIRED_PACKAGED_RUNTIME_ENTRIES,
@@ -30,18 +29,17 @@ import {
   REQUIRED_MACOS_UNIVERSAL_ENTRIES,
   REQUIRED_NON_MACOS_UNPACKED_RUNTIME_ENTRIES,
   REQUIRED_POSIX_FS_EXT_ENTRIES,
-  REQUIRED_PRESET_RUNTIME_ENTRIES,
   REQUIRED_UNPACKED_RUNTIME_ENTRIES,
   REQUIRED_WINDOWS_X64_NODE_PTY_ENTRIES,
+  resolvePackagedApplicationRoot,
   resolvePackagedAsarPath,
   resolvePackagedExecutablePath,
   resolvePackagedUnpackedRoot,
   resolveRuntimePackageRoot,
   smokePackagedElectronRuntime,
-  STAGED_PRESET_SEED_MANIFEST,
   summarizeUnpackedRuntime,
-  UNPACKED_PRESET_PREFIX,
   verifyPackagedRuntime,
+  verifyPackagedAgentsAnywhere,
   verifySelectiveUnpackedRuntime,
   type ArchiveHeaderReader,
   type FileProbe,
@@ -131,42 +129,9 @@ function asarIndex(
   }
 }
 
-/** Physical leaves of the staged OmniMux preset seed, shipped unpacked beside app.asar. */
-const PRESET_SEED_FILES: readonly UnpackedRuntimeFile[] = REQUIRED_PRESET_RUNTIME_ENTRIES.map(
-  path => ({ path, bytes: 1 }),
-)
-
-/**
- * Append the staged preset seed that Electron Builder's `asarUnpack` places in
- * every real `app.asar.unpacked` tree, so synthetic fixtures model the package
- * rather than an archive-only runtime.
- */
-function withPresetSeed(files: readonly UnpackedRuntimeFile[]): UnpackedRuntimeFile[] {
-  return [...files, ...PRESET_SEED_FILES]
-}
-
-/** Archive index whose unpacked leaves mirror one preset-seeded physical fixture. */
-function fixtureIndex(files: readonly UnpackedRuntimeFile[]): PackagedAsarIndex {
-  return asarIndex(withPresetSeed(files).map(file => file.path))
-}
-
-/** Raw ASAR header subtree for the unpacked preset seed directory. */
-function presetSeedLeaves(): TestAsarHeaderEntry {
-  return {
-    unpacked: true,
-    files: {
-      'owned-packages.json': { size: 1 },
-      'distribution.json': { size: 1 },
-      'seed-version': { size: 1 },
-      plugins: { files: { omnimux: { files: { 'package.json': { size: 1 } } } } },
-    },
-  }
-}
-
 function completeArchiveEntries(): string[] {
   return [...new Set([
     ...REQUIRED_PACKAGED_RUNTIME_ENTRIES,
-    ...REQUIRED_PRESET_RUNTIME_ENTRIES,
     ...DESKTOP_RUNTIME_ENTRIES,
     ...REQUIRED_UNPACKED_RUNTIME_ENTRIES,
     ...REQUIRED_WINDOWS_X64_NODE_PTY_ENTRIES,
@@ -206,11 +171,8 @@ function physicalFixture(
   options: { missing?: string; extra?: readonly string[] } = {},
 ): { exists: FileProbe; files: UnpackedRuntimeFile[]; paths: string[] } {
   const unpackedRoot = resolvePackagedUnpackedRoot(runtimeContext)
-  const paths = [
-    ...requiredPhysicalEntries(runtimeContext),
-    ...REQUIRED_PRESET_RUNTIME_ENTRIES,
-    ...(options.extra ?? []),
-  ].filter(entry => entry !== options.missing)
+  const paths = [...requiredPhysicalEntries(runtimeContext), ...(options.extra ?? [])]
+    .filter(entry => entry !== options.missing)
   return {
     files: paths.map(path => ({ path, bytes: 1 })),
     exists: filename => paths.includes(relative(unpackedRoot, filename).replaceAll('\\', '/')),
@@ -252,100 +214,14 @@ describe('packaged desktop runtime verification', () => {
     expect(DESKTOP_RUNTIME_ENTRIES).toContain('lib/native-ui/setup-wizard.html')
   })
 
-  it('keeps the shipped agent-preset packages integrity-protected in app.asar', () => {
+  it('keeps the shipped PTC preset present and integrity-protected in app.asar', () => {
     expect(REQUIRED_AGENT_PRESET_RUNTIME_ENTRIES).toEqual([
-      'node_modules/@deepseek-ai/dsh-agent-preset/package.json',
-      'node_modules/@deepseek-ai/dsh-agent-preset-registry/package.json',
+      'node_modules/@deepseek-ai/dsh-web-app/presets/ptc.patch.yml',
     ])
     for (const entry of REQUIRED_AGENT_PRESET_RUNTIME_ENTRIES) {
       expect(REQUIRED_PACKAGED_RUNTIME_ENTRIES).toContain(entry)
       expect(FORBIDDEN_UNPACKED_RUNTIME_ENTRIES).toContain(entry)
     }
-  })
-
-  it('ships the staged OmniMux preset seed unpacked beside app.asar', () => {
-    expect(REQUIRED_PRESET_RUNTIME_ENTRIES).toEqual([
-      'preset/owned-packages.json',
-      'preset/distribution.json',
-      'preset/seed-version',
-      'preset/plugins/omnimux/package.json',
-    ])
-    for (const entry of REQUIRED_PRESET_RUNTIME_ENTRIES) {
-      // `asarUnpack: preset/**` emits the seed beside the archive, so it is
-      // deliberately absent from the archive-entry contract...
-      expect(REQUIRED_PACKAGED_RUNTIME_ENTRIES).not.toContain(entry)
-      // ...and it is a reviewed physical unpack rather than a mirror of an
-      // archived module.
-      expect(FORBIDDEN_UNPACKED_RUNTIME_ENTRIES).not.toContain(entry)
-    }
-
-    const seed = REQUIRED_PRESET_RUNTIME_ENTRIES.map(path => ({ path, bytes: 1 }))
-    expect(() => verifySelectiveUnpackedRuntime(
-      asarIndex(seed.map(file => file.path)),
-      '/build/resources/app.asar.unpacked',
-      seed,
-    )).not.toThrow()
-
-    const [dropped, ...retained] = REQUIRED_PRESET_RUNTIME_ENTRIES
-    const partial = retained.map(path => ({ path, bytes: 1 }))
-    expect(() => verifySelectiveUnpackedRuntime(
-      asarIndex(partial.map(file => file.path)),
-      '/build/resources/app.asar.unpacked',
-      partial,
-    )).toThrow(`missing required OmniMux preset seed entries: ${dropped}`)
-  })
-
-  it('requires the preset seed only while the desktop package staged one', () => {
-    const unpackedRoot = '/build/resources/app.asar.unpacked'
-    const staged = [...PRESET_SEED_FILES, { path: 'build/app-icon.png', bytes: 1 }]
-    const unStaged = [{ path: 'build/app-icon.png', bytes: 1 }]
-    const stagedIndex = asarIndex(staged.map(file => file.path))
-    const unStagedIndex = asarIndex(unStaged.map(file => file.path))
-
-    // A staged seed is verified for strict and lenient callers alike.
-    for (const requirePreset of [true, false]) {
-      expect(() => verifySelectiveUnpackedRuntime(
-        stagedIndex,
-        unpackedRoot,
-        staged,
-        undefined,
-        requirePreset,
-      )).not.toThrow()
-    }
-
-    // An un-staged seed fails loud for every direct caller, which defaults strict.
-    expect(() => verifySelectiveUnpackedRuntime(unStagedIndex, unpackedRoot, unStaged))
-      .toThrow(`missing required OmniMux preset seed entries: ${REQUIRED_PRESET_RUNTIME_ENTRIES[0]}`)
-    expect(() => verifySelectiveUnpackedRuntime(unStagedIndex, unpackedRoot, unStaged, undefined, true))
-      .toThrow('missing required OmniMux preset seed entries')
-
-    // The un-staged caller opts out and discloses the skipped check on one line.
-    const notice = vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
-    try {
-      expect(() => verifySelectiveUnpackedRuntime(
-        unStagedIndex,
-        unpackedRoot,
-        unStaged,
-        undefined,
-        false,
-      )).not.toThrow()
-      expect(notice).toHaveBeenCalledTimes(1)
-      const line = String(notice.mock.calls[0]?.[0] ?? '')
-      expect(line).toBe(`${PRESET_SEED_NOT_STAGED_NOTICE}\n`)
-      expect(line.trimEnd()).not.toContain('\n')
-    } finally {
-      notice.mockRestore()
-    }
-  })
-
-  it('probes the staged preset seed inside the desktop package root', () => {
-    // Membership, not position: the probe path must be one of the required
-    // entries, and the list is expected to grow.
-    expect(REQUIRED_PRESET_RUNTIME_ENTRIES).toContain(STAGED_PRESET_SEED_MANIFEST)
-    const present = vi.fn(() => true)
-    expect(isPresetSeedStaged(present, '/desktop')).toBe(true)
-    expect(present).toHaveBeenCalledWith(join('/desktop', STAGED_PRESET_SEED_MANIFEST))
-    expect(isPresetSeedStaged(() => false, '/desktop')).toBe(false)
   })
 
   it('recursively derives every non-map desktop runtime file from the completed build', () => {
@@ -401,9 +277,48 @@ describe('packaged desktop runtime verification', () => {
         expect(received).toBe(summary)
         calls.push('report')
       },
+      () => { calls.push('aa') },
+      () => { calls.push('runtime'); return [] },
     )
 
-    expect(calls).toEqual(['static', 'report'])
+    expect(calls).toEqual(['static', 'aa', 'runtime', 'report'])
+  })
+
+  it.skipIf(process.platform === 'win32')('rejects a 0644 packaged uv before signing', () => {
+    const root = mkdtempSync(join(tmpdir(), 'dsh-packaged-uv-'))
+    try {
+      const base = context(root, 'darwin', 4)
+      const target: PackagedRuntimeContext = {
+        ...base, packager: { ...base.packager, platformSpecificBuildOptions: { asar: false } },
+      }
+      const files = ['arm64', 'x64'].map(arch => join(
+        resolvePackagedApplicationRoot(target), 'node_modules', '@dataiku', `uv-darwin-${arch}`, 'bin', 'uv',
+      ))
+      for (const path of files) {
+        mkdirSync(join(path, '..'), { recursive: true })
+        writeFileSync(path, 'uv fixture')
+        chmodSync(path, 0o644)
+      }
+      const read = (path: string): Buffer => Buffer.from(path.endsWith('package.json') ? '{"version":"1.0.0"}' : 'same AA')
+      expect(() => verifyPackagedAgentsAnywhere(target, read, read)).toThrow()
+      for (const path of files) chmodSync(path, 0o755)
+      expect(() => verifyPackagedAgentsAnywhere(target, read, read)).not.toThrow()
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects a stale AA version or entry copied into the installation payload', () => {
+    const installed = (path: string): Buffer => path.endsWith('package.json')
+      ? Buffer.from(JSON.stringify({ version: '0.1.0-dev.desktop.c123' }))
+      : Buffer.from('prepared AA entry')
+    expect(() => verifyPackagedAgentsAnywhere(context('/build', 'win32'), installed, installed)).not.toThrow()
+    expect(() => verifyPackagedAgentsAnywhere(context('/build', 'win32'), installed, path =>
+      path.endsWith('package.json') ? Buffer.from('{"version":"0.1.0-old"}') : installed(path),
+    )).toThrow('Packaged AA version mismatch')
+    expect(() => verifyPackagedAgentsAnywhere(context('/build', 'win32'), installed, path =>
+      path.endsWith('lib/index.js') ? Buffer.from('stale AA entry') : installed(path),
+    )).toThrow('Packaged AA entry differs')
   })
 
   it('tracks ripgrep and the ConPTY native surface required on Windows', () => {
@@ -441,6 +356,26 @@ describe('packaged desktop runtime verification', () => {
     expect(resolvePackagedExecutablePath(runtimeContext)).toBe(expectedExecutable)
     expect(readHeader).toHaveBeenCalledWith(expectedPath)
     expect(listUnpacked).toHaveBeenCalledWith(`${expectedPath}.unpacked`)
+  })
+
+  it.each(['win32', 'darwin', 'linux'] as const)('verifies a plain %s app and refuses an accidental ASAR entry', platform => {
+    const base = context('/build', platform, 1)
+    const runtimeContext: PackagedRuntimeContext = {
+      ...base, packager: { ...base.packager, platformSpecificBuildOptions: { asar: false } },
+    }
+    const appRoot = resolvePackagedApplicationRoot(runtimeContext)
+    const paths = [...new Set([
+      ...REQUIRED_PACKAGED_RUNTIME_ENTRIES, ...DESKTOP_RUNTIME_ENTRIES,
+      ...requiredPhysicalEntries(runtimeContext),
+    ])]
+    const files = paths.map(path => ({ path, bytes: 1 }))
+    const readHeader = vi.fn<ArchiveHeaderReader>(headerReader([]))
+    const exists = (filename: string) => paths.includes(relative(appRoot, filename).replaceAll('\\', '/'))
+    expect(() => verifyPackagedRuntime(runtimeContext, readHeader, exists, () => files)).not.toThrow()
+    expect(readHeader).not.toHaveBeenCalled()
+    expect(() => verifyPackagedRuntime(runtimeContext, readHeader,
+      filename => filename === resolvePackagedAsarPath(runtimeContext) || exists(filename),
+      () => files)).toThrow('unexpectedly contains app.asar')
   })
 
   it('uses LinuxPackager executableName instead of appInfo.productFilename', () => {
@@ -491,43 +426,41 @@ describe('packaged desktop runtime verification', () => {
   it('rejects unpacked files absent from the ASAR header', () => {
     const unpackedRoot = join('/build', 'resources', 'app.asar.unpacked')
     const unexpected = 'node_modules/unexpected/index.js'
-    const archived = [...REQUIRED_PRESET_RUNTIME_ENTRIES, 'build/app-icon.png']
 
     expect(() => verifySelectiveUnpackedRuntime(
-      asarIndex(archived, archived),
+      asarIndex(['build/app-icon.png'], ['build/app-icon.png']),
       unpackedRoot,
-      withPresetSeed([
+      [
         { path: 'build/app-icon.png', bytes: 10 },
         { path: unexpected, bytes: 20 },
-      ]),
+      ],
     )).toThrow(`physical entries absent from the ASAR header: ${unexpected}`)
   })
 
   it('rejects a physical file whose ASAR header leaf is not marked unpacked', () => {
     const path = 'node_modules/node-pty/prebuilds/darwin-arm64/pty.node'
     expect(() => verifySelectiveUnpackedRuntime(
-      asarIndex([...REQUIRED_PRESET_RUNTIME_ENTRIES, path], REQUIRED_PRESET_RUNTIME_ENTRIES),
+      asarIndex([path], []),
       '/build/resources/app.asar.unpacked',
-      withPresetSeed([{ path, bytes: 10 }]),
+      [{ path, bytes: 10 }],
     )).toThrow(`physical entries not marked unpacked in the ASAR header: ${path}`)
   })
 
   it('rejects an ASAR unpacked leaf missing from the physical tree', () => {
     const path = 'node_modules/node-pty/prebuilds/darwin-arm64/pty.node'
     expect(() => verifySelectiveUnpackedRuntime(
-      fixtureIndex([{ path, bytes: 10 }]),
+      asarIndex([path]),
       '/build/resources/app.asar.unpacked',
-      PRESET_SEED_FILES,
+      [],
     )).toThrow(`ASAR header entries missing from the physical tree: ${path}`)
   })
 
   it('rejects duplicate normalized physical paths', () => {
     const path = 'node_modules/node-pty/prebuilds/darwin-arm64/pty.node'
     expect(() => verifySelectiveUnpackedRuntime(
-      fixtureIndex([{ path, bytes: 10 }]),
+      asarIndex([path]),
       '/build/resources/app.asar.unpacked',
       [
-        ...PRESET_SEED_FILES,
         { path, bytes: 10 },
         { path: `/${path.replaceAll('/', '\\')}`, bytes: 10 },
       ],
@@ -551,7 +484,6 @@ describe('packaged desktop runtime verification', () => {
     const link = 'node_modules/node-pty/current.node'
     const archive = indexPackagedAsarHeader({
       files: {
-        preset: presetSeedLeaves(),
         node_modules: {
           files: {
             'node-pty': {
@@ -566,11 +498,11 @@ describe('packaged desktop runtime verification', () => {
       },
     })
 
-    expect(archive.unpackedFiles).toEqual(new Set([binding, link, ...REQUIRED_PRESET_RUNTIME_ENTRIES]))
+    expect(archive.unpackedFiles).toEqual(new Set([binding, link]))
     expect(() => verifySelectiveUnpackedRuntime(
       archive,
       '/build/resources/app.asar.unpacked',
-      [...PRESET_SEED_FILES, { path: binding, bytes: 10 }, { path: link, bytes: 12 }],
+      [{ path: binding, bytes: 10 }, { path: link, bytes: 12 }],
     )).not.toThrow()
   })
 
@@ -582,9 +514,9 @@ describe('packaged desktop runtime verification', () => {
     'lib/legacy.cjs',
   ])('rejects desktop-owned code/data %s from the physical tree', (path) => {
     expect(() => verifySelectiveUnpackedRuntime(
-      fixtureIndex([{ path, bytes: 10 }]),
+      asarIndex([path]),
       '/build/resources/app.asar.unpacked',
-      withPresetSeed([{ path, bytes: 10 }]),
+      [{ path, bytes: 10 }],
     )).toThrow(`desktop code/data that must stay in app.asar: ${path}`)
   })
 
@@ -593,39 +525,37 @@ describe('packaged desktop runtime verification', () => {
     (forbidden) => {
       const unpackedRoot = join('/build', 'resources', 'app.asar.unpacked')
       expect(() => verifySelectiveUnpackedRuntime(
-        fixtureIndex([{ path: forbidden, bytes: 10 }]),
+        asarIndex([forbidden]),
         unpackedRoot,
-        withPresetSeed([{ path: forbidden, bytes: 10 }]),
+        [{ path: forbidden, bytes: 10 }],
       )).toThrow(`mirrors ordinary archived modules: ${forbidden}`)
     },
   )
 
   it('unpacks AA Python sources while keeping its JavaScript runtime archived', () => {
     const source = 'node_modules/@agents-anywhere/dsh-bridge-next/lib/bundled-connector/connector/cli.py'
-    expect(() => verifySelectiveUnpackedRuntime(fixtureIndex([{ path: source, bytes: 100 }]),
-      '/build/resources/app.asar.unpacked',
-      withPresetSeed([{ path: source, bytes: 100 }]))).not.toThrow()
+    expect(() => verifySelectiveUnpackedRuntime(asarIndex([source]), '/build/resources/app.asar.unpacked',
+      [{ path: source, bytes: 100 }])).not.toThrow()
     const host = 'node_modules/@agents-anywhere/dsh-bridge-next/lib/index.js'
-    expect(() => verifySelectiveUnpackedRuntime(fixtureIndex([{ path: host, bytes: 100 }]),
-      '/build/resources/app.asar.unpacked',
-      withPresetSeed([{ path: host, bytes: 100 }]))).toThrow('non-allowlisted package roots')
+    expect(() => verifySelectiveUnpackedRuntime(asarIndex([host]), '/build/resources/app.asar.unpacked',
+      [{ path: host, bytes: 100 }])).toThrow('non-allowlisted package roots')
   })
 
   it('rejects a new smart-unpacked package until its native root is reviewed', () => {
     const path = 'node_modules/unexpected-native/binding.node'
     expect(() => verifySelectiveUnpackedRuntime(
-      fixtureIndex([{ path, bytes: 10 }]),
+      asarIndex([path]),
       '/build/resources/app.asar.unpacked',
-      withPresetSeed([{ path, bytes: 10 }]),
+      [{ path, bytes: 10 }],
     )).toThrow('non-allowlisted package roots: node_modules/unexpected-native')
   })
 
   it('rejects an unreviewed desktop-owned physical asset', () => {
     const path = 'build/accidental-large-documentation.pdf'
     expect(() => verifySelectiveUnpackedRuntime(
-      fixtureIndex([{ path, bytes: 10 }]),
+      asarIndex([path]),
       '/build/resources/app.asar.unpacked',
-      withPresetSeed([{ path, bytes: 10 }]),
+      [{ path, bytes: 10 }],
     )).toThrow(`non-allowlisted desktop entries: ${path}`)
   })
 
@@ -692,9 +622,9 @@ describe('packaged desktop runtime verification', () => {
       { path: 'node_modules/pnpm/dist/vendor/fastlist-0.3.0-x64.exe', bytes: 20 },
     ]
     expect(() => verifySelectiveUnpackedRuntime(
-      fixtureIndex(files),
+      asarIndex(files.map(file => file.path)),
       '/build/resources/app.asar.unpacked',
-      withPresetSeed(files),
+      files,
     )).not.toThrow()
   })
 
@@ -706,16 +636,16 @@ describe('packaged desktop runtime verification', () => {
       (_, index) => ({ path: `node_modules/pnpm/native-${String(index)}.node`, bytes: 1 }),
     )
     expect(() => verifySelectiveUnpackedRuntime(
-      fixtureIndex(tooManyFiles),
+      asarIndex(tooManyFiles.map(file => file.path)),
       '/build/resources/app.asar.unpacked',
-      withPresetSeed(tooManyFiles),
+      tooManyFiles,
     )).toThrow(`pnpm smart-unpack budget ${expectedBudget}`)
 
     const path = 'node_modules/pnpm/bin/pnpm.mjs'
     expect(() => verifySelectiveUnpackedRuntime(
-      fixtureIndex([{ path, bytes: MAX_PNPM_SMART_UNPACK_BYTES + 1 }]),
+      asarIndex([path]),
       '/build/resources/app.asar.unpacked',
-      withPresetSeed([{ path, bytes: MAX_PNPM_SMART_UNPACK_BYTES + 1 }]),
+      [{ path, bytes: MAX_PNPM_SMART_UNPACK_BYTES + 1 }],
     )).toThrow(`pnpm smart-unpack budget ${expectedBudget}`)
   })
 
@@ -725,49 +655,19 @@ describe('packaged desktop runtime verification', () => {
       (_, index) => ({ path: `node_modules/node-pty/native-${String(index)}.node`, bytes: 1 }),
     )
     expect(() => verifySelectiveUnpackedRuntime(
-      fixtureIndex(files),
+      asarIndex(files.map(file => file.path)),
       '/build/resources/app.asar.unpacked',
-      withPresetSeed(files),
+      files,
     )).toThrow(`exceeds selective ASAR file budget ${String(MAX_UNPACKED_RUNTIME_FILES)}`)
   })
 
   it('caps Electron Builder smartUnpack bytes as well as inode count', () => {
     const path = 'node_modules/node-pty/prebuilds/win32-x64/conpty.node'
     expect(() => verifySelectiveUnpackedRuntime(
-      fixtureIndex([{ path, bytes: MAX_UNPACKED_RUNTIME_BYTES + 1 }]),
+      asarIndex([path]),
       '/build/resources/app.asar.unpacked',
-      withPresetSeed([{ path, bytes: MAX_UNPACKED_RUNTIME_BYTES + 1 }]),
+      [{ path, bytes: MAX_UNPACKED_RUNTIME_BYTES + 1 }],
     )).toThrow(`exceeds selective ASAR byte budget ${String(MAX_UNPACKED_RUNTIME_BYTES)}`)
-  })
-
-  it('budgets the staged preset seed apart from the primary dependency payload', () => {
-    expect(UNPACKED_PRESET_PREFIX).toBe('preset/')
-    const seed = [
-      'preset/owned-packages.json',
-      'preset/distribution.json',
-      'preset/seed-version',
-      'preset/plugins/omnimux/package.json',
-      'preset/plugins/omnimux/lib/index.js',
-    ]
-    expect(() => verifySelectiveUnpackedRuntime(
-      asarIndex(seed),
-      '/build/resources/app.asar.unpacked',
-      seed.map(path => ({ path, bytes: 1 })),
-    )).not.toThrow()
-
-    const oversizedSeed = [
-      ...seed,
-      ...Array.from(
-        { length: MAX_UNPACKED_RUNTIME_FILES },
-        (_, index) => `preset/plugins/omnimux/seed-${String(index)}.js`,
-      ),
-    ]
-    expect(oversizedSeed.length).toBeGreaterThan(MAX_UNPACKED_RUNTIME_FILES)
-    expect(() => verifySelectiveUnpackedRuntime(
-      asarIndex(oversizedSeed),
-      '/build/resources/app.asar.unpacked',
-      oversizedSeed.map(path => ({ path, bytes: 1 })),
-    )).not.toThrow()
   })
 
   it('rejects a host-architecture node-pty build from a universal app', () => {
@@ -930,5 +830,28 @@ describe('packaged desktop runtime verification', () => {
 
     expect(() => smokePackagedElectronRuntime(context('/build', process.platform), run))
       .toThrow('status null; signal=SIGTERM')
+  })
+
+  // `prepare-fs-ext.ts` names its output after the ABI of whichever Electron is
+  // actually installed (`electron.abi${abi}.node`), but the manifests above spell that
+  // number out. Bumping the Electron pin across an ABI boundary therefore makes the two
+  // disagree, and nothing fails until a packaging job goes looking for a file that was
+  // never built — on macOS that surfaced only as "universal macOS runtime is missing 2
+  // native file(s)" at the very end of a 14-minute job. Reading electron's own
+  // `abi_version` here turns that into an immediate, every-platform unit failure.
+  it('pins fs-ext ABI manifests to the ABI of the installed Electron', () => {
+    const abi = readFileSync(
+      fileURLToPath(new URL('../node_modules/electron/abi_version', import.meta.url)),
+      'utf8',
+    ).trim()
+    expect(abi).toMatch(/^\d+$/)
+
+    const manifestPaths = [
+      ...Object.values(REQUIRED_POSIX_FS_EXT_ENTRIES).flatMap(byArch => Object.values(byArch)),
+      ...REQUIRED_MACOS_UNIVERSAL_ENTRIES,
+    ].filter(path => path.includes('/fs-ext/'))
+
+    expect(manifestPaths.length).toBeGreaterThan(0)
+    expect(manifestPaths.filter(path => !path.endsWith(`/electron.abi${abi}.node`))).toEqual([])
   })
 })

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -88,22 +88,85 @@ describe('pre-Host recovery plugin uninstall command', () => {
     })
   })
 
-  // Upstream now refuses to let the CLI manage the desktop profile, so the
-  // pre-Host recovery path cannot remove the dependency through it. The shell
-  // surfaces that refusal instead of silently succeeding. Re-implementing the
-  // removal with the packaged pnpm plus the bundle reconciliation is tracked as
-  // the remaining follow-up for this upgrade.
-  it('surfaces the upstream refusal when the CLI cannot manage the desktop profile', async () => {
+  it('uses packaged pnpm after runtime PATH release and preserves official bundle reconciliation', async () => {
     const base = fixture('')
     const dshBootstrapPath = join(import.meta.dirname, '../lib/desktop-cli.js')
-    let failure: unknown
-    try {
-      await removeRecoveryPlugin({ ...base, dshBootstrapPath })
-    } catch (cause) { failure = cause }
-    expect(failure).toBeInstanceOf(RecoveryPluginUninstallError)
-    expect(formatRecoveryPluginRemoveFailure(failure as RecoveryPluginUninstallError))
-      .toContain('managed exclusively by the Electron application')
+    const systemBin = join(dirname(base.profileDir), 'system-bin')
+    const selectedMarker = join(dirname(base.profileDir), 'selected-pnpm.txt')
+    const packagedScript = join(base.pnpmBinDir, 'packaged-pnpm.cjs')
+    const systemScript = join(systemBin, 'system-pnpm.cjs')
+    const installedPluginDir = join(base.profileDir, 'node_modules', 'third-party-plugin')
+    const lockfilePath = join(base.profileDir, 'pnpm-lock.yaml')
+    const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
+    mkdirSync(systemBin, { recursive: true })
+    writeFileSync(join(base.profileDir, 'package.json'), `${JSON.stringify({
+      name: 'recovery-profile',
+      private: true,
+      dependencies: { 'third-party-plugin': '1.0.0' },
+      dsh: { profile: { bundles: ['dsh-base', 'third-party-plugin'] } },
+    }, null, 2)}\n`)
+    mkdirSync(installedPluginDir, { recursive: true })
+    writeFileSync(join(installedPluginDir, 'package.json'), '{"name":"third-party-plugin","version":"1.0.0"}\n')
+    writeFileSync(lockfilePath, [
+      "lockfileVersion: '9.0'",
+      'importers:',
+      '  .:',
+      '    dependencies:',
+      '      third-party-plugin:',
+      '        specifier: 1.0.0',
+      '        version: 1.0.0',
+      '',
+    ].join('\n'))
+    writeFileSync(packagedScript, [
+      "const { readFileSync, rmSync, writeFileSync } = require('node:fs')",
+      "const { join } = require('node:path')",
+      "const manifestPath = join(process.cwd(), 'package.json')",
+      "const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))",
+      "delete manifest.dependencies[process.argv.at(-1)]",
+      "writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\\n`)",
+      "writeFileSync(join(process.cwd(), 'pnpm-lock.yaml'), `lockfileVersion: '9.0'\\nimporters:\\n  .: {}\\n`)",
+      "rmSync(join(process.cwd(), 'node_modules', process.argv.at(-1)), { recursive: true, force: true })",
+      "writeFileSync(process.env.PNPM_SELECTION_MARKER, 'packaged-11.28.5')",
+      '',
+    ].join('\n'))
+    writeFileSync(systemScript, [
+      "const { writeFileSync } = require('node:fs')",
+      "writeFileSync(process.env.PNPM_SELECTION_MARKER, 'system-pnpm')",
+      'process.exitCode = 91',
+      '',
+    ].join('\n'))
+    const commandShim = (script: string): string => process.platform === 'win32'
+      ? `@"${process.execPath}" "${script}" %*\r\n`
+      : `#!/bin/sh\nexec "${process.execPath}" "${script}" "$@"\n`
+    const packagedCommand = join(base.pnpmBinDir, pnpmCommand)
+    const systemCommand = join(systemBin, pnpmCommand)
+    writeFileSync(packagedCommand, commandShim(packagedScript))
+    writeFileSync(systemCommand, commandShim(systemScript))
+    if (process.platform !== 'win32') {
+      chmodSync(packagedCommand, 0o700)
+      chmodSync(systemCommand, 0o700)
+    }
+
+    await expect(removeRecoveryPlugin({
+      ...base,
+      dshBootstrapPath,
+      environment: {
+        PATH: systemBin,
+        PNPM_SELECTION_MARKER: selectedMarker,
+      },
+    })).resolves.toMatchObject({ exitCode: 0 })
+
+    expect(readFileSync(selectedMarker, 'utf8')).toBe('packaged-11.28.5')
+    const manifest = JSON.parse(readFileSync(join(base.profileDir, 'package.json'), 'utf8')) as {
+      dependencies?: Record<string, unknown>
+      dsh?: { profile?: { bundles?: unknown[] } }
+    }
+    expect(manifest.dependencies).not.toHaveProperty('third-party-plugin')
+    expect(manifest.dsh?.profile?.bundles).toEqual(['dsh-base'])
+    expect(readFileSync(lockfilePath, 'utf8')).not.toContain('third-party-plugin')
+    expect(existsSync(installedPluginDir)).toBe(false)
   })
+
   it('retains bounded command diagnostics when dsh plugin remove fails', async () => {
     const options = fixture(`process.stderr.write('simulated remove failure\\n'); process.exitCode = 7\n`)
     let failure: unknown

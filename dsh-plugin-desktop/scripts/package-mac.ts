@@ -1,14 +1,44 @@
 /** Build an unsigned macOS DMG smoke artifact on a native macOS host. */
 
 import { spawnSync } from 'node:child_process'
-import { rmSync } from 'node:fs'
+import { chmodSync, existsSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { withoutMacReleaseSecrets } from './release-preflight.ts'
-import { prepareInstalledMacUniversalRuntime } from './mac-universal.ts'
+import {
+  MACOS_UNIVERSAL_NATIVE_ENTRIES,
+  macSmokeArchitecture,
+  macSmokeExecutableSlices,
+  prepareMacUniversalRuntime,
+} from './mac-universal.ts'
 import { prepareFsExtForElectron } from './prepare-fs-ext.ts'
 import { electronBuilderEnvironment } from './electron-builder-environment.ts'
+import { prepareDesktopInterpreters, verifyPreparedDesktopRuntime } from './prepare-runtime.ts'
+
+const MAC_COMPRESSION_LEVELS = new Set(['store', 'normal', 'maximum'])
+
+/**
+ * Read an optional electron-builder compression override for unsigned CI
+ * smoke artifacts. DMG zlib compression and blockmap generation dominate the
+ * macOS job while smoke artifacts are never published, so CI may select
+ * `store`; release builds leave the variable unset and keep the package
+ * configuration.
+ * @param environment - Environment of the packaging process.
+ * @returns The override, or `undefined` to keep the package configuration.
+ */
+export function macCompressionOverride(
+  environment: NodeJS.ProcessEnv,
+): string | undefined {
+  const value = environment.DSH_MAC_PACKAGE_COMPRESSION
+  if (value === undefined || value === '') return undefined
+  if (!MAC_COMPRESSION_LEVELS.has(value)) {
+    throw new Error(
+      `DSH_MAC_PACKAGE_COMPRESSION must be store, normal, or maximum; received ${JSON.stringify(value)}`,
+    )
+  }
+  return value
+}
 
 /** Injectable native macOS packaging boundary used by focused tests. */
 export interface MacSmokePackageOptions {
@@ -75,9 +105,23 @@ function defaultOptions(): MacSmokePackageOptions {
     outputDir,
     resetOutput: () => rmSync(outputDir, { recursive: true, force: true }),
     prepareRuntime: () => {
-      prepareFsExtForElectron({ platform: 'darwin', arch: 'arm64', desktopRoot })
-      prepareFsExtForElectron({ platform: 'darwin', arch: 'x64', desktopRoot })
-      prepareInstalledMacUniversalRuntime(desktopRoot)
+      const slices = macSmokeExecutableSlices(macSmokeArchitecture(process.env))
+      for (const slice of slices) {
+        prepareFsExtForElectron({
+          platform: 'darwin',
+          arch: slice === 'x86_64' ? 'x64' : 'arm64',
+          desktopRoot,
+        })
+      }
+      prepareMacUniversalRuntime({
+        desktopRoot,
+        nativeEntries: MACOS_UNIVERSAL_NATIVE_ENTRIES.filter(
+          entry => slices.includes(entry.arch) || !entry.path.startsWith('node_modules/fs-ext/'),
+        ),
+        exists: existsSync,
+        chmod: chmodSync,
+      })
+      verifyPreparedDesktopRuntime(desktopRoot, 'darwin')
     },
     builderCli: require.resolve('electron-builder/cli.js'),
     verifier: fileURLToPath(new URL('./verify-mac-smoke.ts', import.meta.url)),
@@ -93,7 +137,8 @@ function defaultOptions(): MacSmokePackageOptions {
  * The signed and notarized release stays a manual step on a credentialed
  * machine; this smoke exists so macOS packaging regressions fail in CI before
  * a manual release. The universal target exercises both Intel and Apple
- * Silicon packaging in one artifact.
+ * Silicon packaging in one artifact; `DSH_MAC_SMOKE_ARCH=arm64` or `x64`
+ * packages a single CPU instead and skips the slow universal merge.
  * @param options - Injectable process and command boundaries.
  */
 export function packageMacSmoke(options: MacSmokePackageOptions = defaultOptions()): void {
@@ -112,8 +157,16 @@ export function packageMacSmoke(options: MacSmokePackageOptions = defaultOptions
     )
   }
 
+  const architecture = macSmokeArchitecture(options.env)
+  const compression = macCompressionOverride(options.env)
   const cleanEnvironment = withoutMacReleaseSecrets(options.env)
   options.log('Building an unsigned macOS DMG smoke; signing and notarization are release-only steps.')
+  if (architecture !== 'universal') {
+    options.log(`Packaging only the ${architecture} application; the universal merge is skipped.`)
+  }
+  if (compression !== undefined) {
+    options.log(`Packaging the macOS DMG smoke with ${compression} compression.`)
+  }
   if (options.env.DSH_PACKAGE_CHECK_ALREADY_RAN !== '1') {
     options.run(
       'corepack',
@@ -132,12 +185,14 @@ export function packageMacSmoke(options: MacSmokePackageOptions = defaultOptions
       options.builderCli,
       '--mac',
       'dmg',
-      '--universal',
+      `--${architecture}`,
       '--publish',
       'never',
       '--config.mac.notarize=false',
       '--config.npmRebuild=false',
       `--config.directories.output=${options.outputDir}`,
+      ...(compression === undefined ? [] : [`--config.mac.compression=${compression}`]),
+      ...(compression === 'store' ? ['--config.dmg.writeUpdateInfo=false'] : []),
     ],
     options.desktopRoot,
     electronBuilderEnvironment({
@@ -156,6 +211,8 @@ export function packageMacSmoke(options: MacSmokePackageOptions = defaultOptions
 const invokedPath = process.argv[1]
 if (invokedPath !== undefined && resolve(invokedPath) === fileURLToPath(import.meta.url)) {
   try {
+    // The interpreter payloads are downloaded and assembled before the long package gate; the flow re-checks them right before electron-builder.
+    await prepareDesktopInterpreters({ desktopRoot: resolve(dirname(fileURLToPath(import.meta.url)), '..') })
     packageMacSmoke()
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error))

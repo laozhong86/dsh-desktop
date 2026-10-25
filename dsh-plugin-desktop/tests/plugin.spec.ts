@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { join } from 'node:path'
-import type { Context } from '@deepseek-ai/cordis'
+import type { Context, Volatile } from '@deepseek-ai/cordis'
 import type {
   ConnectionRequestRejection,
   ConnectionTrustRequest,
@@ -9,16 +9,15 @@ import type { LocaleId } from '@deepseek-ai/dsh-client-locale'
 import type { WebRoute } from '@deepseek-ai/dsh-host-webserver'
 import type { ThemePreference } from '@deepseek-ai/dsh-client-ui-theme'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { configValue } from '../src/settings-access.ts'
 import {
   apply,
   Config,
   DESKTOP_SETTINGS_NAMESPACE,
   desktopRendererUrl,
+  DesktopSettingsSchema,
   inject,
   type Config as DesktopConfig,
   type DesktopSettings,
-  validateDesktopSettings,
 } from '../src/index.ts'
 import {
   DESKTOP_DIRECTORY_PICKER_PATH,
@@ -39,38 +38,93 @@ import {
   DESKTOP_TERMINAL_OPEN_PATH,
 } from '../src/desktop-settings-contract.ts'
 import type { DesktopRuntime, DesktopShellSpec } from '../src/runtime.ts'
+import type { DesktopPlatformLoginRequest, PlatformLoginAccount } from '../src/platform-login.ts'
 import { createDesktopBrowserAccess } from '../src/desktop-browser-access.ts'
 import { DESKTOP_LAN_HTTPS_CA_PATH, DesktopLanHttpsRuntime } from '../src/lan-https-runtime.ts'
 import { RENDERER_BOOT_REPORT_PATH, type RendererBootReport } from '../src/renderer-boot-contract.ts'
 
-const config: DesktopConfig = {
+/** Loader entry id dsh 0.1.7-alpha.1 keys the Desktop shell's settings by. */
+const DESKTOP_SETTINGS_ENTRY_ID = 'desktop-shell'
+
+/** Editable preference values every fixture configuration starts from. */
+const DEFAULT_SETTINGS: DesktopSettings = {
   mode: 'compatibility',
   macosMaterial: 'transparent',
   windowsMaterial: 'off',
-  port: 44_120,
-  networkExposure: 'loopback',
+  linuxMaterial: 'off',
+  port: 43_120,
   openBrowser: false,
+  networkExposure: 'loopback',
   logLevel: 'info',
-  width: 1280,
-  height: 840,
-  minWidth: 900,
-  minHeight: 640,
 }
 
-/** Project a schema result onto plain values; volatile fields arrive as references. */
-function plainConfig(value: object): Record<string, unknown> {
-  return Object.fromEntries(
-    Object.entries(value).map(([key, item]) => [key, configValue(item as never)]),
-  )
+/** Geometry fields the shell adopts once at window construction. */
+const GEOMETRY = { width: 1280, height: 840, minWidth: 900, minHeight: 640 } as const
+
+/**
+ * A live configuration fixture.
+ *
+ * dsh 0.1.7-alpha.1 hands a plugin its editable fields as `Volatile` references
+ * rather than through a registered settings scope, so a "settings change" in
+ * these tests is a write into this backing state followed by the
+ * `loader/volatile-update` event the Loader raises on the owning fiber.
+ */
+interface ConfigFixture {
+  readonly config: DesktopConfig
+  /** Merge a partial preference edit into the live references. */
+  write(next: Partial<DesktopSettings>): void
+  /** @returns the preference values standing right now. */
+  read(): DesktopSettings
+}
+
+function configFixture(overrides: Partial<DesktopSettings> = {}): ConfigFixture {
+  let state: DesktopSettings = { ...DEFAULT_SETTINGS, ...overrides }
+  const field = <K extends keyof DesktopSettings>(key: K): Volatile<DesktopSettings[K]> =>
+    ({ get: () => state[key] }) as unknown as Volatile<DesktopSettings[K]>
+  return {
+    config: {
+      mode: field('mode'),
+      macosMaterial: field('macosMaterial'),
+      windowsMaterial: field('windowsMaterial'),
+      linuxMaterial: field('linuxMaterial'),
+      port: field('port'),
+      openBrowser: field('openBrowser'),
+      networkExposure: field('networkExposure'),
+      logLevel: field('logLevel'),
+      ...GEOMETRY,
+    },
+    write(next) { state = { ...state, ...next } },
+    read: () => state,
+  }
+}
+
+/** Read every volatile reference of a validated configuration. */
+function readConfig(value: DesktopConfig): DesktopSettings {
+  return {
+    mode: value.mode.get(),
+    macosMaterial: value.macosMaterial.get(),
+    windowsMaterial: value.windowsMaterial.get(),
+    linuxMaterial: value.linuxMaterial.get(),
+    port: value.port.get(),
+    openBrowser: value.openBrowser.get(),
+    networkExposure: value.networkExposure.get(),
+    logLevel: value.logLevel.get(),
+  }
 }
 
 afterEach(() => { vi.useRealTimers() })
 
+type AccountView = { attempt: { id: string; phase: string; authorizeUrl?: string } | null }
+
 interface PluginHarness {
   ctx: Context
+  platformLogin: ReturnType<typeof vi.fn<(request: DesktopPlatformLoginRequest) => void>>
+  /** Publish one `deepseekAccount.watch` view to every open watcher. */
+  emitAccount(view: AccountView): void
+  config: DesktopConfig
   runtime: DesktopRuntime
   shell(): DesktopShellSpec | undefined
-  update: ReturnType<typeof vi.fn<(patch: object) => Promise<void>>>
+  update: ReturnType<typeof vi.fn<(namespace: unknown, patch: object) => Promise<void>>>
   restart: ReturnType<typeof vi.fn<() => Promise<void>>>
   setLocalePreference: ReturnType<typeof vi.fn<(locale: LocaleId | undefined) => void>>
   setThemeSource: ReturnType<typeof vi.fn<(source: ThemePreference) => void>>
@@ -83,28 +137,59 @@ interface PluginHarness {
   requestRejection: ReturnType<typeof vi.fn<(request: ConnectionTrustRequest) => ConnectionRequestRejection>>
   route(path: string): WebRoute | undefined
   routes(): readonly WebRoute[]
-  notify(next: DesktopSettings, prev: DesktopSettings): Promise<void>
+  /** Write a live preference edit and raise the Loader's volatile update. */
+  notify(next: Partial<DesktopSettings>): Promise<void>
   notifyLocale(preference: LocaleId | undefined): void
   notifyTheme(preference: ThemePreference): void
+  /** Run a candidate configuration through the `internal/config` waterfall. */
+  validate(candidate: DesktopSettings): void
 }
 
 function createHarness(
   platform: DesktopRuntime['platform'] = 'darwin',
   ordinaryBrowserEnabled = false,
+  overrides: Partial<DesktopSettings> = {},
 ): PluginHarness {
   let shell: DesktopShellSpec | undefined
-  const update = vi.fn(async (_patch: object) => {})
+  const fixture = configFixture({ openBrowser: ordinaryBrowserEnabled, ...overrides })
+  const volatileUpdated = new Set<() => void | Promise<void>>()
+  const configWaterfall = new Set<(this: unknown, raw: unknown, next: () => unknown) => unknown>()
+  const update = vi.fn(async (_namespace: unknown, _patch: object) => {})
   const restart = vi.fn(async () => {})
   const setLocalePreference = vi.fn<(locale: LocaleId | undefined) => void>()
   const setThemeSource = vi.fn<(source: ThemePreference) => void>()
   const rendererBoot = vi.fn<(report: RendererBootReport) => void>()
   const pickDirectory = vi.fn(async () => null)
   const validateDirectory = vi.fn(async () => true)
+  const platformLogin = vi.fn<(request: DesktopPlatformLoginRequest) => void>()
+  const accountWatchers = new Set<(view: AccountView) => void>()
+  const account: PlatformLoginAccount = {
+    async *watch(signal) {
+      const queue: AccountView[] = []
+      let wake: (() => void) | undefined
+      const push = (view: AccountView) => { queue.push(view); wake?.() }
+      accountWatchers.add(push)
+      try {
+        while (!signal.aborted) {
+          if (queue.length === 0) {
+            await new Promise<void>((resolve) => {
+              wake = resolve
+              signal.addEventListener('abort', () => { resolve() }, { once: true })
+            })
+          }
+          wake = undefined
+          while (queue.length > 0) yield queue.shift()!
+        }
+      } finally {
+        accountWatchers.delete(push)
+      }
+    },
+  }
   const requestRejection = vi.fn<(
     request: ConnectionTrustRequest,
   ) => ConnectionRequestRejection>(() => undefined)
   const routes = new Map<string, WebRoute>()
-  const settingsUpdated = new Set<(namespace: unknown) => void>()
+  const documentUpdated = new Set<(namespace: unknown, revision: number) => void>()
   let localePreference: LocaleId | undefined
   let themePreference: ThemePreference = 'system'
   const browserAccess = createDesktopBrowserAccess(
@@ -121,7 +206,6 @@ function createHarness(
   })
   const runtime: DesktopRuntime = {
     platform,
-    windowsBuild: platform === 'win32' ? 22_631 : undefined,
     locale: 'en',
     updates: {
       isPackaged: false,
@@ -147,7 +231,6 @@ function createHarness(
     toggleDeveloperTools: () => {},
     exportDiagnostics: async () => {},
     pickDirectory,
-    pickFiles: async () => [],
     validateDirectory,
     openProfileCreateWindow: () => {},
     reportRendererBoot: rendererBoot,
@@ -156,26 +239,23 @@ function createHarness(
     requestRestart: restart,
     requestRecoveryRestart: restart,
     prepareToQuit: () => {},
+    platformLogin,
   }
-  let desktopSettingsValue: DesktopSettings = {
-    mode: config.mode,
-    macosMaterial: config.macosMaterial,
-    windowsMaterial: config.windowsMaterial,
-    port: config.port,
-    openBrowser: ordinaryBrowserEnabled,
-    networkExposure: config.networkExposure,
-    logLevel: 'info',
-  }
+  // 0.1.7's `SettingsForms` has no `register`: cross-plugin reads go through
+  // `describe()`, which projects every Loader entry's live configuration, and a
+  // write lands with `update(namespace, patch)`.
   const settings = {
     describe: vi.fn(() => [
       { ns: 'ui-theme', value: { preference: themePreference } },
       { ns: 'locale', value: { preference: localePreference } },
-      { ns: DESKTOP_SETTINGS_NAMESPACE, value: desktopSettingsValue },
+      { ns: DESKTOP_SETTINGS_ENTRY_ID, value: fixture.read() },
     ]),
+    configure: vi.fn(),
     update,
-    replace: vi.fn(async () => {}),
   }
+  const fiber = { id: DESKTOP_SETTINGS_ENTRY_ID }
   const ctx = {
+    fiber,
     desktopRuntime: runtime,
     webServer: {
       host: '127.0.0.1',
@@ -193,16 +273,35 @@ function createHarness(
       if (String(key) === 'desktopBrowserAccess') return browserAccess
       if (String(key) === 'desktopLanHttps') return lanHttps
       if (String(key) === 'settings') return settings
+      if (String(key) === 'deepseekAccount') return account
       return () => {}
     }),
+    inject: vi.fn((_services: string[], callback: (child: Context) => void) => {
+      callback(ctx as unknown as Context)
+    }),
     effect: vi.fn((register: () => unknown) => register()),
-    on: vi.fn((event: string, listener: (namespace: unknown) => void) => {
-      if (event === 'settings/document-updated') settingsUpdated.add(listener)
-      return () => { settingsUpdated.delete(listener) }
+    on: vi.fn((event: string, listener: (...args: never[]) => unknown) => {
+      if (event === 'settings/document-updated') {
+        documentUpdated.add(listener as (namespace: unknown, revision: number) => void)
+        return () => { documentUpdated.delete(listener as (namespace: unknown, revision: number) => void) }
+      }
+      if (event === 'loader/volatile-update') {
+        volatileUpdated.add(listener as () => void)
+        return () => { volatileUpdated.delete(listener as () => void) }
+      }
+      if (event === 'internal/config') {
+        const waterfall = listener as unknown as (this: unknown, raw: unknown, next: () => unknown) => unknown
+        configWaterfall.add(waterfall)
+        return () => { configWaterfall.delete(waterfall) }
+      }
+      return () => {}
     }),
   } as unknown as Context
   return {
     ctx,
+    platformLogin,
+    emitAccount: (view) => { for (const push of accountWatchers) push(view) },
+    config: fixture.config,
     runtime,
     shell: () => shell,
     update,
@@ -219,35 +318,53 @@ function createHarness(
     route: path => routes.get(path),
     routes: () => [...routes.values()],
     notify: async (next) => {
-      desktopSettingsValue = next
-      for (const listener of settingsUpdated) listener(DESKTOP_SETTINGS_NAMESPACE)
+      fixture.write(next)
+      for (const listener of [...volatileUpdated]) await listener()
     },
     notifyLocale: (preference) => {
       localePreference = preference
-      for (const listener of settingsUpdated) listener('locale')
+      for (const listener of documentUpdated) listener('locale', 1)
     },
     notifyTheme: (preference) => {
       themePreference = preference
-      for (const listener of settingsUpdated) listener('ui-theme')
+      for (const listener of documentUpdated) listener('ui-theme', 1)
+    },
+    validate: (candidate) => {
+      for (const waterfall of configWaterfall) waterfall.call(fiber, candidate, () => candidate)
     },
   }
 }
 
 describe('desktop Host plugin', () => {
-  it('defaults to compatibility mode and validates the entry schema', () => {
-    expect(plainConfig(Config({} as DesktopConfig))).toEqual(config)
-    expect(plainConfig(Config({ mode: 'advanced' } as DesktopConfig))).toEqual({ ...config, mode: 'advanced' })
-    expect(() => Config({ port: -1 } as DesktopConfig)).toThrow()
-    expect(() => Config({ port: 1.5 } as DesktopConfig)).toThrow()
-    expect(() => Config({ port: 65_536 } as DesktopConfig)).toThrow()
+  it('defaults to compatibility mode and validates both schemas', () => {
+    // 0.1.7 boxes every editable field in a volatile reference, so the
+    // validated configuration is compared through its reads rather than by
+    // structural equality against a plain fixture.
+    expect(readConfig(Config({} as never))).toEqual(DEFAULT_SETTINGS)
+    expect(Config({} as never)).toMatchObject(GEOMETRY)
+    expect(readConfig(Config({ mode: 'advanced' } as never))).toEqual({ ...DEFAULT_SETTINGS, mode: 'advanced' })
+    expect(DesktopSettingsSchema({} as DesktopSettings)).toEqual({
+      mode: 'compatibility',
+      macosMaterial: 'transparent',
+      windowsMaterial: 'off',
+      linuxMaterial: 'off',
+      port: 43_120,
+      openBrowser: false,
+      networkExposure: 'loopback',
+      logLevel: 'info',
+      developerLogging: false,
+    })
+    expect(() => DesktopSettingsSchema({ port: -1 } as DesktopSettings)).toThrow()
+    expect(() => DesktopSettingsSchema({ port: 1.5 } as DesktopSettings)).toThrow()
+    expect(() => DesktopSettingsSchema({ port: 65_536 } as DesktopSettings)).toThrow()
     expect(() => Config({ mode: 'custom' } as never)).toThrow()
-    expect(String(DESKTOP_SETTINGS_NAMESPACE)).toBe('desktop-shell')
+    expect(String(DESKTOP_SETTINGS_NAMESPACE)).toBe('dsh-desktop')
   })
 
   it('serves the CA created after startup without restarting the Host or exposing a missing certificate', async () => {
     const harness = createHarness('win32')
     const certificate = vi.spyOn(harness.lanHttps, 'caCertificate', 'get').mockReturnValue(null)
-    apply(harness.ctx, config)
+    apply(harness.ctx, harness.config)
     const route = harness.route(DESKTOP_LAN_HTTPS_CA_PATH)!
     const res = { statusCode: 0, setHeader: vi.fn(), end: vi.fn() }
     const request = async (method: string) => {
@@ -276,20 +393,21 @@ describe('desktop Host plugin', () => {
       webServer: { host: '127.0.0.1', port: 43120, register: registerRoute },
       settings: {
         describe: vi.fn(() => []),
+        configure: vi.fn(),
         update: vi.fn(async () => {}),
-        replace: vi.fn(async () => {}),
       },
       logger: { warn: vi.fn(), error: vi.fn() },
       get: vi.fn(() => undefined),
+      inject: vi.fn(),
       effect: vi.fn((register: () => unknown) => register()),
       on: vi.fn(() => () => {}),
     } as unknown as Context
 
-    apply(ctx, config)
+    apply(ctx, configFixture().config)
 
     expect(stderr).toHaveBeenCalledWith(expect.stringContaining('desktop launcher'))
     expect(registerRoute).not.toHaveBeenCalled()
-    expect(ctx.settings.update).not.toHaveBeenCalled()
+    expect(vi.mocked(ctx.settings.configure)).not.toHaveBeenCalled()
     stderr.mockRestore()
   })
 
@@ -308,15 +426,13 @@ describe('desktop Host plugin', () => {
       'extended',
       'win32',
       '2.0.3',
-      'mica',
-      22_631,
+      'off',
     )).searchParams)).toEqual({
       'dsh-desktop-mode': 'extended',
       'dsh-desktop-platform': 'win32',
       'dsh-desktop-version': '2.0.3',
-      'dsh-desktop-material': 'mica',
+      'dsh-desktop-material': 'off',
       'dsh-desktop-titlebar-inset': '36',
-      'dsh-desktop-mica': '1',
     })
     expect(Object.fromEntries(new URL(desktopRendererUrl(
       43120,
@@ -326,24 +442,27 @@ describe('desktop Host plugin', () => {
     )).searchParams)).not.toHaveProperty('dsh-desktop-titlebar-inset')
   })
 
-  it('registers settings and the active Web port without re-entering Loader settlement', async () => {
+  it('publishes settings and the active Web port without re-entering Loader settlement', async () => {
     const harness = createHarness()
     const loaderAwait = vi.fn(() => new Promise<void>(() => {}))
     Object.assign(harness.ctx, { loader: { await: loaderAwait } })
 
-    apply(harness.ctx, config)
+    apply(harness.ctx, harness.config)
 
-    expect(inject).toContain('webApp')
+    expect(inject).toContain('settings')
     expect(inject).toContain('connection')
     expect(inject).not.toContain('loader')
-    // The settings form is derived from the shell entry, so the namespace is its id.
-    expect(String(DESKTOP_SETTINGS_NAMESPACE)).toBe('desktop-shell')
+    // 0.1.7 publishes the editable fields from the plugin's own volatile Config
+    // and has no `applies: 'restart'`: Desktop withdraws the automatic form and
+    // owns both the settings page and the restart decision itself.
+    expect(vi.mocked(harness.ctx.settings.configure))
+      .toHaveBeenCalledWith({ auto: false }, expect.anything())
     expect(loaderAwait).not.toHaveBeenCalled()
     expect(harness.shell()).toEqual(expect.objectContaining({
       mode: 'compatibility',
       url: 'http://127.0.0.1:43120/?dsh-desktop-mode=compatibility&dsh-desktop-platform=darwin&dsh-desktop-version=2.0.0&dsh-desktop-material=transparent&dsh-desktop-titlebar-inset=36',
       authenticationUrl: 'http://127.0.0.1:43120/?token=test-token',
-      productName: 'OmniMux',
+      productName: 'DSH Desktop',
       windowTitle: 'DeepSeek Harness Desktop',
       rendererAccessHeader: {
         name: 'x-dsh-desktop-renderer',
@@ -359,21 +478,25 @@ describe('desktop Host plugin', () => {
     expect(harness.setThemeSource).toHaveBeenCalledWith('dark')
 
     await harness.shell()?.requestModeChange('advanced')
-    expect(harness.update).toHaveBeenCalledWith(DESKTOP_SETTINGS_NAMESPACE, { mode: 'advanced' })
+    expect(harness.update).toHaveBeenCalledWith(DESKTOP_SETTINGS_ENTRY_ID, { mode: 'advanced' })
   })
 
-  it('keeps browser access and only withdraws the LAN listener when the native tray selects a custom mode', async () => {
+  it('atomically withdraws browser access when the native tray selects a custom mode', async () => {
     const harness = createHarness('darwin', true)
-    apply(harness.ctx, config)
+    apply(harness.ctx, harness.config)
 
     await harness.shell()?.requestModeChange('advanced')
 
-    expect(harness.update).toHaveBeenCalledWith(DESKTOP_SETTINGS_NAMESPACE, { mode: 'advanced' })
+    expect(harness.update).toHaveBeenCalledWith(DESKTOP_SETTINGS_ENTRY_ID, {
+      mode: 'advanced',
+      openBrowser: false,
+      networkExposure: 'loopback',
+    })
   })
 
   it('forwards same-origin renderer boot reports through the Host route', async () => {
     const harness = createHarness()
-    apply(harness.ctx, config)
+    apply(harness.ctx, harness.config)
     const route = harness.route(RENDERER_BOOT_REPORT_PATH)
     expect(route).toEqual(expect.objectContaining({
       kind: 'exact',
@@ -406,7 +529,7 @@ describe('desktop Host plugin', () => {
   ) => {
     const harness = createHarness('win32')
     harness.requestRejection.mockReturnValue(status)
-    apply(harness.ctx, config)
+    apply(harness.ctx, harness.config)
     const expectedPaths = [
       DESKTOP_SETTINGS_PATH,
       DESKTOP_PROFILE_CREATE_PATH,
@@ -447,7 +570,7 @@ describe('desktop Host plugin', () => {
   it('serves the Windows native picker through a same-origin desktop route', async () => {
     const harness = createHarness('win32')
     harness.pickDirectory.mockResolvedValue('C:\\Work')
-    apply(harness.ctx, config)
+    apply(harness.ctx, harness.config)
     const route = harness.route(DESKTOP_DIRECTORY_PICKER_PATH)
     expect(route).toEqual(expect.objectContaining({
       kind: 'exact',
@@ -474,7 +597,7 @@ describe('desktop Host plugin', () => {
   it('validates a Windows workspace through a same-origin desktop route', async () => {
     const harness = createHarness('win32')
     harness.validateDirectory.mockResolvedValue(false)
-    apply(harness.ctx, config)
+    apply(harness.ctx, harness.config)
     const route = harness.route(DESKTOP_DIRECTORY_VALIDATOR_PATH)
     const req = {
       method: 'POST',
@@ -503,97 +626,197 @@ describe('desktop Host plugin', () => {
     (platform) => {
       const harness = createHarness(platform)
 
-      apply(harness.ctx, config)
+      apply(harness.ctx, harness.config)
 
       expect(harness.shell()?.iconPath.endsWith(join('build', 'app-icon.png'))).toBe(true)
     },
   )
 
-  it('requests one orderly restart after the settings scope commits another mode', async () => {
+  it('requests one orderly restart after the settings form commits another mode', async () => {
     vi.useFakeTimers()
     const harness = createHarness()
-    apply(harness.ctx, config)
+    apply(harness.ctx, harness.config)
 
-    await harness.notify(
-      { mode: 'compatibility', macosMaterial: 'transparent', windowsMaterial: 'acrylic', port: 0, openBrowser: false, networkExposure: 'loopback', logLevel: 'info' },
-      { mode: 'compatibility', macosMaterial: 'transparent', windowsMaterial: 'acrylic', port: 0, openBrowser: false, networkExposure: 'loopback', logLevel: 'info' },
-    )
+    await harness.notify({})
     expect(harness.restart).not.toHaveBeenCalled()
 
     harness.restart.mockImplementation(() => new Promise<void>(() => {}))
-    await harness.notify(
-      { mode: 'advanced', macosMaterial: 'transparent', windowsMaterial: 'acrylic', port: 0, openBrowser: false, networkExposure: 'loopback', logLevel: 'info' },
-      { mode: 'compatibility', macosMaterial: 'transparent', windowsMaterial: 'acrylic', port: 0, openBrowser: false, networkExposure: 'loopback', logLevel: 'info' },
-    )
+    await harness.notify({ mode: 'advanced' })
     await vi.runAllTimersAsync()
     expect(harness.restart).toHaveBeenCalledOnce()
   })
 
-  it('hot-applies browser and LAN access and keeps browser access across a window-mode switch', async () => {
+  it('saves first-run Setup through the settings scopes without its own native restart prompt', async () => {
+    vi.useFakeTimers()
+    const harness = createHarness('darwin')
+    apply(harness.ctx, harness.config)
+    harness.restart.mockImplementation(() => new Promise<void>(() => {}))
+    const notifications = {
+      enabled: true,
+      notifyOnTurnCompletion: false,
+      notifyOnTurnFailure: true,
+      notifyOnJobCompletion: false,
+      notifyOnJobFailure: true,
+      notifyOnScheduleCompletion: true,
+      notifyOnScheduleFailure: true,
+    }
+
+    await harness.shell()?.applySetupSettings?.({
+      mode: 'extended',
+      macosMaterial: 'off',
+      windowsMaterial: 'off',
+      openBrowser: false,
+      networkExposure: 'loopback',
+      notifications,
+    })
+
+    expect(harness.update).toHaveBeenCalledWith(DESKTOP_SETTINGS_ENTRY_ID, {
+      mode: 'extended',
+      macosMaterial: 'off',
+      windowsMaterial: 'off',
+      openBrowser: false,
+      networkExposure: 'loopback',
+    })
+    expect(harness.update).toHaveBeenCalledWith('desktop-notifications', notifications)
+
+    // Setup's continuation owns the restart that applies its own choice.
+    await harness.notify({ mode: 'extended', macosMaterial: 'off' })
+    await vi.runAllTimersAsync()
+    expect(harness.restart).not.toHaveBeenCalled()
+
+    // A later, different choice still asks for its own restart.
+    await harness.notify({ mode: 'advanced' })
+    await vi.runAllTimersAsync()
+    expect(harness.restart).toHaveBeenCalledOnce()
+  })
+
+  it('asks again when the user returns to the Setup mode after leaving it', async () => {
     vi.useFakeTimers()
     const harness = createHarness()
-    apply(harness.ctx, config)
+    apply(harness.ctx, harness.config)
+    harness.restart.mockImplementation(() => new Promise<void>(() => {}))
+    // Only the notifications half fails; the saved mode keeps its own quiet restart.
+    harness.update.mockImplementation(async (id: unknown) => {
+      if (id === 'desktop-notifications') throw new Error('refused')
+    })
+
+    await expect(harness.shell()?.applySetupSettings?.({
+      mode: 'extended',
+      macosMaterial: 'transparent',
+      windowsMaterial: 'off',
+      openBrowser: false,
+      networkExposure: 'loopback',
+      notifications: {
+        enabled: false,
+        notifyOnTurnCompletion: false,
+        notifyOnTurnFailure: false,
+        notifyOnJobCompletion: false,
+        notifyOnJobFailure: false,
+        notifyOnScheduleCompletion: false,
+        notifyOnScheduleFailure: false,
+      },
+    })).rejects.toThrow('refused')
+    await harness.notify({ mode: 'extended' })
+    await vi.runAllTimersAsync()
+    expect(harness.restart).not.toHaveBeenCalled()
+
+    // Back to the running mode, then Setup's mode again from the mode picker.
+    await harness.notify({ mode: 'compatibility' })
+    await harness.notify({ mode: 'extended' })
+    await vi.runAllTimersAsync()
+    expect(harness.restart).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the restart prompt when first-run Setup could not save its choice', async () => {
+    vi.useFakeTimers()
+    const harness = createHarness()
+    apply(harness.ctx, harness.config)
+    harness.restart.mockImplementation(() => new Promise<void>(() => {}))
+    harness.update.mockRejectedValueOnce(new Error('refused'))
+
+    await expect(harness.shell()?.applySetupSettings?.({
+      mode: 'extended',
+      macosMaterial: 'transparent',
+      windowsMaterial: 'off',
+      openBrowser: false,
+      networkExposure: 'loopback',
+      notifications: {
+        enabled: false,
+        notifyOnTurnCompletion: false,
+        notifyOnTurnFailure: false,
+        notifyOnJobCompletion: false,
+        notifyOnJobFailure: false,
+        notifyOnScheduleCompletion: false,
+        notifyOnScheduleFailure: false,
+      },
+    })).rejects.toThrow('refused')
+
+    await harness.notify({ mode: 'extended' })
+    await vi.runAllTimersAsync()
+    expect(harness.restart).toHaveBeenCalledOnce()
+  })
+
+  it('hot-applies browser and LAN access but restarts when a custom mode withdraws them', async () => {
+    vi.useFakeTimers()
+    const harness = createHarness()
+    apply(harness.ctx, harness.config)
     harness.restart.mockImplementation(() => new Promise<void>(() => {}))
 
-    await harness.notify(
-      { mode: 'compatibility', macosMaterial: 'transparent', windowsMaterial: 'off', port: 44_120, openBrowser: true, networkExposure: 'lan', logLevel: 'info' },
-      { mode: 'compatibility', macosMaterial: 'transparent', windowsMaterial: 'off', port: 44_120, openBrowser: false, networkExposure: 'loopback', logLevel: 'info' },
-    )
+    await harness.notify({ openBrowser: true, networkExposure: 'lan' })
     await vi.runAllTimersAsync()
     expect(harness.restart).not.toHaveBeenCalled()
     expect(harness.browserAccess.ordinaryBrowserEnabled).toBe(true)
     expect(harness.setLanHttpsEnabled).toHaveBeenLastCalledWith(true)
 
     const enabledHarness = createHarness('darwin', true)
-    apply(enabledHarness.ctx, config)
-    await enabledHarness.notify(
-      { mode: 'advanced', macosMaterial: 'transparent', windowsMaterial: 'acrylic', port: 43_120, openBrowser: true, networkExposure: 'loopback', logLevel: 'info' },
-      { mode: 'compatibility', macosMaterial: 'transparent', windowsMaterial: 'acrylic', port: 43_120, openBrowser: true, networkExposure: 'loopback', logLevel: 'info' },
-    )
+    apply(enabledHarness.ctx, enabledHarness.config)
+    await enabledHarness.notify({ mode: 'advanced' })
     await vi.runAllTimersAsync()
     expect(enabledHarness.restart).toHaveBeenCalledOnce()
-    expect(enabledHarness.browserAccess.ordinaryBrowserEnabled).toBe(true)
+    expect(enabledHarness.browserAccess.ordinaryBrowserEnabled).toBe(false)
     expect(enabledHarness.setLanHttpsEnabled).toHaveBeenLastCalledWith(false)
   })
 
   it('requests one orderly restart after the configured Web port changes', async () => {
     vi.useFakeTimers()
     const harness = createHarness()
-    apply(harness.ctx, config)
+    apply(harness.ctx, harness.config)
 
-    await harness.notify(
-      { mode: 'compatibility', macosMaterial: 'transparent', windowsMaterial: 'acrylic', port: 0, openBrowser: false, networkExposure: 'loopback', logLevel: 'debug' },
-      { mode: 'compatibility', macosMaterial: 'transparent', windowsMaterial: 'acrylic', port: 0, openBrowser: false, networkExposure: 'loopback', logLevel: 'info' },
-    )
+    await harness.notify({ logLevel: 'debug' })
     expect(harness.restart).not.toHaveBeenCalled()
 
     harness.restart.mockImplementation(() => new Promise<void>(() => {}))
-    await harness.notify(
-      { mode: 'compatibility', macosMaterial: 'transparent', windowsMaterial: 'acrylic', port: 43_189, openBrowser: false, networkExposure: 'loopback', logLevel: 'debug' },
-      { mode: 'compatibility', macosMaterial: 'transparent', windowsMaterial: 'acrylic', port: 0, openBrowser: false, networkExposure: 'loopback', logLevel: 'debug' },
-    )
+    await harness.notify({ port: 43_189 })
     await vi.runAllTimersAsync()
     expect(harness.restart).toHaveBeenCalledOnce()
   })
 
   it('requests one orderly restart after the native material changes', async () => {
     vi.useFakeTimers()
-    const harness = createHarness('win32')
-    apply(harness.ctx, config)
+    const harness = createHarness('darwin')
+    apply(harness.ctx, harness.config)
 
     harness.restart.mockImplementation(() => new Promise<void>(() => {}))
-    await harness.notify(
-      { mode: 'compatibility', macosMaterial: 'transparent', windowsMaterial: 'mica', port: 0, openBrowser: false, networkExposure: 'loopback', logLevel: 'info' },
-      { mode: 'compatibility', macosMaterial: 'transparent', windowsMaterial: 'acrylic', port: 0, openBrowser: false, networkExposure: 'loopback', logLevel: 'info' },
-    )
+    await harness.notify({ macosMaterial: 'off' })
     await vi.runAllTimersAsync()
 
     expect(harness.restart).toHaveBeenCalledOnce()
   })
 
+  it('does not restart for a legacy Windows Mica value that still renders opaque', async () => {
+    vi.useFakeTimers()
+    const harness = createHarness('win32')
+    apply(harness.ctx, harness.config)
+
+    await harness.notify({ windowsMaterial: 'mica' })
+    await vi.runAllTimersAsync()
+
+    expect(harness.restart).not.toHaveBeenCalled()
+  })
+
   it('projects live built-in theme changes into an advanced native material', () => {
-    const harness = createHarness()
-    apply(harness.ctx, { ...config, mode: 'advanced' })
+    const harness = createHarness('darwin', false, { mode: 'advanced' })
+    apply(harness.ctx, harness.config)
 
     expect(harness.shell()?.readThemeSource()).toBe('system')
     harness.notifyTheme('dark')
@@ -602,7 +825,7 @@ describe('desktop Host plugin', () => {
 
   it('projects the Host-backed locale preference into the native tray', () => {
     const harness = createHarness('win32')
-    apply(harness.ctx, config)
+    apply(harness.ctx, harness.config)
 
     expect(harness.shell()?.readLocalePreference()).toBeUndefined()
     expect(harness.setLocalePreference).not.toHaveBeenCalled()
@@ -615,47 +838,84 @@ describe('desktop Host plugin', () => {
     expect(harness.setLocalePreference).toHaveBeenLastCalledWith(undefined)
   })
 
+  it('hands Platform sign-in attempts to the native shell with the live browser-access route', async () => {
+    const harness = createHarness('win32')
+    apply(harness.ctx, harness.config)
+    const first = 'https://platform.deepseek.com/dsh/authorize?state=a'
+    const second = 'https://platform.deepseek.com/dsh/authorize?state=b'
+
+    harness.emitAccount({ attempt: { id: 'a', phase: 'waiting-browser', authorizeUrl: first } })
+    await vi.waitFor(() => { expect(harness.platformLogin).toHaveBeenCalledWith({ action: 'open', url: first, external: false }) })
+    harness.emitAccount({ attempt: { id: 'a', phase: 'expired' } })
+    await vi.waitFor(() => { expect(harness.platformLogin).toHaveBeenLastCalledWith({ action: 'close', focus: true }) })
+
+    harness.browserAccess.setOrdinaryBrowserEnabled(true)
+    harness.emitAccount({ attempt: { id: 'b', phase: 'waiting-browser', authorizeUrl: second } })
+    await vi.waitFor(() => { expect(harness.platformLogin).toHaveBeenLastCalledWith({ action: 'open', url: second, external: true }) })
+    expect(harness.platformLogin).toHaveBeenCalledTimes(3)
+  })
+
   it('requires the Web carrier host to match the configured exposure', () => {
     const harness = createHarness()
     Object.assign(harness.ctx.webServer, { host: '0.0.0.0' })
 
-    expect(() => apply(harness.ctx, config)).toThrow('does not match networkExposure')
-    expect(() => apply(harness.ctx, { ...config, networkExposure: 'lan' }))
+    expect(() => apply(harness.ctx, harness.config)).toThrow('does not match networkExposure')
+    expect(() => apply(harness.ctx, configFixture({ networkExposure: 'lan' }).config))
       .toThrow('does not match networkExposure')
 
     Object.assign(harness.ctx.webServer, { host: '127.0.0.1' })
-    expect(() => apply(harness.ctx, { ...config, networkExposure: 'lan' })).not.toThrow()
+    expect(() => apply(harness.ctx, configFixture({ networkExposure: 'lan' }).config)).not.toThrow()
   })
 
-  it('rejects an unsupported Linux shell mode', () => {
+  it('validates the effective Linux mode while a browser migration is deferred', () => {
+    const harness = createHarness('linux')
+    apply(harness.ctx, harness.config)
+
+    // 0.1.7 dropped the registration-time `validate` hook, so the two
+    // combination rules now refuse a candidate configuration inside the
+    // Loader's `internal/config` waterfall, before the update commits.
     const settings: DesktopSettings = {
       mode: 'compatibility',
       macosMaterial: 'transparent',
       windowsMaterial: 'acrylic',
+      linuxMaterial: 'off',
       port: 43_120,
       openBrowser: false,
       networkExposure: 'loopback',
       logLevel: 'info',
     }
-    expect(() => validateDesktopSettings({ ...settings, mode: 'advanced' }, 'linux')).toThrow(
+    expect(() => harness.validate({ ...settings, mode: 'advanced' })).toThrow(
       'supported on macOS and Windows',
     )
-    expect(() => validateDesktopSettings({ ...settings, mode: 'extended' }, 'linux')).toThrow(
+    expect(() => harness.validate({ ...settings, mode: 'extended' })).toThrow(
       'supported on macOS and Windows',
     )
-    expect(() => validateDesktopSettings(settings, 'linux')).not.toThrow()
-    expect(() => validateDesktopSettings(
-      { ...settings, mode: 'advanced' },
-      'linux',
-    )).toThrow('supported on macOS and Windows')
-    expect(() => validateDesktopSettings({ ...settings, mode: 'advanced', networkExposure: 'lan' }, 'linux')).toThrow(
-      'LAN exposure requires compatibility mode',
-    )
+    expect(() => harness.validate({ ...settings, mode: 'compatibility' })).not.toThrow()
+    expect(() => harness.validate({
+      ...settings,
+      mode: 'advanced',
+      openBrowser: true,
+    })).toThrow('browser access requires compatibility mode')
+    expect(() => harness.validate({
+      ...settings,
+      mode: 'advanced',
+      networkExposure: 'lan',
+    })).toThrow('supported on macOS and Windows')
   })
 
-  it('rejects a LAN preference outside the compatibility shell on supported platforms', () => {
-    expect(() => validateDesktopSettings({ mode: 'advanced', networkExposure: 'lan' }, 'darwin')).toThrow(
-      'LAN exposure requires compatibility mode',
-    )
+  it('accepts a deferred LAN preference independently of browser mode on supported platforms', () => {
+    const harness = createHarness('darwin')
+    apply(harness.ctx, harness.config)
+
+    expect(() => harness.validate({
+      mode: 'advanced',
+      macosMaterial: 'transparent',
+      windowsMaterial: 'off',
+      linuxMaterial: 'off',
+      port: 43_120,
+      openBrowser: false,
+      networkExposure: 'lan',
+      logLevel: 'info',
+    })).not.toThrow()
   })
 })

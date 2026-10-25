@@ -1,5 +1,5 @@
 diff --git a/lib/client.js b/lib/client.js
-index 3bc9db718b..9406075df3 100644
+index 4d262b6..d5367ca 100644
 --- a/lib/client.js
 +++ b/lib/client.js
 @@ -280,7 +280,7 @@ window.__ModuleLoader__.load({
@@ -70,7 +70,7 @@ index 3bc9db718b..9406075df3 100644
 +									type: "button",
 +									variant: "outline",
 +									size: "sm",
-+									icon: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconFolderOpen16, { size: 16 }),
++									icon: (0, react_jsx_runtime.jsx)(_deepseek_ai_dsh_client_ui_primitives.IconFolderOpenRegular, { size: 16 }),
 +									"aria-busy": nativePicking || void 0,
 +									disabled: parentInert,
 +									onClick: pickFromSystem,
@@ -135,7 +135,7 @@ index 3bc9db718b..9406075df3 100644
  			});
  			ctx.slots.inject("conversation.hero.workspace.directoryFlow", () => ctx.slots.inject("sidebar.workspaces.directoryFlow", function* () {
 diff --git a/lib/types/client/DirectoryBrowser.d.ts b/lib/types/client/DirectoryBrowser.d.ts
-index 2992216e3c..8ff178a712 100644
+index 2992216..8ff178a 100644
 --- a/lib/types/client/DirectoryBrowser.d.ts
 +++ b/lib/types/client/DirectoryBrowser.d.ts
 @@ -17,6 +17,10 @@ export interface DirectoryBrowserProps {
@@ -159,7 +159,7 @@ index 2992216e3c..8ff178a712 100644
 +export declare function DirectoryBrowser({ open, listDirectory, createDirectory, pickNativeDirectory, validateDirectory, onOpen, onClose, busy, t }: DirectoryBrowserProps): import("react").JSX.Element | null;
 +//# sourceMappingURL=DirectoryBrowser.d.ts.map
 diff --git a/lib/types/client/flow.d.ts b/lib/types/client/flow.d.ts
-index e4e84ac2e7..f4ee4792c5 100644
+index e4e84ac..f4ee479 100644
 --- a/lib/types/client/flow.d.ts
 +++ b/lib/types/client/flow.d.ts
 @@ -8,6 +8,10 @@ export interface BrowseFlowInjected {

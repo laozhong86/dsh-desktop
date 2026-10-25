@@ -32,3 +32,10 @@ dsh-plugin-desktop/preset/distribution.json
 
 # Agent parallel worktrees (one branch per checkout)
 .worktrees/
+
+# Upstream Next build outputs (OmniMux keeps the Next package in-tree, grey-box)
+dsh-desktop-next/lib/
+dsh-desktop-next/dist/
+dsh-desktop-next/.desktop-next/
+dsh-desktop-next/.desktop-build/
+dsh-plugin-desktop/.desktop-build/

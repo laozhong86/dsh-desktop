@@ -12,10 +12,9 @@ const input: DesktopSetupWizardInput = {
   appVersion: '2.0.6-beta.1',
   profileName: 'work',
   platform: 'win32',
-  micaSupported: true,
   mode: 'compatibility',
   macosMaterial: 'transparent',
-  windowsMaterial: 'mica',
+  windowsMaterial: 'off',
   openBrowser: false,
   networkExposure: 'loopback',
   market: 'disabled',
@@ -25,6 +24,8 @@ const input: DesktopSetupWizardInput = {
     notifyOnTurnFailure: true,
     notifyOnJobCompletion: true,
     notifyOnJobFailure: true,
+    notifyOnScheduleCompletion: true,
+    notifyOnScheduleFailure: true,
   },
 }
 
@@ -93,11 +94,16 @@ describe('Desktop Setup Wizard copy and contract', () => {
     expect(chinese.openBrowser).toBe('允许在浏览器中打开')
     expect(chinese.openBrowser).not.toMatch(/启动后|自动/u)
     expect(chinese.browserCompatibilityNotice).toContain('兼容模式')
-    expect(chinese.browserCompatibilityNotice).toContain('所有窗口模式')
+    expect(chinese.browserCompatibilityNotice).toContain('仅在')
+    expect(chinese.browserCompatibilityDialogBody).toContain('只能使用兼容模式')
+    expect(chinese.browserCompatibilityDialogBody).toContain('切换为兼容模式')
+    expect(chinese.confirmBrowserCompatibility).toBe('切换并开启')
+    expect(chinese.cancelBrowserCompatibility).toBe('取消')
     expect(english.openBrowser).toMatch(/allow.+(?:open|opening).+browser/iu)
     expect(english.openBrowser).not.toMatch(/after startup|automatically/iu)
-    expect(english.browserCompatibilityNotice).toMatch(/every window mode/iu)
-    expect(english.browserCompatibilityNotice).toMatch(/local network.+compatibility mode/iu)
+    expect(english.browserCompatibilityNotice).toMatch(/only.+compatibility mode/iu)
+    expect(english.browserCompatibilityDialogBody).toMatch(/requires compatibility mode/iu)
+    expect(english.browserCompatibilityDialogBody).toMatch(/switch.+window mode/iu)
   })
 
   it('requires confirmation only when loopback access is changed to LAN', () => {
@@ -115,34 +121,44 @@ describe('Desktop Setup Wizard copy and contract', () => {
   })
 
   it('strictly validates complete input and platform capability gates', () => {
+    const chinese = desktopSetupWizardCopy('zh')
+    const english = desktopSetupWizardCopy('en')
+    expect(chinese.marketBody).toBe('选择一个插件市场，浏览和安装社区插件；\n或配置自定义插件市场。\n也可以暂不开启，以后在插件页面调整。')
+    expect(chinese.officialMarket).toBe('自定义插件市场')
+    expect(chinese.officialMarketBody).toBe('开启官方插件市场，并预置 dsh-market 索引源。')
+    expect(english.officialMarket).toBe('Custom plugin markets')
+    expect(english.officialMarketBody).toBe('Enable the official market with the dsh-market source preconfigured.')
     expect(isDesktopSetupWizardInput(input)).toBe(true)
+    expect(isDesktopSetupWizardInput({ ...input, market: 'official-market' })).toBe(true)
     expect(isDesktopSetupWizardInput({ ...input, unexpected: true })).toBe(false)
     expect(isDesktopSetupWizardInput({ ...input, notifications: { enabled: true } })).toBe(false)
     expect(isDesktopSetupWizardInput({ ...input, appVersion: '' })).toBe(false)
     expect(isDesktopSetupWizardInput({ ...input, appVersion: '<script>' })).toBe(false)
     expect(isDesktopSetupWizardInput({ ...input, profileName: '../escape' })).toBe(false)
     expect(isDesktopSetupWizardInput({ ...input, profileName: 'CON' })).toBe(false)
+    // Windows has no selectable material; the removed Mica value is rejected.
+    expect(isDesktopSetupWizardInput({ ...input, windowsMaterial: 'mica' })).toBe(false)
+    expect(isDesktopSetupWizardInput({ ...input, micaSupported: true })).toBe(false)
     expect(desktopSetupWizardSelectionIsAvailable(input, input)).toBe(true)
-    expect(desktopSetupWizardSelectionIsAvailable(input, { platform: 'win32', micaSupported: false })).toBe(false)
     expect(desktopSetupWizardSelectionIsAvailable(
       { ...input, mode: 'extended', windowsMaterial: 'off' },
-      { platform: 'linux', micaSupported: false },
+      { platform: 'linux' },
     )).toBe(false)
     expect(desktopSetupWizardSelectionIsAvailable(
       { ...input, mode: 'advanced', openBrowser: true },
-      { platform: 'win32', micaSupported: true },
-    )).toBe(true)
+      { platform: 'win32' },
+    )).toBe(false)
     expect(desktopSetupWizardSelectionIsAvailable(
       { ...input, openBrowser: false, networkExposure: 'lan' },
-      { platform: 'win32', micaSupported: true },
+      { platform: 'win32' },
     )).toBe(false)
     expect(desktopSetupWizardSelectionIsAvailable(
       { ...input, openBrowser: true, networkExposure: 'lan' },
-      { platform: 'win32', micaSupported: true },
+      { platform: 'win32' },
     )).toBe(true)
     expect(desktopSetupWizardSelectionIsAvailable(
       { ...input, mode: 'advanced', openBrowser: true, networkExposure: 'lan' },
-      { platform: 'win32', micaSupported: true },
+      { platform: 'win32' },
     )).toBe(false)
   })
 })

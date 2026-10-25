@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import type { GlobalStandardProps, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
+import type { PropsRenderSlots, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from './contracts.ts'
 import type { DesktopClientPlatform } from './environment.ts'
 import {
   collapsedSidebarWidth, computeDesktopColumns, DesktopLayoutState,
-  resolveNarrowBreakpoint, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT, RIGHTBAR_DEFAULT_RATIO,
+  SIDEBAR_AUTO_COLLAPSE, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT, RIGHTBAR_DEFAULT_RATIO,
 } from './layout-state.ts'
 
 /** Private values assembled by one Desktop-owned shell registration. */
@@ -17,7 +17,7 @@ export interface AdvancedFrameInjected {
 }
 
 /** Full enhanced-mode root slot props. */
-export type AdvancedFrameProps = GlobalStandardProps
+export type AdvancedFrameProps = PropsRuntime<'root'>
   & PropsRenderSlots<'sidebar' | 'main' | 'rightbar' | 'shell.overlay'>
   & AdvancedFrameInjected
 
@@ -41,7 +41,6 @@ export function DesktopOwnedFrame({
   const panels = useSyncExternalStore(subscribeLayout, readLayout, readLayout)
   const frameRef = useRef<HTMLDivElement>(null)
   const [viewport, setViewport] = useState(() => window.innerWidth)
-  const [narrow, setNarrow] = useState(() => resolveNarrowBreakpoint(window.innerWidth, false))
 
   useEffect(() => {
     const element = frameRef.current
@@ -61,40 +60,10 @@ export function DesktopOwnedFrame({
     }
   }, [])
 
-  // Breakpoint uses window.innerWidth (rAF-throttled resize), not the
-  // ResizeObserver frame width — that width is squeezed by better-sidebar's
-  // --dsh-sidebar-width / #root margin-right transition and would flash the rail.
-  useEffect(() => {
-    let frame: number | null = null
-    const measure = (): void => {
-      frame = null
-      setNarrow((current) => resolveNarrowBreakpoint(window.innerWidth, current))
-    }
-    const onResize = (): void => {
-      if (frame === null) frame = requestAnimationFrame(measure)
-    }
-    window.addEventListener('resize', onResize)
-    measure()
-    return () => {
-      window.removeEventListener('resize', onResize)
-      if (frame !== null) cancelAnimationFrame(frame)
-    }
-  }, [])
-
+  const narrow = viewport < SIDEBAR_AUTO_COLLAPSE
   useEffect(() => { layout.setNarrow(narrow) }, [layout, narrow])
 
   const collapsed = narrow ? !panels.narrowExpanded : panels.sidebar === 0
-
-  useEffect(() => {
-    if (collapsed) {
-      document.body.dataset.dshSidebarCollapsed = ''
-    } else {
-      delete document.body.dataset.dshSidebarCollapsed
-    }
-    return () => {
-      delete document.body.dataset.dshSidebarCollapsed
-    }
-  }, [collapsed])
   const sidebarPreference = collapsed ? 0 : panels.sidebar === 0 ? SIDEBAR_DEFAULT : panels.sidebar
   const rightbarPreference = panels.rightbar ?? viewport * RIGHTBAR_DEFAULT_RATIO
   const normal = computeDesktopColumns(
@@ -146,12 +115,18 @@ export function DesktopOwnedFrame({
       data-dragging={dragging || undefined}
       style={{ gridTemplateColumns: `${columns.sidebar}px minmax(0, 1fr) ${columns.rightbar}px` }}
     >
+      {mode === 'advanced' && platform === 'darwin' && <div className="dshDesktopMacCaptionRow" aria-hidden="true" />}
       <aside className="dshDesktopSidebarSurface">
-        {/* The official layout marks its sidebar column with `data-pane="sidebar"`,
-            and third-party rows (the OmniMux hub coordinator among them) anchor to
-            that marker. This frame replaces the official column, so it carries the
-            same marker for the slot content it hosts. */}
-        <div className="dshDesktopUpstreamSidebar" data-pane="sidebar">
+        {/*
+          Desktop owns the layout, so the upstream Web frame — and the CSS module
+          class `<hash>_sidebarCol` plugins anchor on — never reaches the DOM.
+          Carry both anchors here so a plugin written against the Web sidebar
+          column keeps resolving one; `dshDesktop_sidebarCol` holds no styles.
+        */}
+        <div
+          className="dshDesktopUpstreamSidebar dshDesktop_sidebarCol"
+          data-pane="sidebar"
+        >
           {renderSlot('sidebar', { collapsed, width: sidebarOwnerWidth })}
         </div>
       </aside>
@@ -186,7 +161,7 @@ export function DesktopOwnedFrame({
   )
 }
 
-function MainPanel({ usePanelInfo, renderSlot }: Pick<GlobalStandardProps, 'usePanelInfo'> & PropsRenderSlots<'main'>) {
+function MainPanel({ usePanelInfo, renderSlot }: Pick<PropsRuntime<'root'>, 'usePanelInfo'> & PropsRenderSlots<'main'>) {
   const panelId = usePanelInfo(info => info.activePanelId)
   return renderSlot('main', {}, { entryKey: panelId ?? 'conversation' })
 }

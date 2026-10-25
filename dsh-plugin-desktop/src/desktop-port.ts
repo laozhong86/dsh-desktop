@@ -17,7 +17,7 @@ export const DESKTOP_DEV_WEB_PORT = 45_120
 /** Default production port fallback. */
 export const DESKTOP_DEFAULT_WEB_PORT = DESKTOP_PROD_WEB_PORT
 
-/** Maximum number of sequential ports tried after a real bind collision. */
+/** Maximum number of sequential ports tried after a bind collision or a Windows-reserved port. */
 export const DESKTOP_WEB_PORT_RETRY_LIMIT = 32
 
 /** Select the default loopback Web port based on runtime Dev/Prod channel identity. */

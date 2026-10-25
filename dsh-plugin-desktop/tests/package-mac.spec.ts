@@ -128,6 +128,71 @@ describe('macOS DMG smoke packaging', () => {
     ])
   })
 
+  it('packages one CPU without the universal merge when requested', () => {
+    const calls: CommandCall[] = []
+    const logs: string[] = []
+    const value = {
+      ...options(calls, logs),
+      env: {
+        ...options(calls).env,
+        DSH_PACKAGE_CHECK_ALREADY_RAN: '1',
+        DSH_MAC_SMOKE_ARCH: 'arm64',
+      },
+    }
+
+    packageMacSmoke(value)
+
+    expect(calls).toHaveLength(2)
+    expect(calls[0]?.args).toContain('--arm64')
+    expect(calls[0]?.args).not.toContain('--universal')
+    expect(calls[1]?.env.DSH_MAC_SMOKE_ARCH).toBe('arm64')
+    expect(logs).toContain('Packaging only the arm64 application; the universal merge is skipped.')
+  })
+
+  it('rejects an unknown smoke architecture before running commands', () => {
+    const calls: CommandCall[] = []
+    const value = {
+      ...options(calls),
+      env: { ...options(calls).env, DSH_MAC_SMOKE_ARCH: 'ia32' },
+    }
+
+    expect(() => packageMacSmoke(value)).toThrow('DSH_MAC_SMOKE_ARCH must be universal, arm64, or x64')
+    expect(calls).toEqual([])
+  })
+
+  it('overrides electron-builder compression and skips DMG update info when requested', () => {
+    const calls: CommandCall[] = []
+    const logs: string[] = []
+    const value = {
+      ...options(calls, logs),
+      env: {
+        ...options(calls).env,
+        DSH_PACKAGE_CHECK_ALREADY_RAN: '1',
+        DSH_MAC_PACKAGE_COMPRESSION: 'store',
+      },
+    }
+
+    packageMacSmoke(value)
+
+    expect(calls).toHaveLength(2)
+    expect(calls[0]?.args).toContain('--config.mac.compression=store')
+    expect(calls[0]?.args).toContain('--config.dmg.writeUpdateInfo=false')
+    expect(logs).toContain('Packaging the macOS DMG smoke with store compression.')
+  })
+
+  it('rejects an unknown compression override before running commands', () => {
+    const calls: CommandCall[] = []
+    const value = {
+      ...options(calls),
+      env: { ...options(calls).env, DSH_MAC_PACKAGE_COMPRESSION: 'fast' },
+    }
+
+    expect(() => packageMacSmoke(value)).toThrow(
+      'DSH_MAC_PACKAGE_COMPRESSION must be store, normal, or maximum',
+    )
+    expect(calls).toEqual([])
+  })
+
   it.each([
     ['win32', 'arm64', '22.23.2', 'native macOS host'],
     ['darwin', 'ia32', '22.23.2', 'requires x64 or arm64 Node'],

@@ -12,6 +12,7 @@ import {
   type MacUniversalArch,
 } from './mac-universal.ts'
 import { verifyDesktopMacRuntime } from './verify-mac-runtime.ts'
+import { DESKTOP_PRODUCT_NAME } from '../src/product-identity.ts'
 
 /** Injectable filesystem and command boundaries for smoke verification. */
 export interface MacSmokeVerificationOptions {
@@ -62,7 +63,7 @@ function defaultOptions(): MacSmokeVerificationOptions {
     distDir: process.argv[2] === undefined
       ? join(packageRoot, 'dist', 'mac-smoke')
       : resolve(process.argv[2]),
-    productName: 'DSH Desktop',
+    productName: DESKTOP_PRODUCT_NAME,
     executableSlices: macSmokeExecutableSlices(macSmokeArchitecture(process.env)),
     listDmgs,
     makeMountPoint: () => mkdtempSync(join(tmpdir(), 'dsh-desktop-dmg-smoke-')),

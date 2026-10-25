@@ -4,6 +4,31 @@
 
 ---
 
+## 2026-10-25 · 前向合并 `68de0b3dad`（与 #3776 / #3786 交付物对齐）
+
+- **范围**：把本分支（551 提交上游同步 + 本任务 11 个提交）与 `fork/omnimux` 的新 tip `68de0b3dad96e12c1ea4a6fbacc662a60187408c` 前向合并（**不是重做 `git merge origin/master`**，保住 2a/2b/2c 成果）。新 base 含 `1563675a4f`（#106 / #3776：Windows provider seam 核验 + 两处过期 CI 断言复位）与 `68de0b3dad`（#107 / #3786：macOS universal smoke 修复——sharp 钉版 `0.35.3→0.35.5` + `x64ArchFiles` 补三个 darwin 原生家族）。merge commit `19ee33171b`，父提交 `5350f70501` + `68de0b3dad`。
+- **冲突 6 项与解法**：
+  1. `dsh-community-market/package.json`：取本分支侧——保留上游新增的 `zod ^4.4.3`（`src/catalog/domain.ts` 直接 `import { z } from 'zod'`，是本次同步带进来的真实依赖）。
+  2. `dsh-plugin-desktop/package.json`：取本分支侧——上游的 `x64ArchFiles` 是超集（含 `Contents/Resources/runtime/**` 与 `#107` 补的三个家族 `@deepseek-ai/libreoffice-kit-darwin-*` / `meshcall-router-darwin-*` / `sherpa-onnx-darwin-*`），并保留 `asar: false`。sharp 两侧同为 `0.35.5`，自动合并。
+  3. `dsh-community-market/tests/market-settings-persistence.spec.ts`：**接受上游删除**（`git rm`，与 #3776 关闭评论口径一致）。
+  4. `dsh-plugin-desktop/tests/package.spec.ts`：**按决定 2（跟随上游 Electron 44.7.0）后的真实 manifest 取值**，不保留 #106 的临时 `43.0.0` 断言。
+  5. `dsh-plugin-desktop/tests/mac-universal.spec.ts`：**保留 #107 新增的「manifest / lockfile / 原生条目三处 sharp 版本一致」用例**，标题采用上游侧（`requires every CPU-specific file and repairs both uv binaries and node-pty helpers`）。
+  6. `dsh-plugin-desktop/tests/windows-pwsh-sandbox.spec.ts`：两侧是**不同测试套件**（本分支=上游的 `windows-console-host` 两套；fork 侧=#106 的 provider seam 套件）。按「保留用例语义、按上游结构改写写法」合成一个文件：**上游的 4 个 describe 全保留 + #106 的 `desktop Windows ACL sandbox provider seam` 套件（含「上游裁决对象不被就地修改」的变异检查）与其 `aclSeam` mock 追加**；`configValue`（来自已删除的 `settings-access.ts`）不引入，改用上游 `desktopWindowsPwshConfig` 的 `.get()` 语义。
+- **#3776 交付物确认落地**：`tests/profile.spec.ts` 自动合并带入 +10 行新 row id 断言（`desktop-windows-acl-sandbox` 存在、`disabled` 为假、旧 `desktop-windows-pwsh-sandbox` 不再出现）；`tests/windows-pwsh-sandbox.spec.ts` 带入 +77 行 provider seam 套件。
+- **顺带修掉一个真实缺陷（本次同步引入）**：551 提交同步带进了上游的 `vite.client.config.ts`，但本仓 `build` 脚本（按合同 B 级保我们的链）没有跑它，而 `package.json` 的 `exports['./client']` 指向 `lib/client.js` → **没有任何构建产物能满足自己的导出**。已把 `vite build --config vite.client.config.ts` 加入本仓 build 链（保留 `generate-*-omnimux.mjs` 图标链与 `vite.native-ui.config.ts`），重建后 `lib/client.js` 701,926 字节。
+- **`yarn.lock`**：以 `corepack yarn install` 结果为准（#107 的剪枝与上游重生成都包含在内）；`--immutable` 复跑通过。
+- **验证证据（前向合并后实测）**：
+  - typecheck：`dsh-plugin-desktop` / `dsh-desktop-next` / `dsh-community-market` **均 exit 0**。
+  - `check:layout`：exit 0（双语 53 记录 / 106 文档、vendored-runtime 344 包、verify-layout 通过）。
+  - `workspace dsh-plugin-desktop build`：**exit 0**。
+  - `workspace dsh-plugin-desktop test`：**162 文件 / 2037 通过 / 18 失败 / 12 跳过**（前向合并前为 21 失败；`package.spec.ts`、`verify-packaged-runtime.spec.ts`、`host-process-integration.spec.ts` 已转绿）。
+  - `tests/package.spec.ts` 单跑：**52 通过 / 1 跳过 / 0 失败**。
+  - `workspace dsh-desktop-next test`：**86 文件 / 717 通过 / 3 跳过 / 0 失败**。
+  - `corepack yarn check`：**仍未通过**，剩余 18 项见下。
+- **剩余 18 项（真实数字）**：`profile.spec` 5、`plugin.spec` 3、`client-environment.spec` 3、`dev-package.spec` 2、`setup-wizard-settings` 1、`setup-wizard-native-ui` 1、`desktop-runtime-environment` 1、`desktop-plugins` 1、`client-desktop-settings` 1。均为上游测试断言与本仓实现/品牌差异的逐项对账，无已知结构性阻塞。
+
+---
+
 ## 2026-10-25 · 上游 551 提交大同步（Next 壳灰盒引入；C 级 13 项已获老板确认）
 
 - **上游范围**：`63e160ab4387988db894adef766865eab897cf80`（2026-09-12 同步落地的 origin/master tip）→ `092e2ecef750d10db43cedbab8e81fd48c8de38e`，共 **551 提交**；fork base `dca12ebdd2b5a7b572663f491c84833da3e487ce`（`fork/omnimux` tip）。上游产品 2.0.9 → 2.0.18；DSH 运行时两侧同 pin `1f81c047fc48fa190a683e469daa699857e9afe8`（`0.2.1-rc.3`），submodule gitlink 无差异。

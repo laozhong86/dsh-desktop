@@ -1229,7 +1229,7 @@ export function registerMarketSettings(ctx: Context, settings?: MarketSettingsSe
   // Electron desktop shell); fall back to schema defaults rather than blocking.
   const service = settings
     ?? (typeof ctx.get === 'function' ? ctx.get('settings') as MarketSettingsService | undefined : undefined)
-    ?? (ctx as unknown as { settings?: MarketSettingsService }).settings
+    ?? undefined
   return {
     get: () => {
       const descriptor = service === undefined

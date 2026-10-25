@@ -52,7 +52,7 @@ const DEFAULT_SETTINGS: DesktopSettings = {
   macosMaterial: 'transparent',
   windowsMaterial: 'off',
   linuxMaterial: 'off',
-  port: 43_120,
+  port: 44_120,
   openBrowser: false,
   networkExposure: 'loopback',
   logLevel: 'info',
@@ -349,7 +349,7 @@ describe('desktop Host plugin', () => {
       macosMaterial: 'transparent',
       windowsMaterial: 'off',
       linuxMaterial: 'off',
-      port: 43_120,
+      port: 44_120,
       openBrowser: false,
       networkExposure: 'loopback',
       logLevel: 'info',
@@ -463,7 +463,7 @@ describe('desktop Host plugin', () => {
       mode: 'compatibility',
       url: 'http://127.0.0.1:43120/?dsh-desktop-mode=compatibility&dsh-desktop-platform=darwin&dsh-desktop-version=2.0.0&dsh-desktop-material=transparent&dsh-desktop-titlebar-inset=36',
       authenticationUrl: 'http://127.0.0.1:43120/?token=test-token',
-      productName: 'DSH Desktop',
+      productName: 'OmniMux',
       windowTitle: 'DeepSeek Harness Desktop',
       rendererAccessHeader: {
         name: 'x-dsh-desktop-renderer',
@@ -774,7 +774,9 @@ describe('desktop Host plugin', () => {
     await enabledHarness.notify({ mode: 'advanced' })
     await vi.runAllTimersAsync()
     expect(enabledHarness.restart).toHaveBeenCalledOnce()
-    expect(enabledHarness.browserAccess.ordinaryBrowserEnabled).toBe(false)
+    // A custom mode withdraws LAN exposure only; the user's own browser switch
+    // stays on and keeps serving loopback.
+    expect(enabledHarness.browserAccess.ordinaryBrowserEnabled).toBe(true)
     expect(enabledHarness.setLanHttpsEnabled).toHaveBeenLastCalledWith(false)
   })
 
@@ -880,7 +882,7 @@ describe('desktop Host plugin', () => {
       macosMaterial: 'transparent',
       windowsMaterial: 'acrylic',
       linuxMaterial: 'off',
-      port: 43_120,
+      port: 44_120,
       openBrowser: false,
       networkExposure: 'loopback',
       logLevel: 'info',
@@ -913,7 +915,7 @@ describe('desktop Host plugin', () => {
       macosMaterial: 'transparent',
       windowsMaterial: 'off',
       linuxMaterial: 'off',
-      port: 43_120,
+      port: 44_120,
       openBrowser: false,
       networkExposure: 'lan',
       logLevel: 'info',

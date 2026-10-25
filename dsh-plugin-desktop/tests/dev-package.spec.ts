@@ -36,7 +36,7 @@ describe('development app packaging', () => {
     const desktop = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8'))
     expect(root.scripts['package:dev']).toBe('yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop package:dev')
     expect(desktop.scripts['package:dev']).toBe('node scripts/package-dev.mjs')
-    expect(desktop.scripts['package:dir']).toBe('yarn run build && yarn run prepare:electron-native && yarn run stage:preset && node scripts/package-dir.mjs')
+    expect(desktop.scripts['package:dir']).toBe('yarn run build && yarn run prepare:electron-native && yarn run prepare:runtime && yarn run stage:preset && node scripts/package-dir.mjs')
   })
 
   it.each([1, 2, 3, 4, 5])('stops at the first failing packaging step %i', failedStep => {

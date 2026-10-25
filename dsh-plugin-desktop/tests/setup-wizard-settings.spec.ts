@@ -605,8 +605,16 @@ describe('Desktop Setup Wizard settings under the 0.1.7 section keys', () => {
     await expect(migrateDesktopWindowMaterialSettings(path)).resolves.toBe(true)
     await expect(migrateDesktopBrowserAccessSettings(path)).resolves.toBe(true)
 
+    // A legacy document carries no mode, so it is read with this platform's
+    // default: only a compatibility shell keeps the legacy LAN grant, every other
+    // mode lands on loopback with browser access left off.
+    const legacyCompatible = defaultDesktopShellMode() === 'compatibility'
     expect(parseDocument(readFileSync(path, 'utf8')).toJS()).toEqual({
-      'desktop-shell': { windowsMaterial: 'off', openBrowser: true, networkExposure: 'lan' },
+      'desktop-shell': {
+        windowsMaterial: 'off',
+        openBrowser: legacyCompatible,
+        networkExposure: legacyCompatible ? 'lan' : 'loopback',
+      },
     })
   })
 

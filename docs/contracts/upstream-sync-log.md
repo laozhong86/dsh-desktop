@@ -41,9 +41,12 @@
   - `corepack yarn workspace dsh-community-market typecheck`：**exit 0**。
   - `corepack yarn check:layout`：**exit 0**（`verify-bilingual-docs: 53 records and 106 documents are consistent`；`sync-vendored-runtime: stable 344 packages from 1f81c047fc are verified`；`verify-layout: Yarn workspace and upstream 1f81c047fc are consistent`）。
   - `corepack yarn workspace dsh-community-market test`：**14 文件 / 309 通过**。
-  - `corepack yarn workspace dsh-plugin-desktop test`：**162 文件 / 1871 通过 / 48 失败 / 11 跳过**（首轮为 131 失败，逐项对账中）。
+  - `corepack yarn workspace dsh-plugin-desktop test`：**162 文件 / 1902 通过 / 20 失败 / 11 跳过**（首轮 131 → 48 → 20，逐项对账中；剩余项见文末「未完」）。
+  - `corepack yarn workspace dsh-desktop-next test`：**86 文件 / 717 通过 / 3 跳过 / 0 失败**（Next 灰盒工作区全绿）。
   - **`corepack yarn check`：尚未通过** —— 阻塞项为 desktop 套件的 48 项断言对账，以及 `tests/package.spec.ts`（该文件由并行任务 #3776/#3786 所有，本次按上游侧保留，待其合并后前向对齐）。
   - 环境：`env -u NODE_OPTIONS PATH=<managed node 22.22.2>/bin:/usr/bin:/bin:/usr/sbin:/sbin`（本机 `22.22.2-6` 目录名与合同示例的 `22.22.2` 不同）。
+- **批准包决定 5 的第 5 个调用点（老板 2026-10-25 追加确认补回）**：fork 的「release/Dev 构建首次启动直接落默认值、不弹 Setup Wizard」在本次合并中一度丢失。已按**上游新的** `setupPending` / `beginDesktopSetupWizard` 状态机语义重插：当上游判定 Setup 必需时，先写默认偏好、重跑 `prepareDesktopProfile`、用 `completeOrSkipDesktopSetupWizard(..., 'skipped', ...)` 把 Setup 记为已结算，再把 `setupPending` 置 false，因此向导不会打开、`runtime.setupOnboarding` 仍报告一致且已结算的文档；`OMNIMUX_FORCE_SETUP_WIZARD=1` 仍可强制走上游向导。新增 `settlesFirstRunSetup(required)` 作为可测决策点，并补 3 个测试（策略 2 个 + `main.ts` 接线 1 个）钉住「不弹向导 / 非 release 行为不变 / 接线在向导之前」。
+- **未完（本条提交时的真实状态）**：`corepack yarn check` 尚未通过。剩余 20 项 desktop 失败为上游测试断言与本仓实现差异的逐项对账（`profile.spec` 4、`plugin.spec` 3、`client-environment.spec` 3、`host-process-integration.spec` 2、`dev-package.spec` 2、`setup-wizard-settings` 1、`setup-wizard-native-ui` 1、`recovery-plugin-uninstall` 1、`desktop-runtime-environment` 1、`desktop-plugins` 1、`client-desktop-settings` 1），加上 `tests/package.spec.ts`（**并行任务 #3776/#3786 所有**，本次按上游侧保留，待其合并后前向对齐）与 `tests/verify-packaged-runtime.spec.ts`（需 `lib/` 构建产物，`yarn check` 会先 build，非缺陷）。
 
 ---
 

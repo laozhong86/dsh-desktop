@@ -447,5 +447,3 @@ it('renders the on-demand /computer-use command sub-switch on the Computer Use d
   )
   expect(hiddenSwitch).toBeUndefined()
 })
-
-

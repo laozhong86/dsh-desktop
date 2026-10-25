@@ -162,7 +162,9 @@ describe('desktop update Host plugin', () => {
     } finally { await harness.dispose() }
   })
 
-  it('rechecks Stable after confirmation and downloads its promoted Next release', async () => {
+  // OmniMux keeps the stable stream stable-only: a Next release offered on the
+  // stable channel is never confirmed, downloaded, or re-checked.
+  it('refuses a Next release offered on the Stable channel', async () => {
     const request = vi.fn(async (_url: string, init: RequestInit) => {
       expect(new Headers(init.headers).get(DESKTOP_RELEASE_CHANNEL_HEADER)).toBe('stable')
       return Response.json({ version: '2.0.20-next', channel: 'stable' })
@@ -171,9 +173,9 @@ describe('desktop update Host plugin', () => {
       config: { ...testConfig, enabled: false }, request, confirmDownload: async () => true })
     try {
       await harness.tray.invoke()
-      expect(request).toHaveBeenCalledTimes(2)
-      expect(harness.confirmDownload).toHaveBeenCalledWith('2.0.20-next', 'stable')
-      expect(harness.downloadAndOpen).toHaveBeenCalledWith('2.0.20-next', expect.any(AbortSignal), 'stable')
+      expect(request).toHaveBeenCalledTimes(1)
+      expect(harness.confirmDownload).not.toHaveBeenCalled()
+      expect(harness.downloadAndOpen).not.toHaveBeenCalled()
     } finally { await harness.dispose() }
   })
 

@@ -88,22 +88,18 @@ afterEach(async () => {
 })
 
 describe('desktop update installer download', () => {
-  it.each(['darwin', 'win32'] as const)('downloads the Stable-promoted Next installer on %s', async platform => {
+  // OmniMux keeps the stable stream stable-only: a Next version offered on the
+  // stable channel must be refused before any request is issued.
+  it.each(['darwin', 'win32'] as const)('refuses the Stable-promoted Next installer on %s', async platform => {
     const directory = await temporaryDirectory()
     const version = '2.0.20-next'
-    const filename = desktopUpdateFilename(platform, version, 'stable')
-    expect(filename).toBe(`DSH-NEXT-${version}-${platform === 'darwin' ? 'mac.dmg' : 'windows.exe'}`)
-    const destination = join(directory, filename)
-    const artifact = platform === 'darwin' ? dmgArtifact() : windowsArtifact()
-    await expect(downloadDesktopUpdate({ platform, version, channel: 'stable', destinationPath: destination,
-      request: async (_url, init) => {
-        const headers = new Headers(init.headers)
-        expect(headers.get(DESKTOP_RELEASE_CHANNEL_HEADER)).toBe('stable')
-        expect(headers.get(DESKTOP_TARGET_VERSION_HEADER)).toBe(version)
-        return chunkedResponse([artifact])
-      },
-    })).resolves.toBe(destination)
-    expect(await readFile(destination)).toEqual(Buffer.from(artifact))
+    const request = vi.fn<UpdateArtifactRequest>(async () => chunkedResponse([dmgArtifact()]))
+    await expect(downloadDesktopUpdate({ platform, version, channel: 'stable',
+      destinationPath: join(directory, `DSH-NEXT-${version}-${platform === 'darwin' ? 'mac.dmg' : 'windows.exe'}`),
+      request,
+    })).rejects.toThrow()
+    expect(request).not.toHaveBeenCalled()
+    expect(() => desktopUpdateFilename(platform, version, 'stable')).toThrow()
   })
 
 

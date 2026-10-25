@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -17,6 +18,23 @@ describe('universal macOS native runtime preparation', () => {
         path: 'node_modules/fs-ext/prebuilds/darwin-x64/electron.abi148.node',
       },
     ]))
+  })
+
+  it('keeps one sharp version across the manifest, the lockfile and the native entries', () => {
+    const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+      devDependencies?: Record<string, string>
+    }
+    const declared = manifest.devDependencies?.sharp
+    expect(declared).toBeDefined()
+    // Two sharp resolutions in the tree let Yarn hoist a different one than the
+    // pinned entry names. That 0.35.3/0.35.5 split is what broke the universal
+    // DMG smoke: nothing else compares the pin with what the install resolves.
+    const lockfile = readFileSync(new URL('../../yarn.lock', import.meta.url), 'utf8')
+    expect(lockfile.match(/^"sharp@npm:[^"]+":$/gmu)).toEqual([`"sharp@npm:${declared}":`])
+    for (const entry of MACOS_UNIVERSAL_NATIVE_ENTRIES) {
+      const embedded = /@img\/sharp-darwin-(?:arm64|x64)\/lib\/sharp-darwin-(?:arm64|x64)-(\d+\.\d+\.\d+)\.node$/u.exec(entry.path)
+      if (embedded !== null) expect(embedded[1]).toBe(declared)
+    }
   })
 
   it('requires every CPU-specific file and repairs both node-pty helpers', () => {

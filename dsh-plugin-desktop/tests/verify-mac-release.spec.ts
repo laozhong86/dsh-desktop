@@ -79,7 +79,7 @@ describe('macOS release artifact verification', () => {
       },
     ])
     expect(harness.removeMountPoint).toHaveBeenCalledWith('/private/tmp/dsh-desktop-dmg-test')
-    expect(harness.verifyEntitlements).toHaveBeenCalledWith(appPath, 'DSH Desktop')
+    expect(harness.verifyEntitlements).toHaveBeenCalledWith(appPath, 'OmniMux')
   })
 
   it('rejects a release missing microphone signature access and detaches the image', () => {
@@ -101,7 +101,7 @@ describe('macOS release artifact verification', () => {
       verifyRuntime: appPath => { order.push(`runtime:${appPath}`) },
     })
     verifyMacRelease(harness.value)
-    expect(order).toEqual(['entitlements', `runtime:${join('/private/tmp/dsh-desktop-dmg-test', 'DSH Desktop.app')}`])
+    expect(order).toEqual(['entitlements', `runtime:${join('/private/tmp/dsh-desktop-dmg-test', 'OmniMux.app')}`])
     expect(harness.calls.some(call => call.command === 'spctl')).toBe(true)
   })
 

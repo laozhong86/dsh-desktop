@@ -355,6 +355,7 @@ virtualStoreDirMaxLength: 60
       id: 'sandbox',
       name: '@deepseek-ai/dsh-sandbox-local',
     })
+    expect(rows.map(row => row.id)).not.toContain('desktop-windows-acl-sandbox')
     expect(rows.find(row => row.id === 'agent-preset-registry')).toEqual(expect.objectContaining({
       name: '@deepseek-ai/dsh-agent-preset-registry',
     }))
@@ -977,6 +978,15 @@ virtualStoreDirMaxLength: 60
       disabled: { __jsExpr: "process.platform !== 'win32'" },
       config: { cwd: 'C:\\workspace' },
     }))
+    // The trampoline moved off the pwsh executor onto the shell-owned sandbox
+    // provider, so the swap disables the upstream provider row and inserts the
+    // desktop one. It needs no disabled guard: the whole swap already sits in
+    // the win32 branch, so the row is active whenever it exists.
+    expect(rows).toContainEqual(expect.objectContaining({
+      id: 'desktop-windows-acl-sandbox',
+      name: 'dsh-plugin-desktop/windows-acl-sandbox-provider',
+    }))
+    expect(rows.find(row => row.id === 'desktop-windows-acl-sandbox')?.disabled).toBeFalsy()
   })
 
   it('rejects a bundle and user patch that register the same loader entry id', () => {

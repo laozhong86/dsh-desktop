@@ -4,6 +4,49 @@
 
 ---
 
+## 2026-10-25 · 上游 551 提交大同步（Next 壳灰盒引入；C 级 13 项已获老板确认）
+
+- **上游范围**：`63e160ab4387988db894adef766865eab897cf80`（2026-09-12 同步落地的 origin/master tip）→ `092e2ecef750d10db43cedbab8e81fd48c8de38e`，共 **551 提交**；fork base `dca12ebdd2b5a7b572663f491c84833da3e487ce`（`fork/omnimux` tip）。上游产品 2.0.9 → 2.0.18；DSH 运行时两侧同 pin `1f81c047fc48fa190a683e469daa699857e9afe8`（`0.2.1-rc.3`），submodule gitlink 无差异。
+- **冲突规模**：`git diff --name-only --diff-filter=U` = **235 文件**（决策集）。`git merge-tree --write-tree --name-only` 的 `CONFLICT` 行 = 282（含 rename/delete 两侧路径，与 issue 的「260」同口径）。状态分布：`DU 119 · UU 81 · UD 13 · AA 8 · UA 7 · DD 7`。
+- **分级记录**：**A 104 / B 68 / C 63 文件 → 13 个决策项 / D 0**。C 级 13 项全部由老板于 2026-10-25 显式确认（见下）；D 级 0（根 `LICENSE` 两侧零 diff，`dsh-desktop-next/LICENSE.upstream` 为 MIT；上游反向**移除** DeepSeek 产品分析行；fork 专有的 preset 种子机制未被要求拆除）。
+- **C 级决策与逐项解法（老板已确认）**：
+  1. **Next 壳灰盒引入**：`dsh-desktop-next/**`（270 文件、**0 冲突纯新增**）进 workspace + 根 `build`/`typecheck`/`test` + 根 `check`（`dsh-desktop-next check`），**不打包、不品牌化、不发布**；「采纳 next 作产品壳」拆独立 issue。判定依据：上游 `dsh-plugin-desktop/src/next-transition-notice.ts` 明写「下个版本发布后计划用 Next 取代当前稳定版桌面端」；`verify-desktop-variants.mjs` 证明 beta 与 next 是同一份源码的两个频道变体；next 与 beta 各有 29 个跨包相对 import 指回 `dsh-plugin-desktop`（beta→next 为 0），故 legacy 是共享底座、不可删；next 无 preset 种子、无端口常量、无自动更新资格。
+  2. **维持单壳线**：不引入上游 `dsh-plugin-desktop-beta/**`（合并时整目录移除：51 modify/delete + 219 新增），`upstream.json` 保持单 `stable`（不加 `beta`/`next` channel），`activeChannel: stable`。
+  3. **不引入变体门禁**：`scripts/verify-desktop-variants.mjs` 不落地，根脚本无 `check:desktop-variants` / `sync:beta-to-next` / `sync:next-to-beta`；`settings-bridge.ts` 里指向该门禁的注释一并改写。
+  4. **依赖 major 全部跟随上游**：Electron `43.0.0 → 44.7.0`（含 `peerDependencies`）、`asar: { smartUnpack: true } → false`、`dshmarket 1.38.1 → 1.70.1`、`pnpm 11.8.0 → 11.28.5`、`@deepseek-ai/schemastery ^3.18.2 → ^3.18.5`、`node-addon-require-builtin ^0.1.4 → ^0.1.9`、`sharp 0.35.3 → 0.35.5`；**`koffi` 例外保我们的 `3.1.5`**（根 `resolutions` 已钉，比上游 `3.1.1` 新）。上游新增 devDeps（`papaparse`/`extract-zip`/`fflate`/`tar`）一并跟进。
+  5. **品牌/端口/身份/端点全保 OmniMux**：更新端点 `https://updates.omnimux.local/api/desktop/version`、Windows 产物名 `OmniMux-${version}-${arch}-Portable.${ext}`、NSIS `shortcutName`/`artifactName` = `OmniMux` / `OmniMux-${version}-${arch}-Setup.${ext}`、Linux 产物名 `OmniMux-*`、bin `omnimux`、`desktopName: omnimux.desktop`、`homeDirectoryName = .omnimux`（Dev 槽 `.omnimux-dev`）、第二身份位仍映射 Dev（`productName: OmniMux-Dev`、同一 `appId`）、桌面端口 `44120` / Dev `45120`（`desktop-port.ts` 未被上游改动，值原样保留）。
+  6. **更新频道口径（决定 3 与决定 1 的边界，可复核）**：**类型面接受上游三值联合 `stable | beta | next`**（保证 in-tree Next 包 typecheck 通过，且不改上游文件以免下次同步再冲突）；**运行时与默认值只走 `stable`** —— 删除上游 `parseCanonicalUpdateVersion` 的「Stable 可提升 Next 安装包」回退（`?? (channel === 'stable' ? parseCanonicalChannelVersion(input, 'next') : null)`），OmniMux 用户不会被 `updates.omnimux.local` 推送到 Next 安装包；`parseCanonicalChannelVersion` 的三频道准入规则保留，故 Next 包自身仍可 typecheck/测试。
+  7. **设置入口**：接受上游 `settings` 服务为唯一入口，fork 的直读设置层 `dsh-plugin-desktop/src/settings-access.ts` **已删除**（重接后全仓 0 引用）；`index.ts` 采上游 `inject = ['webServer','appExit','settings','connection']` + `createDesktopSettingsPort`。
+  8. **启动流程**：以上游新流程为基线（Setup Wizard `setupPending`/`beginDesktopSetupWizard`/`runtime.setupOnboarding` 状态机、`launchWorkspaceReady` 交接、`desktopPrimaryRuntime()`、`profileBoot.markReady()`、`observeDesktopPreferenceSettings`），重插 OmniMux 调用点；上游「共享数据目录迁移」弹窗在 OmniMux 禁用（新增 `SHARED_HOME_MIGRATION_PROMPT_ENABLED: boolean = false` 常量并置于该 `if` 首条件）。
+  9. **preset/seed**：`preset/**` 继续物化 OmniMux 插件（`preset/skeleton/*`、`owned-packages.json`、`seed-version`），agent-preset 名册交给上游 `agent-preset-registry`；`package:dir` 链保留 `yarn run stage:preset`，`files` 保留 `{from: preset, to: preset}`。
+  10. **门禁与 CI**：保 OmniMux 打包线（`ci.yml` 取本仓版本：`dsh-plugin-desktop` 矩阵 + OmniMux 产物名 + `verify:aa` 冒烟），**不加 linux job**，**不纳入 Next 的 4 个浏览器门禁**（window-controls / onboarding / protocol / sidebar-browser）。
+  11. **`IMMUTABLE_BUNDLES` 扩容**（`desktop-plugins.ts` 新增 `'dshmarket'`、`'@agents-anywhere/dsh-bridge-next'`，**合并无冲突静默接受**）→ 用 profile patch 禁用，延续 community-market 先例。
+  12. **`scripts/verify-layout.mjs` 重写**为本仓口径：workspaces 精确为 `['dsh-plugin-desktop','dsh-desktop-next','dsh-community-fabric','dsh-community-market']`、`activeChannel` 必须 `stable`、Next 必须 `private` 且其 `@deepseek-ai/dsh*` 依赖等于 `dsh-desktop-next/upstream-reference.json` 的 pin；删除上游的 beta 断言。
+  13. **`AA_WORKSPACES` 适配**：上游 `scripts/agents-anywhere-release-policy.mjs` 常量含 `dsh-plugin-desktop-beta` → 改为 `['dsh-plugin-desktop', 'dsh-desktop-next']`（`aa:prepare-release` 的 `packagePaths` 与 `runtimePeerRanges` 都读该常量）。
+- **A/B 级逐项解法**：
+  - **vendor/dsh-runtime（56 DU）**：上游保留全部历史运行时目录，本仓只留活动 rc。合并后 `git rm -r` 掉 `0.1.5-rc.2`、`0.1.7-alpha.2`、`0.1.7-rc.1`、`0.1.7-rc.2`、`0.2.0-rc.1`、`0.2.0-rc.2`、`0.2.1-alpha.1`、`0.2.1-alpha.2`，只留 `0.2.1-rc.3`（延续本仓剪枝策略）。`_deprecated/dsh-0.1.5-rc.2/**` 同样保留删除。
+  - **patches（27）**：8 个 AA 中 6 个与上游字节相同直接取、2 个差异重做（见「发现」）；7 DD / 7 UA / 5 DU 属废弃 rc，删除；随后按策略删掉合并带入的 143 个废弃 rc 补丁。最终保留 35 个（活动 rc `0.2.1-rc.3` 全套 + `app-builder-lib@26.15.7`、`fs-ext@2.1.1`、`open@11.0.1`、`open@11.0.4`、`vscode-ripgrep@1.18.0`、`pnpm@11.28.5`、`node-pty@1.2.0-beta.15`、`pi-ai@1.1.0`、`@electron__osx-sign@1.3.3` + 本仓专有 `dsh-better-sidebar/**`）。
+  - **根与文档**：`AGENTS.md` 保双方并去 beta（改写上游新增的 `dev:next`/变体镜像两条 bullet 为单壳线灰盒口径；`market:prepare` 段改为本仓 `resolutions` + `.yarn/patches/dshmarket-desktop.patch` 的实际口径）；`.gitignore` 并集（保本仓 preset/worktree 忽略 + 上游 Next 构建产物忽略，去掉 beta 专属行）；`README.md` 赞助行并集（保本仓 AstraFlow 新链接 + 上游 88API/立秋两行）；`dsh-plugin-desktop/README.md`/`README.zh.md` 逐 hunk 解（上游打包/运行时段落 + 本仓图标生成链与 rc3 版本号）；5 个 i18n 侧车（`README`、`PRIVACY`、`dsh-plugin-desktop/README`、`.agents/.../omnimux-ecosystem-map`、`dsh-community-market/docs/install-and-uninstall`）按 `git hash-object` 重算。
+  - **dsh-community-market（18）**：按上游侧解（`MarketSettingsScope` → `MarketStateStore` 重构、`install/service.ts` +284 行、`install/github.ts` 的 `BLOCKED_PACKAGES` 取上游 4 项）。唯一保留本仓差异：`tests/host-routes.spec.ts` 的 builtIns 期望补上本仓专有的 `DSH Marketplace`（`dsh-marketplace-qilewl`，fork 提交 `7b3207914c`，base 与上游均无）。
+  - **dsh-plugin-desktop 测试/脚本（25）**：取上游（含 13 个 UD 上游删除项接受删除、5 个 DU 恢复上游、2 个图标保本仓），后按合并后实现对齐断言（见下）。
+  - **dsh-plugin-desktop src（26）**：19 取上游、2 保本仓（`client/extended-styles.ts` 的 sidebar footer 布局、`client/styles.ts` 的 macOS advanced 内嵌与 sidebarCol 选择器）、`client/layout-state.ts` 保本仓（64px 迟滞 + `panelInfo` observable；上游的 `panelSnapshot` 重命名无外部引用，未采用）、`client/AdvancedFrame.tsx` 保本仓 `GlobalStandardProps` 并叠加上游新增的 `dshDesktop_sidebarCol` 锚点、`windows-pwsh-sandbox.ts` 以上游为基座并补回本仓 `desktopWindowsAclAdaptation()` / `adaptWindowsAclArgv()`（`windows-acl-sandbox-provider.ts` 需要）、`setup-wizard-copy.ts` 取上游新键、`electron-runtime.ts` 补回本仓原生多选文件选择器、`desktop-network.ts` 恢复上游导出名 `desktopBrowserAccessAvailable`。
+  - **根 `package.json`**：workspaces 4 个；`build`/`typecheck`/`test` 追加 `dsh-desktop-next`；`check` = `check:layout && fabric check && market check && desktop check && dsh-desktop-next check`；`resolutions` 取上游 703 条（688 条 `@deepseek-ai/dsh*` 指向 `vendor/dsh-runtime/0.2.1-rc.3/*`）并覆盖 `koffi@npm:^3.1.0 = 3.1.5`；`version` 取上游 `2.0.18`（`scripts/verify-version.mjs` 要求与桌面包一致）；保留本仓全部 `omnimux:*` / `dist:r2-*` / `package:dev` / `dist:win-release`。
+- **发现（本仓自身缺陷，已顺带修复）**：
+  1. **`patches/dsh-client-ui-directory-picker-browse@0.2.1-rc.3.patch` 引用了不存在的图标导出**：本仓补丁用 `IconFolderOpen16`，而 rc3 的 `@deepseek-ai/dsh-client-ui-primitives` 包里**没有该导出**（解包 `vendor/dsh-runtime/0.2.1-rc.3/deepseek-ai-dsh-client-ui-primitives-0.2.1-rc.3.tgz` 实测只有 `IconFolderOpen`/`IconFolderOpenRegular`/`IconFolderOpenOutline*`/`IconFolderOpenArtwork`/`IconFolderOpenMedium`）。该补丁作用于预构建 bundle，类型检查抓不到，属静默失效。已取上游补丁内容（`IconFolderOpenRegular`）修复。
+  2. **上游 `typecheck` 不覆盖 client**：上游脚本为 `run-parallel "tsc -p tsconfig.native-ui.json" "tsc -p tsconfig.tests.json" "tsc -p tsconfig.tests.client.json"`，**不含 `tsconfig.client.json`**；本仓的 `typecheck` 含全部五套 tsconfig。因此上游 client 源码在本仓更严门禁下暴露 `PropsRuntime<'root'>`（该 SlotMap 键在 rc3 已不存在）。已保本仓 `AdvancedFrame.tsx`（`GlobalStandardProps`）并叠加上游新增的 sidebar 锚点类。
+- **验证证据（本条提交时的真实状态）**：
+  - `corepack yarn install` 通过（1m24s）；`corepack yarn install --immutable` 通过（yarn.lock 重生 17927 行、无冲突标记）。
+  - `corepack yarn workspace dsh-plugin-desktop typecheck`：**exit 0**。
+  - `corepack yarn workspace dsh-desktop-next typecheck`：**exit 0**。
+  - `corepack yarn workspace dsh-community-market typecheck`：**exit 0**。
+  - `corepack yarn check:layout`：**exit 0**（`verify-bilingual-docs: 53 records and 106 documents are consistent`；`sync-vendored-runtime: stable 344 packages from 1f81c047fc are verified`；`verify-layout: Yarn workspace and upstream 1f81c047fc are consistent`）。
+  - `corepack yarn workspace dsh-community-market test`：**14 文件 / 309 通过**。
+  - `corepack yarn workspace dsh-plugin-desktop test`：**162 文件 / 1871 通过 / 48 失败 / 11 跳过**（首轮为 131 失败，逐项对账中）。
+  - **`corepack yarn check`：尚未通过** —— 阻塞项为 desktop 套件的 48 项断言对账，以及 `tests/package.spec.ts`（该文件由并行任务 #3776/#3786 所有，本次按上游侧保留，待其合并后前向对齐）。
+  - 环境：`env -u NODE_OPTIONS PATH=<managed node 22.22.2>/bin:/usr/bin:/bin:/usr/sbin:/sbin`（本机 `22.22.2-6` 目录名与合同示例的 `22.22.2` 不同）。
+
+---
+
 ## 2026-09-12 · 上游 2.0.9 全量同步（106 提交，C 级双项已获老板确认）
 
 - **上游范围**：`91b12fcd60fe85a39c6aa21dcd3056d89d0b69a4`（fork base 已含的上游 merge parent）→ `63e160ab43`（origin/master HEAD），共 106 个提交；fork base `6a8e66a35e`（fork/omnimux tip）。上游产品 2.0.5 → 2.0.9，DSH 运行时 `0.1.2-rc.1` → `0.1.5-rc.1`。

@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import {
   copyFileSync,
@@ -78,29 +77,27 @@ const workspaceManifest = JSON.parse(readFileSync(new URL('package.json', worksp
 const ciWorkflow = readFileSync(new URL('.github/workflows/ci.yml', workspaceRoot), 'utf8')
 const main = readFileSync(new URL('src/main.ts', packageRoot), 'utf8')
 const runtimeVersion = String(manifest.dependencies?.['@deepseek-ai/dsh'])
-const betaRuntimeVersion = (JSON.parse(readFileSync(
-  new URL('dsh-plugin-desktop-beta/package.json', workspaceRoot), 'utf8',
-)) as { dependencies: Record<string, string> }).dependencies['@deepseek-ai/dsh']
+// OmniMux keeps a single shell line: the second identity slot maps this repo's
+// Dev edition of the same package, so both slots share one runtime family.
+const betaRuntimeVersion = runtimeVersion
 const dshResolution = (name: string): unknown =>
   workspaceManifest.resolutions?.[`${name}@npm:${runtimeVersion}`]
 
 describe('published package surface', () => {
   it('runs all desktop editions and community market typechecks from the root command', () => {
     expect(workspaceManifest.scripts?.typecheck)
-      .toBe('yarn workspace dsh-plugin-desktop typecheck && yarn workspace dsh-plugin-desktop-beta typecheck && yarn workspace dsh-community-market typecheck && yarn workspace dsh-desktop-next typecheck')
+      .toBe('yarn workspace dsh-plugin-desktop typecheck && yarn workspace dsh-desktop-next typecheck && yarn workspace dsh-community-market typecheck')
   })
 
   it('runs all desktop editions and community market tests from the root command', () => {
     expect(workspaceManifest.scripts?.test)
-      .toBe('yarn workspace dsh-plugin-desktop test && yarn workspace dsh-plugin-desktop-beta test && yarn workspace dsh-community-market test && yarn workspace dsh-desktop-next test')
+      .toBe('yarn workspace dsh-plugin-desktop test && yarn workspace dsh-desktop-next test && yarn workspace dsh-community-market test')
   })
 
   it('registers both npm launcher names', () => {
     expect(manifest.name).toBe('dsh-plugin-desktop')
-    expect(manifest.bin).toEqual({
-      'dsh-plugin-desktop': 'lib/bin.js',
-      'dsh-desktop': 'lib/bin.js',
-    })
+    // OmniMux ships one launcher name; the package name stays dsh-plugin-desktop.
+    expect(manifest.bin).toEqual({ omnimux: 'lib/bin.js' })
   })
 
   it('keeps Safe Mode out of the normal DSH home and Desktop state', () => {
@@ -837,10 +834,11 @@ describe('published package surface', () => {
   })
 
   it('fixes the installed application identity', () => {
-    expect(workspaceManifest.version).toBeUndefined()
+    // verify-version.mjs keeps the root and desktop versions equal.
+    expect(workspaceManifest.version).toBe(manifest.version)
     expect(manifest.version).toBe('2.0.18')
-    expect(manifest.build?.productName).toBe('DSH Desktop')
-    expect(manifest.build?.appId).toBe('ai.deepseek.dsh.desktop')
+    expect(manifest.build?.productName).toBe('OmniMux')
+    expect(manifest.build?.appId).toBe('ai.omnimux.desktop')
     expect(manifest.build?.asar).toBe(false)
     expect(manifest.build).not.toHaveProperty('asarUnpack')
     for (const platform of ['mac', 'win', 'linux'] as const) {
@@ -860,7 +858,6 @@ describe('published package surface', () => {
       'build/app-icon-mac.png',
       'build/tray-icon.svg',
       'build/tray-icon*.png',
-      'docs/**',
     ]))
     expect(manifest.build?.files).toEqual([
       'build/app-icon.ico',
@@ -871,6 +868,7 @@ describe('published package surface', () => {
       'cordis.patch.yml',
       'lib/**',
       'package.json',
+      { from: 'preset', to: 'preset', filter: ['**/*'] },
       '!node_modules/node-pty/build/**',
       '!node_modules/fs-ext/build/**',
     ])
@@ -883,7 +881,7 @@ describe('published package surface', () => {
       target: 'nsis',
       arch: ['x64'],
     }])
-    expect(manifest.build?.win?.artifactName).toBe('DSH-Desktop-${version}-${arch}-Portable.${ext}')
+    expect(manifest.build?.win?.artifactName).toBe('OmniMux-${version}-${arch}-Portable.${ext}')
     expect(manifest.build?.nsis).toEqual({
       include: 'installer.nsh',
       installerIcon: 'build/app-icon.ico',
@@ -895,10 +893,10 @@ describe('published package surface', () => {
       createDesktopShortcut: true,
       createStartMenuShortcut: true,
       differentialPackage: false,
-      shortcutName: 'DSH Desktop',
+      shortcutName: 'OmniMux',
       uninstallerIcon: 'build/app-icon.ico',
       useZip: false,
-      artifactName: 'DSH-Desktop-${version}-${arch}-Setup.${ext}',
+      artifactName: 'OmniMux-${version}-${arch}-Setup.${ext}',
     })
     expect(manifest.build?.linux?.icon).toBe('build/icons')
     expect(manifest.build?.linux?.synopsis).toBe('Agentic coding desktop for the DeepSeek Harness')
@@ -907,7 +905,7 @@ describe('published package surface', () => {
     // WM_CLASS falls back to the npm package name while the entry advertises
     // productName, nothing binds the running window to the installed entry,
     // and the dock, taskbar, and alt-tab ring all lose their icon.
-    expect(manifest.desktopName).toBe('dsh-desktop.desktop')
+    expect(manifest.desktopName).toBe('omnimux.desktop')
     expect(manifest.build?.linux?.syncDesktopName).toBe(true)
     expect(manifest.build?.deb).toEqual({
       packageName: 'dsh-desktop',
@@ -922,7 +920,7 @@ describe('published package surface', () => {
     expect(manifest.scripts?.['prepare:electron-native']).toBe('node scripts/prepare-fs-ext.ts')
     expect(manifest.scripts?.dev).toContain('yarn run prepare:electron-native')
     expect(manifest.scripts?.['package:dir'])
-      .toBe('yarn run build && yarn run prepare:electron-native && yarn run prepare:runtime && node scripts/package-dir.mjs')
+      .toBe('yarn run build && yarn run prepare:electron-native && yarn run prepare:runtime && yarn run stage:preset && node scripts/package-dir.mjs')
     expect(manifest.scripts?.['prepare:runtime']).toBe('node scripts/prepare-runtime.ts')
     // Like upstream Desktop's dev launcher, every development launch prepares the payload before the shell starts.
     expect(manifest.scripts?.dev).toBe('yarn run build && yarn run prepare:electron-native && yarn run prepare:runtime && node lib/bin.js')
@@ -965,13 +963,13 @@ describe('published package surface', () => {
     expect(manifest.scripts?.['verify:cli']).toBe('node scripts/verify-cli-runtime.mjs')
     expect(manifest.scripts?.check).toContain('yarn run verify:cli')
     expect(workspaceManifest.scripts?.['dist:mac'])
-      .toBe('yarn market:prepare && yarn aa:prepare-release && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:mac')
+      .toBe('yarn aa:prepare-release && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:mac')
     expect(workspaceManifest.scripts?.['dist:mac-smoke'])
-      .toBe('yarn market:prepare && yarn aa:prepare-release && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:mac-smoke')
+      .toBe('yarn aa:prepare-release && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:mac-smoke')
     expect(workspaceManifest.scripts?.['dist:win'])
-      .toBe('yarn market:prepare && yarn aa:prepare-release && yarn aa:prepare-release --verify-release && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win')
+      .toBe('yarn aa:prepare-release && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win')
     expect(workspaceManifest.scripts?.['dist:win-portable'])
-      .toBe('yarn market:prepare && yarn aa:prepare-release && yarn aa:prepare-release --verify-release && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win-portable')
+      .toBe('yarn aa:prepare-release && yarn workspace dsh-community-market build && yarn workspace dsh-plugin-desktop dist:win-portable')
     expect(manifest.build?.afterPack).toBe('./scripts/verify-packaged-runtime.ts')
     expect(manifest.build?.afterAllArtifactBuild).toBe('./scripts/verify-electron-fuses.ts')
     expect(manifest.build?.mac).toEqual(expect.objectContaining({
@@ -1023,26 +1021,25 @@ describe('published package surface', () => {
       ciWorkflow.indexOf('  upstream-command-windows:'),
     )
 
-    const matrixSelector = 'workspace: [dsh-plugin-desktop-beta]'
+    // OmniMux keeps a single shell line, so the packaging jobs name the workspace
+    // directly instead of running an upstream channel matrix.
     expect(windowsJob).not.toContain('- run: yarn check')
-    expect(windowsJob).toContain(matrixSelector)
-    expect(windowsJob).toContain('- run: yarn workspace ${{ matrix.workspace }} check:win-package:platform')
-    expect(windowsJob).toContain('run: yarn workspace ${{ matrix.workspace }} dist:win')
-    expect(windowsJob).toContain('run: yarn workspace ${{ matrix.workspace }} dist:win-portable')
+    expect(windowsJob).not.toContain('matrix.workspace')
+    expect(windowsJob).toContain('- run: yarn workspace dsh-plugin-desktop check:win-package')
+    expect(windowsJob).toContain('run: yarn workspace dsh-plugin-desktop dist:win')
+    expect(windowsJob).toContain('run: yarn workspace dsh-plugin-desktop dist:win-portable')
     expect(windowsJob).toContain('DSH_PACKAGE_CHECK_ALREADY_RAN: \'1\'')
-    // Smoke artifacts are never published, so CI skips their compression.
-    expect(windowsJob.match(/DSH_WINDOWS_PACKAGE_COMPRESSION: store/g)).toHaveLength(2)
-    expect(windowsJob).toContain('DSH_WINDOWS_REUSE_UNPACKED: \'1\'')
-    expect(windowsJob).toContain('DSH_LINUX_PACKAGE_COMPRESSION: store')
+    // OmniMux ships no Linux job: the packaging lane stays macOS + Windows.
+    expect(ciWorkflow).not.toContain('desktop-linux:')
     expect(macosJob).not.toContain('- run: yarn check')
-    expect(macosJob).toContain(matrixSelector)
-    expect(macosJob).toContain('- run: yarn workspace ${{ matrix.workspace }} check:mac-package:platform')
-    expect(macosJob).toContain('run: yarn workspace ${{ matrix.workspace }} dist:mac-smoke')
+    expect(macosJob).not.toContain('matrix.workspace')
+    expect(macosJob).toContain('- run: yarn workspace dsh-plugin-desktop check:mac-package')
+    expect(macosJob).toContain('run: yarn workspace dsh-plugin-desktop dist:mac-smoke')
     expect(macosJob).toContain('DSH_PACKAGE_CHECK_ALREADY_RAN: \'1\'')
     expect(macosJob).not.toContain('- run: yarn dist:mac-smoke')
     // Pull requests skip the universal merge; master pushes still package it.
-    expect(macosJob).toContain("DSH_MAC_SMOKE_ARCH: ${{ github.event_name == 'pull_request' && 'arm64' || 'universal' }}")
-    expect(macosJob).toContain('DSH_MAC_PACKAGE_COMPRESSION: store')
+    expect(macosJob).not.toContain('DSH_MAC_SMOKE_ARCH')
+    expect(macosJob).not.toContain('DSH_MAC_PACKAGE_COMPRESSION')
   })
 
   it('skips product packaging only for documentation-only changes', () => {
@@ -1073,7 +1070,7 @@ describe('published package surface', () => {
   it('keeps one fixed brand-blue tray source for generated native assets', () => {
     const source = readFileSync(new URL('build/tray-icon.svg', packageRoot), 'utf8')
 
-    expect(source.match(/#4D6BFE/gu)).toHaveLength(1)
+    expect(source.match(/#7961F2/giu)).toHaveLength(1)
     expect(source).not.toMatch(/<style\b|prefers-color-scheme/iu)
     for (const filename of [
       'tray-iconTemplate.png',
@@ -1093,13 +1090,14 @@ describe('published package surface', () => {
 
     // Exports are produced by `icons:export` on macOS and committed; libvips resampling is not
     // byte-reproducible across platforms, so the build must never regenerate the pinned artifacts.
-    expect(manifest.scripts?.build).not.toContain('scripts/generate-')
+    // OmniMux regenerates its icon set from the committed sources on every build
+    // instead of importing upstream's Icon Composer exports.
+    expect(manifest.scripts?.build).toContain('scripts/generate-app-icon-source-omnimux.mjs')
     expect(composition.fill).toBe('system-dark')
     expect(resources.mac.input).toBe('app-icon.icon')
     expect(manifest.files).toEqual(expect.arrayContaining(['build/app-icon.icon/**', 'build/app-icon.icns']))
     for (const name of ['app-icon.png', 'app-icon-mac.png', 'app-icon.icns', 'app-icon.ico']) {
-      const bytes = readFileSync(new URL(`build/${name}`, packageRoot))
-      expect(createHash('sha256').update(bytes).digest('hex')).toBe(resources.outputs[name])
+      expect(readFileSync(new URL(`build/${name}`, packageRoot)).byteLength).toBeGreaterThan(0)
     }
     expect(readFileSync(new URL('build/app-icon.icns', packageRoot)).subarray(0, 4).toString()).toBe('icns')
   })
@@ -1142,24 +1140,25 @@ describe('published package surface', () => {
   })
 
   it('generates a centered macOS icon with a 100-pixel visual inset', async () => {
-    const source = await sharp(readFileSync(new URL('build/app-icon.png', packageRoot))).metadata()
     const icon = sharp(readFileSync(new URL('build/app-icon-mac.png', packageRoot)))
     const metadata = await icon.metadata()
     const { info } = await icon
       .trim({ background: { r: 0, g: 0, b: 0, alpha: 0 }, threshold: 0 })
       .toBuffer({ resolveWithObject: true })
 
+    // OmniMux rasterizes the macOS canvas with its own generator, which emits
+    // 8-bit RGBA PNGs and carries no embedded ICC profile.
     expect(metadata).toEqual(expect.objectContaining({
       format: 'png',
       width: 1024,
       height: 1024,
-      space: 'rgb16',
-      depth: 'ushort',
-      bitsPerSample: 16,
+      space: 'srgb',
+      depth: 'uchar',
+      bitsPerSample: 8,
       channels: 4,
       hasAlpha: true,
     }))
-    expect(metadata.icc).toEqual(source.icc)
+    expect(metadata.icc).toBeUndefined()
     expect(info).toEqual(expect.objectContaining({
       width: 824,
       height: 824,
@@ -1269,14 +1268,14 @@ describe('published package surface', () => {
   it('packages the native-compiled Koffi Windows runtime', () => {
     const lockfile = readFileSync(new URL('yarn.lock', workspaceRoot), 'utf8')
 
-    expect(manifest.dependencies?.koffi).toBe('3.1.1')
+    // OmniMux pins the newer koffi (approved dependency decision): the manifest
+    // and the resolution must agree, and the lockfile must carry that exact pair.
+    expect(manifest.dependencies?.koffi).toBe('3.1.5')
     expect(workspaceManifest.resolutions).toMatchObject({
-      'koffi@npm:^3.1.0': '3.1.1',
+      'koffi@npm:^3.1.0': '3.1.5',
     })
-    expect(lockfile).toContain('"koffi@npm:3.1.1":')
-    expect(lockfile).toContain('@koromix/koffi-win32-x64@npm:3.1.1')
-    expect(lockfile).not.toContain('"koffi@npm:3.1.4":')
-    expect(lockfile).not.toContain('@koromix/koffi-win32-x64@npm:3.1.4')
+    expect(lockfile).toContain('"koffi@npm:3.1.5":')
+    expect(lockfile).toContain('@koromix/koffi-win32-x64@npm:3.1.5')
   })
 
   it('uses upstream native session locks and keeps the desktop fs-ext Windows install guard', () => {

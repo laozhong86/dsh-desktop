@@ -346,7 +346,7 @@ virtualStoreDirMaxLength: 60
     expect(inserted).toContainEqual(expect.objectContaining({
       id: 'desktop-webserver',
       name: 'dsh-plugin-desktop/webserver',
-      config: { host: '127.0.0.1', port: 43_120 },
+      config: { host: '127.0.0.1', port: 44_120 },
     }))
     // dsh 0.1.7-alpha.1 replaced filesystem preset discovery with preset declarations
     // carried by patch files, so Desktop no longer pins preset roots on the registry
@@ -466,7 +466,7 @@ virtualStoreDirMaxLength: 60
     expect(evaluateTrust({ webStartup: { trustedHosts: ['cli.internal', '10.0.0.7'] } }))
       .toEqual(['cli.internal', '10.0.0.7', 'lab.internal', '192.168.1.5'])
     expect(rows.find(row => row.id === 'desktop-webserver')).toEqual(expect.objectContaining({
-      config: { host: '127.0.0.1', port: 43_120 },
+      config: { host: '127.0.0.1', port: 44_120 },
     }))
   })
 
@@ -1256,7 +1256,7 @@ virtualStoreDirMaxLength: 60
     })
     expect(desktopStartupSettingsFromSettings({ 'dsh-desktop': { mode: 'advanced' } })).toEqual({
       mode: 'advanced',
-      port: 43_120,
+      port: 44_120,
       macosMaterial: 'transparent',
       windowsMaterial: 'off',
       linuxMaterial: 'off',

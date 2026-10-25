@@ -4,6 +4,31 @@
 
 ---
 
+## 2026-10-25 · 验收达成：`corepack yarn check` = exit 0
+
+- **真实命令与结果**（受管环境 `env -u NODE_OPTIONS PATH=<managed node 22.22.2>/bin:/usr/bin:/bin:/usr/sbin:/sbin`，worktree `.worktrees/next-shell-merge-issue-3778`）：
+  ```
+  corepack yarn check
+  → exit 0
+  ```
+- **三个工作区全绿（真实计数）**：
+  - `dsh-community-market`：**14 文件 / 309 通过 / 0 失败**
+  - `dsh-plugin-desktop`：**162 文件 / 2055 通过 / 12 跳过 / 0 失败**（本轮起点为 131 失败）
+  - `dsh-desktop-next`：**86 文件 / 717 通过 / 3 跳过 / 0 失败**
+- **同批门禁（均通过）**：`verify-bilingual-docs`（53 记录 / 106 文档）、`verify-fabric-docs`（20 Markdown / 10 双语对）、`verify-market-docs`（12 Markdown / 6 双语对 / 4 schema）、`verify-layout`（workspace 与上游 `1f81c047fc` 一致）、`sync-vendored-runtime`（stable 344 包）、`verify-runtime-closure`（319 首方节点闭合）、`verify-host`（Web-composed Schedule 开关与重启持久化）、`verify-profile-boot`（Creator / 插件管理器 / 两代 Profile HMR）、`verify-operation-reliability`（7 操作 / 18 故障契约）、`verify-licenses`（629 生产包，2 个 LGPL-3.0-or-later 走 notice）、`verify-package-exports`、`verify-market-dependency-direction`、`verify-market-client-loader`、`contract-types`。
+- **本轮（收尾段）修掉的真实缺陷**：
+  1. `dsh-plugin-desktop/package.json` 的 `verify:operations` 仍引用被上游删除的 `scripts/operation-reliability.spec.mjs`，导致 `yarn check` 直接失败 → 按上游收口为 `node scripts/verify-operation-reliability.mjs`（上游已把该 spec 的 7/18 断言内联进 verifier，属**被取代**而非丢失）。
+  2. `exports` 缺 `./windows-acl-sandbox-provider`（`#3776` 行注入的消费者）→ 补声明；缺失时 Host 导入该行失败，并以 `****` 污染 `host-process-integration` 的日志断言（该用例此前被误判为「抖动」）。
+  3. `profile.ts` / `setup-wizard-settings.ts` 的 `networkExposure` 补回「LAN 仅兼容模式」闸门；包级 `cordis.patch.yml` 补回上游 `desktop-shell` 行的 `config.mode` 默认声明。
+- **分级与 C 级确认**：A 104 / B 68 / C 63 文件 → **13 项决定** / D 0；13 项 C 级**均经老板 2026-10-25 逐条确认**（见下方「C 级 13 项」表）。
+- **剩余未验证 / 遗留项（如实登记）**：
+  1. **未做**：`dist:mac-smoke` / `dist:win` 等真实打包与签名链路未在本轮重跑（老板已接受该判断，不为此额外花时间）。
+  2. **未做**：Electron 壳内 Setup 向导的实机验收（属 #3790 的范围）。
+  3. **遗留项**：`client/index.ts` 的原生标题栏双击接线未装回（改动因质量闭环门禁要求同捆端到端证据而回退，见上一条目）；`window-state.ts` 已被上游 `main-window-state.ts` 取代，生产无消费者，属死代码清理。
+  4. **策略取舍**：Setup 向导「浏览器访问在所有窗口模式可用」按上游流程收口，fork 策略跟进单 **#3790**。
+
+---
+
 ## 2026-10-25 · Next 壳合并收尾（2c/2d）：分级、逐调用点核对与门禁结果
 
 - **分级记录（全量）**：本次「上游 551 提交 + 前向合并 `68de0b3dad`」的冲突分级为 **A 104 / B 68 / C 63 文件 → 13 项决定 / D 0**。13 项 C 级**均经老板 2026-10-25 逐条确认**（原文见本文件下方「C 级 13 项」表）；D 级 0 项（未出现需要立即拒绝的上游改动）。

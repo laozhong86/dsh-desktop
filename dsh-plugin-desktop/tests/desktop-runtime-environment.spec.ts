@@ -705,7 +705,8 @@ describe('desktop Host dsh runtime', () => {
  */
 describe("RunAsNode scope", () => {
   it("never exports the flag from either Electron main process", () => {
-    for (const variant of ["dsh-plugin-desktop", "dsh-plugin-desktop-beta"]) {
+    // OmniMux ships a single shell line; the beta workspace is retired.
+    for (const variant of ["dsh-plugin-desktop"]) {
       const source = readFileSync(new URL(`../../${variant}/src/main.ts`, import.meta.url), "utf8")
       expect(source).not.toMatch(/process\.env\.ELECTRON_RUN_AS_NODE\s*=/u)
       expect(source).not.toMatch(/process\.env\[("|"'"')ELECTRON_RUN_AS_NODE\1\]\s*=/u)

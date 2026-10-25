@@ -2,20 +2,31 @@
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import { DesktopSettingsSection, type DesktopNotificationSettings, type DesktopShellSettings } from './DesktopSettingsSection.tsx'
 import { DesktopTerminalSettingsAction } from './DesktopTerminalSettingsAction.tsx'
 import { createDesktopSettingsApi } from './desktop-settings-api.ts'
 import { en, zh, type DesktopSettingsLocaleKey } from './desktop-settings-locales.ts'
 import { installDesktopSettingsStyles } from './desktop-settings-styles.ts'
 import type { DesktopClientEnvironment } from './environment.ts'
+import { COMMUNITY_MARKET, DSH_MARKET, REMOTE_CONTROL_BUNDLE } from './market-toggle.ts'
+import { installPluginControlsStyles } from './plugin-controls-styles.ts'
+import {
+  bindDesktopSettingsForm,
+  DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE,
+  DESKTOP_SHELL_SETTINGS_NAMESPACE,
+  type DesktopSettingsForm,
+} from './settings-bridge.ts'
 
 /** Locale namespace owned by the Desktop settings page. */
 export const DESKTOP_SETTINGS_LOCALE_NAMESPACE = 'desktop.settings'
 
-/** Host settings namespaces bound through the standard client settings service. */
-export const DESKTOP_SHELL_SETTINGS_NAMESPACE = 'desktop-shell'
-export const DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE = 'desktop-notifications'
+/**
+ * Host settings namespaces bound through the standard client settings service.
+ * The two channels' cores address a settings document differently, so the ids
+ * themselves are edition-local; see `src/client/settings-bridge.ts`.
+ */
+export { DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE, DESKTOP_SHELL_SETTINGS_NAMESPACE } from './settings-bridge.ts'
 
 /** Shared client controls consumed by settings and Desktop-owned window chrome. */
 export interface DesktopSettingsClientControl {
@@ -24,20 +35,25 @@ export interface DesktopSettingsClientControl {
 }
 
 /**
- * Persist a native mode choice. Browser access is its own switch now, so a
- * custom mode keeps it and only the compatibility-only LAN exposure falls back
- * to loopback. Withdraw the listener first so every intermediate persisted
- * state remains valid while compatibility mode is still selected.
+ * Persist a native mode choice without leaving browser access in a mode the
+ * marker-free client cannot render. Custom modes withdraw browser and LAN
+ * access in ordered writes; the Host compares only effective generation state.
  */
 export async function persistDesktopModeSelection(
-  desktopSettings: Pick<ConfigForm<DesktopShellSettings>, 'set'>,
+  desktopSettings: Pick<DesktopSettingsForm<DesktopShellSettings>, 'set'>,
   mode: DesktopShellSettings['mode'],
 ): Promise<void> {
   if (mode === 'compatibility') {
     await desktopSettings.set('mode', mode)
     return
   }
+  // The titlebar is interactive before the settings mirror necessarily reaches
+  // ready. Always withdraw both browser capabilities for a custom mode instead
+  // of treating an unavailable or stale snapshot as browser access being off.
+  // Withdraw the listener first so every intermediate persisted state remains
+  // valid while compatibility mode is still selected.
   await desktopSettings.set('networkExposure', 'loopback')
+  await desktopSettings.set('openBrowser', false)
   await desktopSettings.set('mode', mode)
 }
 
@@ -53,8 +69,12 @@ export function applyDesktopSettings(
   ctx: ClientContext,
   environment: DesktopClientEnvironment,
 ): DesktopSettingsClientControl {
-  const desktopSettings = ctx.configForms.get<DesktopShellSettings>(DESKTOP_SHELL_SETTINGS_NAMESPACE)
-  const notificationSettings = ctx.configForms.get<DesktopNotificationSettings>(
+  const desktopSettings = bindDesktopSettingsForm<DesktopShellSettings>(
+    ctx,
+    DESKTOP_SHELL_SETTINGS_NAMESPACE,
+  )
+  const notificationSettings = bindDesktopSettingsForm<DesktopNotificationSettings>(
+    ctx,
     DESKTOP_NOTIFICATIONS_SETTINGS_NAMESPACE,
   )
   const api = createDesktopSettingsApi()
@@ -71,6 +91,10 @@ export function applyDesktopSettings(
     () => installDesktopSettingsStyles(),
     'dsh-plugin-desktop: settings styles',
   )
+  ctx.effect(
+    () => installPluginControlsStyles(),
+    'dsh-plugin-desktop: plugin controls styles',
+  )
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section',
     id: 'desktop',
@@ -80,11 +104,16 @@ export function applyDesktopSettings(
     inject: () => ({
       api,
       platform: environment.platform,
+      version: environment.version,
       initialMode: environment.mode,
-      micaSupported: environment.micaSupported,
       setMode,
       desktopSettings,
       notificationSettings,
+      capabilities: { pluginSelectors: false },
+      openPlugins: () => {
+        const layout = ctx.reflect?.get('layout', false) as { selectPanel?(id: string): void } | undefined
+        layout?.selectPanel?.('plugins')
+      },
     }),
   }, DesktopSettingsSection))
   ctx.slots.inject('settings.action', () => ctx.slots.register({
@@ -94,6 +123,19 @@ export function applyDesktopSettings(
     locale: DESKTOP_SETTINGS_LOCALE_NAMESPACE,
     inject: () => ({ api }),
   }, DesktopTerminalSettingsAction))
+
+  // The Plugins overview owns built-in Market and Remote Control selection.
+  // Their bundles must not expose duplicate switches in the generic plugin list.
+  ctx.slots.inject('plugins.bundle.hidden', () => {
+    const disposers = [COMMUNITY_MARKET, DSH_MARKET, REMOTE_CONTROL_BUNDLE].map(key =>
+      ctx.slots.register({
+        name: 'plugins.bundle.hidden',
+        key,
+      }, () => null))
+    return () => {
+      for (const dispose of disposers) dispose()
+    }
+  })
 
   return Object.freeze({
     api,

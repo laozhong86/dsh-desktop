@@ -13,6 +13,8 @@ export const DESKTOP_RELEASE_IDENTITIES = Object.freeze({
     packageName: 'dsh-plugin-desktop',
     productName: 'OmniMux',
     appId: 'ai.omnimux.desktop',
+    // The release harness home; `preset-profile.ts` resolves the same directory.
+    homeDirectoryName: '.omnimux',
   }),
   beta: Object.freeze({
     releaseChannel: 'beta' as const,
@@ -21,6 +23,8 @@ export const DESKTOP_RELEASE_IDENTITIES = Object.freeze({
     // set in main.ts); cross-edition evidence is located through this name.
     productName: 'OmniMux-Dev',
     appId: 'ai.omnimux.desktop',
+    // The Dev harness home, resolved by `preset-profile.ts` and `desktop-identity.ts`.
+    homeDirectoryName: '.omnimux-dev',
   }),
 })
 
@@ -34,6 +38,7 @@ export const BETA_DESKTOP_PACKAGE_NAME = OTHER_DESKTOP_PRODUCT_IDENTITY.packageN
 export const DESKTOP_PRODUCT_NAME = DESKTOP_PRODUCT_IDENTITY.productName
 export const DESKTOP_APP_ID = DESKTOP_PRODUCT_IDENTITY.appId
 export const DESKTOP_RELEASE_CHANNEL = DESKTOP_PRODUCT_IDENTITY.releaseChannel
+export const DESKTOP_HOME_DIRECTORY_NAME = DESKTOP_PRODUCT_IDENTITY.homeDirectoryName
 
 /** Both Desktop editions are launcher-owned, never Profile plugins. */
 export const DESKTOP_PACKAGE_NAMES: ReadonlySet<string> = new Set([

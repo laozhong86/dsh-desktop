@@ -21,22 +21,24 @@ interface AppFixture {
 function fixture(): AppFixture {
   const root = mkdtempSync(join(tmpdir(), 'dsh-mac-smoke-'))
   temporaryRoots.push(root)
-  const contents = join(root, 'OmniMux.app', 'Contents')
+  const contents = join(root, 'DSH Desktop.app', 'Contents')
   const macos = join(contents, 'MacOS')
   const resources = join(contents, 'Resources')
   mkdirSync(macos, { recursive: true })
   mkdirSync(resources, { recursive: true })
   const infoPlist = join(contents, 'Info.plist')
-  const executable = join(macos, 'OmniMux')
-  const appAsar = join(resources, 'app.asar')
+  const executable = join(macos, 'DSH Desktop')
+  const appAsar = join(resources, 'app', 'package.json')
   const modeOverrides = new Map<string, number>()
   writeFileSync(infoPlist, '<?xml version="1.0" encoding="UTF-8"?>')
   writeFileSync(executable, 'binary')
   chmodSync(executable, 0o755)
   modeOverrides.set(executable, 0o755)
-  writeFileSync(appAsar, 'packed')
+  mkdirSync(join(resources, 'app', 'lib'), { recursive: true })
+  writeFileSync(join(resources, 'app', 'lib', 'main.js'), 'main')
+  writeFileSync(appAsar, '{}')
   for (const entry of MACOS_UNIVERSAL_NATIVE_ENTRIES) {
-    const path = join(`${appAsar}.unpacked`, entry.path)
+    const path = join(join(appAsar, '..'), entry.path)
     mkdirSync(join(path, '..'), { recursive: true })
     writeFileSync(path, 'native')
     if (entry.path.endsWith('/spawn-helper')) {
@@ -55,8 +57,8 @@ function options(
   const removeMountPoint = vi.fn()
   const value: MacSmokeVerificationOptions = {
     distDir: '/release/dist',
-    productName: 'OmniMux',
-    listDmgs: () => ['/release/dist/OmniMux-2.0.1.dmg'],
+    productName: 'DSH Desktop',
+    listDmgs: () => ['/release/dist/DSH Desktop-2.0.1.dmg'],
     makeMountPoint: () => '/private/tmp/dsh-desktop-dmg-smoke-test',
     run: (command, args) => { calls.push({ command, args: [...args] }) },
     removeMountPoint,
@@ -98,18 +100,18 @@ describe('macOS DMG smoke artifact verification', () => {
   it('mounts one DMG and accepts a well-formed unsigned application bundle', () => {
     const value = fixture()
     const harness = options({ makeMountPoint: () => value.root }, value.modeOverrides)
-    const appPath = join(value.root, 'OmniMux.app')
+    const appPath = join(value.root, 'DSH Desktop.app')
 
     expect(verifyMacSmoke(harness.value)).toEqual({
       appPath,
-      dmgPath: '/release/dist/OmniMux-2.0.1.dmg',
+      dmgPath: '/release/dist/DSH Desktop-2.0.1.dmg',
     })
 
     expect(harness.calls).toEqual([
       {
         command: 'hdiutil',
         args: [
-          'attach', '/release/dist/OmniMux-2.0.1.dmg',
+          'attach', '/release/dist/DSH Desktop-2.0.1.dmg',
           '-mountpoint', value.root, '-nobrowse', '-readonly',
         ],
       },
@@ -121,11 +123,35 @@ describe('macOS DMG smoke artifact verification', () => {
       { command: 'lipo', args: [value.executable, '-verify_arch', 'arm64'] },
       ...MACOS_UNIVERSAL_NATIVE_ENTRIES.map(entry => ({
         command: 'lipo',
-        args: [join(`${value.appAsar}.unpacked`, entry.path), '-verify_arch', entry.arch],
+        args: [join(join(value.appAsar, '..'), entry.path), '-verify_arch', entry.arch],
       })),
       { command: 'hdiutil', args: ['detach', value.root] },
     ])
     expect(harness.removeMountPoint).toHaveBeenCalledWith(value.root)
+  })
+
+  it('checks bundled resources inside the mounted application after the native entries', () => {
+    const value = fixture()
+    const seen: string[] = []
+    const harness = options({ makeMountPoint: () => value.root, verifyRuntime: appPath => { seen.push(appPath) } }, value.modeOverrides)
+    verifyMacSmoke(harness.value)
+    expect(seen).toEqual([join(value.root, 'DSH Desktop.app')])
+    expect(harness.calls.at(-1)).toEqual({ command: 'hdiutil', args: ['detach', value.root] })
+  })
+
+  it('checks only the packaged slice of a single-architecture smoke', () => {
+    const value = fixture()
+    const harness = options(
+      { makeMountPoint: () => value.root, executableSlices: ['arm64'] },
+      value.modeOverrides,
+    )
+
+    verifyMacSmoke(harness.value)
+
+    const executableChecks = harness.calls
+      .filter(call => call.command === 'lipo' && call.args[0] === value.executable)
+      .map(call => call.args)
+    expect(executableChecks).toEqual([[value.executable, '-verify_arch', 'arm64']])
   })
 
   it('rejects the mount when no DMG is present', () => {
@@ -145,7 +171,7 @@ describe('macOS DMG smoke artifact verification', () => {
     expect(harness.calls).toEqual([
       {
         command: 'hdiutil',
-        args: ['attach', '/release/dist/OmniMux-2.0.1.dmg', '-mountpoint', value.root, '-nobrowse', '-readonly'],
+        args: ['attach', '/release/dist/DSH Desktop-2.0.1.dmg', '-mountpoint', value.root, '-nobrowse', '-readonly'],
       },
       { command: 'hdiutil', args: ['detach', value.root] },
     ])
@@ -171,12 +197,12 @@ describe('macOS DMG smoke artifact verification', () => {
     expect(harness.removeMountPoint).toHaveBeenCalledWith(value.root)
   })
 
-  it('rejects a missing or empty application archive', () => {
+  it('rejects a missing or empty application manifest', () => {
     const value = fixture()
     rmSync(value.appAsar)
     const harness = options({ makeMountPoint: () => value.root }, value.modeOverrides)
 
-    expectSmokeFailure(harness, 'app.asar')
+    expectSmokeFailure(harness, 'package.json')
     expect(harness.removeMountPoint).toHaveBeenCalledWith(value.root)
   })
 })

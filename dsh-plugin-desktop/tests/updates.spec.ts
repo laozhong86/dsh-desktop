@@ -15,7 +15,6 @@ import type {
   DesktopTrayItem,
 } from '../src/runtime.ts'
 import {
-  DESKTOP_CURRENT_VERSION_HEADER,
   DESKTOP_RELEASE_CHANNEL_HEADER,
   type UpdateCheckResult,
 } from '../src/update-checker.ts'
@@ -59,7 +58,12 @@ async function createHarness(options: {
   readonly currentVersion?: string
   readonly confirmDownload?: (version: string, channel?: 'stable' | 'beta') => Promise<boolean>
   readonly showManualCheckResult?: (result: UpdateCheckResult | null) => Promise<void>
-  readonly downloadAndOpen?: (version: string, signal: AbortSignal, channel?: 'stable' | 'beta') => Promise<void>
+  readonly downloadAndOpen?: (
+    version: string,
+    signal: AbortSignal,
+    channel?: 'stable' | 'beta',
+    installerSha256?: Readonly<Partial<Record<'win32' | 'darwin', string>>>,
+  ) => Promise<void>
   readonly notify?: (notification: DesktopNotification) => void
   readonly locale?: DesktopRuntime['locale']
   readonly state?: string
@@ -146,61 +150,76 @@ afterEach(() => {
 })
 
 describe('desktop update Host plugin', () => {
-  it('serves the single stable channel and installs an older release only through the explicit action', async () => {
-    const request = vi.fn(async (_url: string, init: RequestInit) => {
-      const current = new Headers(init.headers).get(DESKTOP_CURRENT_VERSION_HEADER)
-      return Response.json({
-        version: current === '2.0.6' ? '2.0.4' : '2.0.8',
-        channel: 'stable',
-      })
-    })
-
-    // The fork ships one release channel: no Beta auto-check and no separate
-    // "install stable" command. An older release stays uninstalled even when
-    // the explicit tray action runs.
-    const older = await createHarness({
-      packaged: false,
-      releaseChannel: 'stable',
-      currentVersion: '2.0.6',
-      request,
-      confirmDownload: async () => true,
-    })
-    expect(older.trays).toHaveLength(1)
-    expect(older.trays[0]?.id).toBe('check-for-updates')
-    await older.trays[0]!.invoke()
-    expect(older.confirmDownload).not.toHaveBeenCalled()
-    expect(older.downloadAndOpen).not.toHaveBeenCalled()
-    expect(older.showManualCheckResult).toHaveBeenCalledWith({
-      status: 'up-to-date',
-      currentVersion: '2.0.6',
-      latestVersion: '2.0.4',
-    })
-    expect(request.mock.calls.map(([, init]) =>
-      new Headers(init.headers).get(DESKTOP_RELEASE_CHANNEL_HEADER))).toEqual(['stable'])
-    await older.dispose()
-
-    // Installing still requires the explicit tray action: the passive
-    // background check only announces the available release.
+  it('remembers notifications for the promoted Next release across launches', async () => {
     vi.useFakeTimers()
-    const newer = await createHarness({
-      releaseChannel: 'stable',
-      currentVersion: '2.0.4',
+    const harness = await createHarness({ currentVersion: '2.0.19', releaseChannel: 'stable',
+      state: JSON.stringify({ version: 3, lastNotifiedVersion: '2.0.20-next' }),
+      request: async () => Response.json({ version: '2.0.20-next', channel: 'stable' }) })
+    try {
+      await vi.advanceTimersByTimeAsync(testConfig.initialDelayMs)
+      expect(harness.notifications).toEqual([])
+      expect(JSON.parse(await readFile(harness.statePath, 'utf8'))).toEqual({ version: 3, lastNotifiedVersion: '2.0.20-next' })
+    } finally { await harness.dispose() }
+  })
+
+  // OmniMux keeps the stable stream stable-only: a Next release offered on the
+  // stable channel is never confirmed, downloaded, or re-checked.
+  it('refuses a Next release offered on the Stable channel', async () => {
+    const request = vi.fn(async (_url: string, init: RequestInit) => {
+      expect(new Headers(init.headers).get(DESKTOP_RELEASE_CHANNEL_HEADER)).toBe('stable')
+      return Response.json({ version: '2.0.20-next', channel: 'stable' })
+    })
+    const harness = await createHarness({ currentVersion: '2.0.19', releaseChannel: 'stable',
+      config: { ...testConfig, enabled: false }, request, confirmDownload: async () => true })
+    try {
+      await harness.tray.invoke()
+      expect(request).toHaveBeenCalledTimes(1)
+      expect(harness.confirmDownload).not.toHaveBeenCalled()
+      expect(harness.downloadAndOpen).not.toHaveBeenCalled()
+    } finally { await harness.dispose() }
+  })
+
+  it('does not download when the promoted Next release changes after confirmation', async () => {
+    let version = '2.0.20-next'
+    const harness = await createHarness({ currentVersion: '2.0.19', releaseChannel: 'stable',
+      config: { ...testConfig, enabled: false }, request: async () => Response.json({ version, channel: 'stable' }),
+      confirmDownload: async () => { version = '2.0.21-next'; return true } })
+    try {
+      await harness.tray.invoke()
+      expect(harness.downloadAndOpen).not.toHaveBeenCalled()
+    } finally { await harness.dispose() }
+  })
+
+
+  it('checks Beta automatically and installs an older stable release only through the explicit action', async () => {
+    const request = vi.fn(async (_url: string, init: RequestInit) => {
+      const channel = new Headers(init.headers).get(DESKTOP_RELEASE_CHANNEL_HEADER)
+      return Response.json(channel === 'beta'
+        ? { version: '2.0.6-beta.1', channel: 'beta' }
+        : { version: '2.0.4', channel: 'stable' })
+    })
+    const harness = await createHarness({
+      releaseChannel: 'beta',
+      currentVersion: '2.0.6-beta.1',
       request,
       confirmDownload: async () => true,
     })
-    expect(newer.trays).toHaveLength(1)
-    await vi.advanceTimersByTimeAsync(testConfig.initialDelayMs)
-    await vi.waitFor(() => { expect(newer.notifications).toHaveLength(1) })
-    expect(newer.confirmDownload).not.toHaveBeenCalled()
-    expect(newer.downloadAndOpen).not.toHaveBeenCalled()
 
-    await newer.trays[0]!.invoke()
-    expect(newer.confirmDownload).toHaveBeenCalledWith('2.0.8')
-    expect(newer.downloadAndOpen).toHaveBeenCalledWith(
-      '2.0.8',
+    expect(harness.trays).toHaveLength(2)
+    await harness.tray.invoke()
+    expect(harness.downloadAndOpen).not.toHaveBeenCalled()
+
+    await harness.trays[1]!.invoke()
+    expect(harness.confirmDownload).toHaveBeenCalledWith('2.0.4', 'stable')
+    expect(harness.downloadAndOpen).toHaveBeenCalledWith(
+      '2.0.4',
       expect.any(AbortSignal),
+      'stable',
     )
-    await newer.dispose()
+    const channels = request.mock.calls.map(([, init]) => new Headers(init.headers).get(DESKTOP_RELEASE_CHANNEL_HEADER))
+    expect(channels).toContain('beta')
+    expect(channels).toContain('stable')
+    await harness.dispose()
   })
 
   it('exposes the packaged 60-second and six-hour background policy', () => {
@@ -367,6 +386,63 @@ describe('desktop update Host plugin', () => {
     await vi.waitFor(() => { expect(harness.tray.label()).toBe('DSH Desktop 2.1.0 Available') })
     expect(harness.notifications).toEqual([])
     expect(harness.tray.label()).toBe('DSH Desktop 2.1.0 Available')
+  })
+
+  it('passes the rechecked installer digests to the download adapter', async () => {
+    vi.useFakeTimers()
+    const harness = await createHarness({
+      packaged: false,
+      request: async () => Response.json({
+        version: '2.1.0',
+        sha256: { windows: 'c'.repeat(64), mac: 'd'.repeat(64) },
+      }),
+      confirmDownload: async () => true,
+    })
+
+    const pending = harness.tray.invoke()
+    await vi.waitFor(() => { expect(harness.downloadAndOpen).toHaveBeenCalledOnce() })
+    const [version, , , installerSha256] = harness.downloadAndOpen.mock.calls[0] as [
+      string,
+      AbortSignal,
+      unknown,
+      Readonly<Partial<Record<'win32' | 'darwin', string>>> | undefined,
+    ]
+    expect(version).toBe('2.1.0')
+    expect(installerSha256).toEqual({ win32: 'c'.repeat(64), darwin: 'd'.repeat(64) })
+    await pending
+  })
+
+  it('uses the digest from the recheck, not the first check', async () => {
+    vi.useFakeTimers()
+    let call = 0
+    const harness = await createHarness({
+      packaged: false,
+      request: async () => {
+        call += 1
+        return Response.json({ version: '2.1.0', sha256: { mac: call === 1 ? 'c'.repeat(64) : 'd'.repeat(64) } })
+      },
+      confirmDownload: async () => true,
+    })
+
+    const pending = harness.tray.invoke()
+    await vi.waitFor(() => { expect(harness.downloadAndOpen).toHaveBeenCalledOnce() })
+    expect(harness.downloadAndOpen.mock.calls[0]?.[3]).toEqual({ darwin: 'd'.repeat(64) })
+    await pending
+  })
+
+  it('omits the digest argument when the service publishes none', async () => {
+    vi.useFakeTimers()
+    const harness = await createHarness({
+      packaged: false,
+      request: async () => versionResponse('2.1.0'),
+      confirmDownload: async () => true,
+    })
+
+    const pending = harness.tray.invoke()
+    await vi.waitFor(() => { expect(harness.downloadAndOpen).toHaveBeenCalledOnce() })
+    const digestArgument = harness.downloadAndOpen.mock.calls[0]?.[3]
+    expect(digestArgument).toBeUndefined()
+    await pending
   })
 
   it('treats a manual available-version selection as a fresh confirmation', async () => {

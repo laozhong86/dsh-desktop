@@ -17,6 +17,8 @@ if (upstreamDocument.activeChannel !== 'stable') fail('the pinned upstream check
 const upstream = upstreamDocument.channels?.[upstreamDocument.activeChannel]
 if (upstream === undefined) fail('the active upstream channel is missing')
 const plugin = readJson('dsh-plugin-desktop/package.json')
+const nextDesktop = readJson('dsh-desktop-next/package.json')
+const nextReference = readJson('dsh-desktop-next/upstream-reference.json')
 const fabric = readJson('dsh-community-fabric/package.json')
 const market = readJson('dsh-community-market/package.json')
 const upstreamPackage = readJson('deepseek-harness/package.json')
@@ -26,13 +28,15 @@ if (workspace.packageManager !== 'yarn@4.18.0') {
 }
 if (JSON.stringify(workspace.workspaces) !== JSON.stringify([
   'dsh-plugin-desktop',
+  'dsh-desktop-next',
   'dsh-community-fabric',
   'dsh-community-market',
 ])) {
-  fail('the root Yarn workspace must contain the desktop, community-fabric, and community-market packages')
+  fail('the root Yarn workspace must contain the desktop, next, community-fabric, and community-market packages')
 }
 for (const [name, manifest] of [
   ['dsh-plugin-desktop', plugin],
+  ['dsh-desktop-next', nextDesktop],
   ['dsh-community-fabric', fabric],
   ['dsh-community-market', market],
 ]) {
@@ -55,6 +59,8 @@ for (const legacyFile of [
   'pnpm-workspace.yaml',
   'dsh-plugin-desktop/pnpm-lock.yaml',
   'dsh-plugin-desktop/pnpm-workspace.yaml',
+  'dsh-desktop-next/pnpm-lock.yaml',
+  'dsh-desktop-next/pnpm-workspace.yaml',
   'dsh-community-fabric/pnpm-lock.yaml',
   'dsh-community-fabric/pnpm-workspace.yaml',
   'dsh-community-market/pnpm-lock.yaml',
@@ -75,6 +81,7 @@ if (typeof upstreamPackage.packageManager !== 'string' || !upstreamPackage.packa
 for (const [owner, manifest] of [
   ['root', workspace],
   ['desktop', plugin],
+  ['next desktop', nextDesktop],
   ['fabric', fabric],
   ['market', market],
 ]) {
@@ -106,9 +113,24 @@ if (run('git', ['remote', 'get-url', 'origin'], upstreamDir) !== upstreamDocumen
 if (upstreamPackage.version !== upstream.sourceVersion) {
   fail('deepseek-harness package version differs from upstream.json')
 }
+if (upstream.package !== plugin.name) fail('the stable upstream metadata points at the wrong package')
 for (const name of Object.keys(plugin.dependencies).filter(name => name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-'))) {
   if (plugin.dependencies[name] !== upstream.runtimePackageVersion) {
-    fail(`${name} must use the recorded DSH runtime package family`)
+    fail(`${plugin.name} ${name} must use the recorded stable DSH runtime package family`)
+  }
+}
+
+// The Next shell stays in-tree as an experimental, unpublished workspace. It is
+// built, type-checked and tested, but never packaged or branded (see the sync log).
+if (nextDesktop.name !== 'dsh-desktop-next' || nextDesktop.private !== true) {
+  fail('Next must remain a private experimental package')
+}
+if (typeof nextReference?.version !== 'string' || nextReference.version.length === 0) {
+  fail('Next must record the upstream family it was ported from')
+}
+for (const [name, version] of Object.entries(nextDesktop.dependencies)) {
+  if ((name === '@deepseek-ai/dsh' || name.startsWith('@deepseek-ai/dsh-')) && version !== nextReference.version) {
+    fail(`Next ${name} must match the pinned upstream family`)
   }
 }
 

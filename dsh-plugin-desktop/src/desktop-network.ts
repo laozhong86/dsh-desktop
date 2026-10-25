@@ -25,7 +25,7 @@ export function parseDesktopOpenBrowser(value: unknown): boolean {
  * LAN (beta) exposure stays a compatibility-mode feature; loopback access does
  * not, so an enhanced window keeps its ordinary-browser entry point.
  */
-export function desktopLanExposureAvailable(mode: DesktopShellMode): boolean {
+export function desktopBrowserAccessAvailable(mode: DesktopShellMode): boolean {
   return mode === 'compatibility'
 }
 
@@ -39,7 +39,7 @@ export function desktopBrowserAccessEnabled(
   storedOpenBrowser: boolean,
   exposure: DesktopNetworkExposure,
 ): boolean {
-  return storedOpenBrowser || (exposure === 'lan' && desktopLanExposureAvailable(mode))
+  return storedOpenBrowser || (exposure === 'lan' && desktopBrowserAccessAvailable(mode))
 }
 
 /** LAN exposure is meaningful only while ordinary-browser access is enabled. */

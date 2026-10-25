@@ -12,9 +12,12 @@ This repository owns the desktop product around an unmodified DeepSeek Harness c
 
 - Start the desktop development workflow with `corepack yarn dev`.
 - Build the desktop package with `corepack yarn build`.
+- The bundled `dshmarket` version and its Desktop compatibility patch live in the root `resolutions` (`dshmarket@npm:1.70.1` → `.yarn/patches/dshmarket-desktop.patch`); commit the version, the patch, and the lockfile together. Installed apps do not hot-update executable plugins on launch.
+- Before each release, run `corepack yarn aa:prepare-release` to build the latest official Agents Anywhere `main` for both Desktop workspaces (`dsh-plugin-desktop` and `dsh-desktop-next`, see `scripts/agents-anywhere-release-policy.mjs`). Commit the resulting artifact, provenance, manifests, and lockfile before packaging. Signed macOS releases and root Windows distribution commands verify freshness and installed versions; `DSH_AA_SOURCE_REF=pinned` is no longer supported.
 - Run unit tests with `corepack yarn test`.
 - Run type checking with `corepack yarn typecheck`.
 - Run the complete headless gate with `corepack yarn check`.
+- `dsh-desktop-next/` is the in-tree experimental Next shell, adopted from upstream as a **grey box**: it participates in root `build` / `typecheck` / `test` and in `corepack yarn check`, but this fork never brands, packages, or ships it. Adopting Next as the product shell is a separate, unapproved decision — upstream's `dsh-plugin-desktop-beta` variant is deliberately absent, and there is no `check:desktop-variants` mirror to maintain.
 - Run upstream operations through the root scripts, such as `corepack yarn upstream:build`.
 
 
@@ -37,6 +40,7 @@ MUST NOT hand-`rsync`/`cp` into any profile. Daily iteration uses `omnimux:sync`
 
 - `deepseek-harness/` is a pinned upstream Git submodule. Never edit files inside it from a desktop feature branch.
 - `dsh-plugin-desktop/` owns the Cordis Host and Client faces, Electron bootstrap, packaging, and release tests.
+- `dsh-desktop-next/` owns the separate experimental Desktop shell, Profiles and recovery, and adapters for the existing AA bridge and Community Market. Keep its upstream reference and published runtime versions aligned; do not fork the official main frontend. It is built and gated here, never shipped.
 - `dsh-community-fabric/` owns the community interoperability RFC. Until schemas and a reviewed reference adapter exist, it remains a private documentation scaffold and must not declare loadable DSH or package entry points.
 - `dsh-community-market/` owns the community-market shell. Until its runtime is implemented, it remains a private documentation scaffold and must not declare loadable DSH or package entry points.
 - The outer repository and all owned packages use the root Yarn release with `nodeLinker: node-modules`.

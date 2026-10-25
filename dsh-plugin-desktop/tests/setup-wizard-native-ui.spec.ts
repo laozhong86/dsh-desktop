@@ -12,6 +12,7 @@ import {
   desktopSetupWizardSkipRequiresLanAcknowledgement,
   nextDesktopSetupWizardStep,
   previousDesktopSetupWizardStep,
+  confirmDesktopSetupWizardBrowserCompatibility,
   resolveDesktopSetupWizardBrowserAccessRequest,
   SetupWizardLanConfirmation,
   SetupWizardNavigation,
@@ -27,7 +28,6 @@ const input: DesktopSetupWizardInput = {
   appVersion: '2.0.6-beta.1',
   profileName: 'work',
   platform: 'darwin',
-  micaSupported: false,
   mode: 'extended',
   macosMaterial: 'transparent',
   windowsMaterial: 'off',
@@ -41,6 +41,8 @@ const input: DesktopSetupWizardInput = {
     notifyOnTurnFailure: true,
     notifyOnJobCompletion: false,
     notifyOnJobFailure: true,
+    notifyOnScheduleCompletion: true,
+    notifyOnScheduleFailure: true,
   },
 }
 
@@ -228,9 +230,10 @@ describe('Setup Wizard setting pages', () => {
     expect(browser).not.toContain(copy.marketTitle)
     expect(browser).not.toContain(copy.communityMarket)
     expect(browser).not.toContain(copy.dshMarket)
+    expect(browser).not.toContain(copy.officialMarket)
   })
 
-  it('marks Community Market and LAN access as Beta features', () => {
+  it('marks Community Market and LAN access as Beta features and Custom Plugin Market as Experimental', () => {
     const market = renderStep('market')
     const browser = renderStep('browser')
     const enabledBrowser = renderStep('browser', {
@@ -241,7 +244,9 @@ describe('Setup Wizard setting pages', () => {
     })
     const communityOption = market.indexOf('for="setup-plugin-market-community-market"')
     const nextMarketOption = market.indexOf('for="setup-plugin-market-dsh-market"')
+    const officialMarketOption = market.indexOf('for="setup-plugin-market-official-market"')
     const marketBadge = market.indexOf('data-slot="badge"')
+    const experimentalBadge = market.indexOf('data-slot="badge"', marketBadge + 1)
     const lanOption = browser.indexOf('for="setup-network-exposure-lan"')
     const lanBadge = browser.indexOf('data-slot="badge"')
     const enabledLanOption = enabledBrowser.indexOf('for="setup-network-exposure-lan"')
@@ -250,12 +255,16 @@ describe('Setup Wizard setting pages', () => {
       enabledBrowser.indexOf('</label>', enabledLanOption),
     )
 
-    expect(occurrences(market, 'data-slot="badge"')).toBe(1)
+    expect(occurrences(market, 'data-slot="badge"')).toBe(2)
     expect(occurrences(browser, 'data-slot="badge"')).toBe(1)
     expect(market).toContain(copy.beta)
+    expect(market).toContain(copy.experimental)
+    expect(market).toContain(copy.officialMarket)
+    expect(market).toContain(copy.officialMarketBody)
     expect(browser).toContain(copy.beta)
     expect(marketBadge).toBeGreaterThan(communityOption)
     expect(marketBadge).toBeLessThan(nextMarketOption)
+    expect(experimentalBadge).toBeGreaterThan(officialMarketOption)
     expect(lanBadge).toBeGreaterThan(lanOption)
     expect(browser.slice(lanOption)).toContain('disabled=""')
     expect(enabledLanChoice).not.toContain('disabled=""')
@@ -263,7 +272,7 @@ describe('Setup Wizard setting pages', () => {
     expect(browser).toContain('HTTPS')
   })
 
-  it('describes browser access as an opt-in capability in every window mode', () => {
+  it('describes browser access as an opt-in capability limited to compatibility mode', () => {
     const browser = renderStep('browser')
     expect(browser).toContain(copy.openBrowser)
     expect(browser).toContain(copy.browserCompatibilityNotice)
@@ -271,15 +280,15 @@ describe('Setup Wizard setting pages', () => {
     expect(copy.openBrowser).not.toContain('启动后')
     expect(copy.openBrowser).not.toContain('自动')
     expect(copy.browserCompatibilityNotice).toContain('兼容模式')
-    expect(copy.browserCompatibilityNotice).toContain('所有窗口模式')
+    expect(copy.browserCompatibilityNotice).toContain('仅在')
     expect(browser).not.toMatch(/<button[^>]*disabled=""[^>]*aria-label="允许在浏览器中打开"/u)
   })
 
   it('uses the shadcn Switch component for every wizard toggle', () => {
     const notifications = renderStep('notifications')
     const browser = renderStep('browser')
-    expect(occurrences(notifications, 'data-slot="switch"')).toBe(5)
-    expect(occurrences(notifications, 'role="switch"')).toBe(5)
+    expect(occurrences(notifications, 'data-slot="switch"')).toBe(7)
+    expect(occurrences(notifications, 'role="switch"')).toBe(7)
     expect(occurrences(browser, 'data-slot="switch"')).toBe(1)
     expect(occurrences(browser, 'role="switch"')).toBe(1)
   })
@@ -370,14 +379,22 @@ describe('Setup Wizard native UI boundaries', () => {
     }, false)).toBe(false)
   })
 
-  it('enables browser access in a custom mode without switching the window mode', () => {
+  it('asks before switching a custom mode to compatibility for browser access', () => {
     expect(resolveDesktopSetupWizardBrowserAccessRequest(selection, true)).toEqual({
-      action: 'update',
-      selection: { ...selection, openBrowser: true, networkExposure: 'loopback' },
+      action: 'confirm-compatibility',
     })
     expect(resolveDesktopSetupWizardBrowserAccessRequest(selection, false)).toEqual({
       action: 'update',
       selection: { ...selection, openBrowser: false, networkExposure: 'loopback' },
+    })
+    expect(confirmDesktopSetupWizardBrowserCompatibility({
+      ...selection,
+      networkExposure: 'lan',
+    })).toEqual({
+      ...selection,
+      mode: 'compatibility',
+      openBrowser: true,
+      networkExposure: 'loopback',
     })
   })
 

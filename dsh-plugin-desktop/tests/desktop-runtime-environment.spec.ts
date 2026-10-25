@@ -1,7 +1,6 @@
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import {
-  chmodSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -51,8 +50,26 @@ function options(
   }
 }
 
-function quoteSh(value: string): string {
-  return `'${value.replaceAll("'", `'"'"'`)}'`
+/**
+ * cmd.exe decodes a batch file with the console code page, so every embedded path must be read
+ * after the shim pins UTF-8, and the pin must be undone because the console outlives the process.
+ * Keeping the temporaries inside `setlocal` stops them from reaching the caller's environment.
+ */
+function expectCodePagePinnedAheadOfEveryPath(shim: string): void {
+  const lines = shim.split('\r\n')
+  expect(lines.slice(0, 4)).toEqual([
+    '@echo off',
+    'setlocal DisableDelayedExpansion',
+    `for /f "tokens=2 delims=:" %%c in ('chcp 2^>nul') do set "DSH_RUNTIME_CODEPAGE=%%c"`,
+    'chcp 65001>nul 2>nul',
+  ])
+  expect(lines.findIndex(line => /[A-Za-z]:\\|%~dp0/u.test(line))).toBeGreaterThan(3)
+  expect(lines.slice(-4, -1)).toEqual([
+    'set "DSH_RUNTIME_EXIT=%errorlevel%"',
+    'chcp %DSH_RUNTIME_CODEPAGE% >nul 2>nul',
+    'exit /b %DSH_RUNTIME_EXIT%',
+  ])
+  expect(shim).not.toContain('exit /b %errorlevel%')
 }
 
 afterEach(() => {
@@ -168,94 +185,6 @@ describe('desktop Host pnpm runtime', () => {
     })
     installation.dispose()
   })
-
-  it.runIf(process.platform === 'darwin' || process.platform === 'linux')(
-    'keeps process.execPath children headless without changing explicit application launches',
-    () => {
-      const root = temporaryDirectory()
-      const appExecutable = join(root, 'Fake Electron')
-      const guiLaunches = join(root, 'gui-launches.txt')
-      const childEntry = join(root, 'child.mjs')
-      const probeEntry = join(root, 'probe.mjs')
-      const probeOutput = join(root, 'probe.json')
-      const environment: NodeJS.ProcessEnv = { PATH: process.env.PATH }
-
-      writeFileSync(appExecutable, [
-        '#!/bin/sh',
-        `if [ "\${ELECTRON_RUN_AS_NODE:-}" = "1" ]; then`,
-        `  exec ${quoteSh(process.execPath)} "$@"`,
-        'fi',
-        `printf '%s\\n' "$*" >> ${quoteSh(guiLaunches)}`,
-        'exit 86',
-        '',
-      ].join('\n'))
-      chmodSync(appExecutable, 0o700)
-      writeFileSync(childEntry, [
-        "process.stdout.write('child-stdout')",
-        "process.stderr.write('child-stderr')",
-        'process.exitCode = 23',
-        '',
-      ].join('\n'))
-      writeFileSync(probeEntry, [
-        "import { spawnSync } from 'node:child_process'",
-        "import { writeFileSync } from 'node:fs'",
-        'const [preloadUrl, appExecutable, childEntry, output] = process.argv.slice(2)',
-        'process.execPath = appExecutable',
-        'await import(preloadUrl)',
-        'const inherited = spawnSync(process.execPath, [childEntry], { encoding: \'utf8\' })',
-        'const explicit = spawnSync(appExecutable, [childEntry], { encoding: \'utf8\' })',
-        'writeFileSync(output, JSON.stringify({',
-        '  execPath: process.execPath,',
-        "  runAsNode: Object.keys(process.env).filter(name => name.toUpperCase() === 'ELECTRON_RUN_AS_NODE'),",
-        '  inherited: { status: inherited.status, stdout: inherited.stdout, stderr: inherited.stderr },',
-        '  explicit: { status: explicit.status, stdout: explicit.stdout, stderr: explicit.stderr },',
-        '}))',
-        '',
-      ].join('\n'))
-
-      const installation = installDesktopPnpmRuntime({
-        platform: process.platform,
-        appExecutable,
-        pnpmBinPath: childEntry,
-        electronVersion: '43.3.0',
-        stateDir: join(root, 'runtime'),
-        environment,
-      })
-      const result = spawnSync(process.execPath, [
-        probeEntry,
-        pathToFileURL(installation.clearEnvironmentPath).href,
-        appExecutable,
-        childEntry,
-        probeOutput,
-      ], {
-        encoding: 'utf8',
-        env: {
-          PATH: process.env.PATH,
-          ELECTRON_RUN_AS_NODE: '1',
-          electron_run_as_node: 'legacy',
-        },
-      })
-
-      expect(result.error).toBeUndefined()
-      expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0)
-      expect(JSON.parse(readFileSync(probeOutput, 'utf8'))).toEqual({
-        execPath: realpathSync(installation.nodeShimPath),
-        runAsNode: [],
-        inherited: {
-          status: 23,
-          stdout: 'child-stdout',
-          stderr: 'child-stderr',
-        },
-        explicit: {
-          status: 86,
-          stdout: '',
-          stderr: '',
-        },
-      })
-      expect(readFileSync(guiLaunches, 'utf8').trim().split('\n')).toEqual([childEntry])
-      installation.dispose()
-    },
-  )
 
   it('scopes Electron ABI settings to the pnpm process tree', () => {
     const root = temporaryDirectory()
@@ -403,6 +332,7 @@ describe('desktop Host pnpm runtime', () => {
     expect(node).toContain('set "ELECTRON_RUN_AS_NODE=1"')
     expect(node).toContain('--require "%DSH_RUNTIME_PRIVATE%\\clear-env.cjs" %*')
     expect(node).not.toContain('npm_config_')
+    for (const shim of [pnpm, node]) expectCodePagePinnedAheadOfEveryPath(shim)
     expect(readFileSync(installation.clearEnvironmentPath, 'utf8')).not.toContain(
       "name.toUpperCase() === 'ELECTRON_RUN_AS_NODE'",
     )
@@ -499,6 +429,63 @@ describe('desktop Host pnpm runtime', () => {
     expect(readFileSync(captureOutput, 'utf8')).toBe('host runtime')
     installation.dispose()
     expect(environment).toEqual(original)
+  })
+
+  it.runIf(process.platform === 'win32')('runs a non-ASCII packaged path under an OEM console code page', () => {
+    const root = temporaryDirectory()
+    const stateDir = join(root, 'runtime')
+    // CP437 ships with every Windows install and is not UTF-8, so it decodes the shim's UTF-8 path
+    // bytes into a directory that cannot exist. A Latin-1 name keeps the fixture free of any
+    // dependency on East Asian code page tables.
+    const packagedRoot = join(root, 'DSH café')
+    const captureEntry = join(packagedRoot, 'capture.mjs')
+    const captureOutput = join(root, 'capture.txt')
+    const codePageHarness = join(root, 'oem-console.cmd')
+    mkdirSync(packagedRoot, { recursive: true })
+    writeFileSync(captureEntry, [
+      "import { writeFileSync } from 'node:fs'",
+      "writeFileSync(process.argv.at(-1), 'host runtime')",
+      '',
+    ].join('\n'))
+    // vitest's own console is inherited here, so the harness restores whatever it was started with.
+    writeFileSync(codePageHarness, [
+      '@echo off',
+      `for /f "tokens=2 delims=:" %%c in ('chcp') do set "ORIGINAL=%%c"`,
+      'chcp 437>nul',
+      'call pnpm %*',
+      'set "RESULT=%errorlevel%"',
+      'chcp %ORIGINAL% >nul',
+      'exit /b %RESULT%',
+      '',
+    ].join('\r\n'))
+    const environment: NodeJS.ProcessEnv = {
+      Path: process.env.Path ?? process.env.PATH,
+      PATHEXT: process.env.PATHEXT,
+      SystemRoot: process.env.SystemRoot,
+    }
+
+    const installation = installDesktopPnpmRuntime({
+      ...options(stateDir, 'win32', environment),
+      appExecutable: process.execPath,
+      pnpmBinPath: captureEntry,
+    })
+    const result = spawnSync(process.env.ComSpec ?? 'cmd.exe', [
+      '/d',
+      '/s',
+      '/c',
+      `${basename(codePageHarness)} "${captureOutput}"`,
+    ], {
+      cwd: root,
+      encoding: 'utf8',
+      env: environment,
+      shell: false,
+      windowsVerbatimArguments: true,
+    })
+
+    expect(result.error).toBeUndefined()
+    expect(result.status, `${result.stdout}\n${result.stderr}`).toBe(0)
+    expect(readFileSync(captureOutput, 'utf8')).toBe('host runtime')
+    installation.dispose()
   })
 
   it('reuses an exact immutable generation without rewriting it', () => {
@@ -651,6 +638,7 @@ describe('desktop Host dsh runtime', () => {
     expect(readdirSync(second.pathDir)).toEqual(['dsh.cmd'])
     expect(readdirSync(firstRoot).sort()).toEqual(['.generation.json', 'bin'])
     expect(readFileSync(second.dshShimPath, 'utf8')).toContain('set "DSH_DESKTOP_DEFAULT_PROFILE=web"')
+    expectCodePagePinnedAheadOfEveryPath(readFileSync(second.dshShimPath, 'utf8'))
     second.dispose()
   })
 
@@ -706,5 +694,35 @@ describe('desktop Host dsh runtime', () => {
     installation.dispose()
     installation.dispose()
     expect(environment).toEqual(original)
+  })
+})
+
+/**
+ * `ELECTRON_RUN_AS_NODE` belongs to the private runner bootstrap environment.
+ * Exporting it from the Electron main process also reaches every Chromium child
+ * (renderer, GPU process, network service, utility hosts), which then starts as
+ * Node, rejects its `--type=` switches, and exits before it can launch.
+ */
+describe("RunAsNode scope", () => {
+  it("never exports the flag from either Electron main process", () => {
+    // OmniMux ships a single shell line; the beta workspace is retired.
+    for (const variant of ["dsh-plugin-desktop"]) {
+      const source = readFileSync(new URL(`../../${variant}/src/main.ts`, import.meta.url), "utf8")
+      expect(source).not.toMatch(/process\.env\.ELECTRON_RUN_AS_NODE\s*=/u)
+      expect(source).not.toMatch(/process\.env\[("|"'"')ELECTRON_RUN_AS_NODE\1\]\s*=/u)
+    }
+  })
+
+  it("scopes the flag to the runner child in every active runtime patch", () => {
+    const upstream = JSON.parse(readFileSync(new URL('../../upstream.json', import.meta.url), 'utf8')) as {
+      channels: Record<string, { runtimePackageVersion: string }>
+    }
+    for (const channel of new Set(Object.values(upstream.channels).map(value => value.runtimePackageVersion))) {
+      const patch = readFileSync(new URL(`../../patches/dsh-subprocess-local@${channel}.patch`, import.meta.url), "utf8")
+      // Electron hosts launch the private runner through process.execPath, so the
+      // flag is required on every platform, not only on the Windows selector.
+      expect(patch).toContain(`env.ELECTRON_RUN_AS_NODE = "1";`)
+      expect(patch).toMatch(/process\.versions\.electron !== void 0 && \(process\.platform !== "win32"/u)
+    }
   })
 })

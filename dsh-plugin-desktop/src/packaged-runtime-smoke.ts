@@ -12,13 +12,13 @@ import {
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import type {} from '@deepseek-ai/dsh-session-persistence'
+import { verifyBundledSkills } from './packaged-filesystem-smoke.ts'
 import { rgPath } from '@vscode/ripgrep'
 import AdmZip from 'adm-zip'
 import { exportDiagnosticsZip } from './diagnostic-export.ts'
-import { unpackedAsarPath } from './packaged-runtime-path.ts'
 import { installProfilePackageResolver } from './module-resolution.ts'
-import type {} from '@deepseek-ai/dsh-session-persistence'
 
 const OK_MARKER = 'DSH_PACKAGED_RUNTIME_OK'
 
@@ -27,29 +27,29 @@ function assert(condition: unknown, message: string): asserts condition {
 }
 
 const installAnchor = new URL('../package.json', import.meta.url)
+const packagedAsarRoot = /(?:^|[\\/])app\.asar(?:\.unpacked)?[\\/]/u
+const packagedDirectoryRoot = /(?:^|[\\/])app[\\/]/u
+const usesAsar = packagedAsarRoot.test(installAnchor.pathname)
 assert(
-  /([\\/])app\.asar\1/u.test(installAnchor.pathname),
-  `did not start from app.asar: ${installAnchor.pathname}`,
+  usesAsar || packagedDirectoryRoot.test(installAnchor.pathname),
+  `did not start from a packaged application root: ${installAnchor.pathname}`,
 )
-// The ripgrep shim stays inside app.asar by contract (see
-// FORBIDDEN_UNPACKED_RUNTIME_ENTRIES in scripts/verify-packaged-runtime.ts), so
-// the logical resolution names app.asar even though the executable itself is
-// unpacked. Run the physical twin: the OS cannot exec a path that traverses the
-// archive (ENOTDIR), and Electron's child_process ASAR redirect does not cover
-// this ESM caller. Existence and a real `--version` run are the guarantees that
-// matter, on both layouts.
-const executableRgPath = unpackedAsarPath(rgPath)
 assert(
-  /([\\/])app\.asar\.unpacked\1/u.test(executableRgPath),
-  `resolved ripgrep outside app.asar.unpacked: ${rgPath}`,
+  usesAsar
+    ? /(?:^|[\\/])app\.asar\.unpacked[\\/]/u.test(rgPath)
+    : packagedDirectoryRoot.test(rgPath),
+  `resolved ripgrep outside the packaged application root: ${rgPath}`,
 )
-assert(existsSync(executableRgPath), `cannot find ripgrep at ${executableRgPath}`)
-const rgVersion = execFileSync(executableRgPath, ['--version'], { encoding: 'utf8', windowsHide: true })
+assert(existsSync(rgPath), `cannot find ripgrep at ${rgPath}`)
+const rgVersion = execFileSync(rgPath, ['--version'], { encoding: 'utf8', windowsHide: true })
 assert(/^ripgrep\s/u.test(rgVersion), `received an invalid ripgrep version: ${JSON.stringify(rgVersion.trim())}`)
 if (process.platform === 'win32') {
-  const sessionBackend = await import('@deepseek-ai/dsh-session-persistence-jsonl')
+  const sessionBackend = await import('@deepseek-ai/dsh-session-persistence-jsonl') as {
+    default?: unknown
+    apply?: unknown
+  }
   assert(
-    typeof sessionBackend.apply === 'function',
+    typeof (sessionBackend.default ?? sessionBackend.apply) === 'function',
     'could not import the Windows JSONL session backend without fs-ext',
   )
 } else {
@@ -57,11 +57,14 @@ if (process.platform === 'win32') {
   assert(typeof fsExt.flockSync === 'function', 'did not load the Electron ABI fs-ext binding')
 }
 
-/** Exercise upstream migration and native session locks from the packaged ASAR. */
+/** Exercise upstream migration and native session locks from the packaged runtime. */
 async function smokeSessionMigration(): Promise<void> {
   const { Context } = await import('@deepseek-ai/cordis')
   const { SessionId } = await import('@deepseek-ai/dsh-session')
-  const JsonlSessionPersistence = await import('@deepseek-ai/dsh-session-persistence-jsonl')
+  const sessionBackend = await import('@deepseek-ai/dsh-session-persistence-jsonl')
+  const JsonlSessionPersistence = (
+    'default' in sessionBackend ? sessionBackend.default : sessionBackend
+  ) as Parameters<InstanceType<typeof Context>['plugin']>[0]
   const root = mkdtempSync(join(tmpdir(), 'dsh-packaged-session-migration-'))
   const id = SessionId('packaged-migration')
   const directory = join(root, '_no-cwd', id)
@@ -203,9 +206,11 @@ try {
     assert(typeof consumer.yamlUtil?.createNode === 'function', 'did not resolve an exact conditional subpath')
     assert(
       typeof consumer.frontend === 'string'
-        && /([\\/])app\.asar\1/u.test(consumer.frontend)
+        && (usesAsar
+          ? /(?:^|[\\/])app\.asar[\\/]/u.test(consumer.frontend)
+          : packagedDirectoryRoot.test(consumer.frontend))
         && consumer.frontend.endsWith(join('dist', 'index.html')),
-      `did not resolve a wildcard export inside app.asar: ${String(consumer.frontend)}`,
+      `did not resolve a wildcard export inside the packaged application: ${String(consumer.frontend)}`,
     )
     assert(
       profileRequire('dsh-packaged-cjs-consumer/features/shape') === 'wildcard-cjs',
@@ -228,6 +233,7 @@ try {
   rmSync(root, { recursive: true, force: true })
 }
 
+await verifyBundledSkills(fileURLToPath(new URL('./', installAnchor)))
 await smokeSessionMigration()
 await smokeDiagnosticExportWorker()
 

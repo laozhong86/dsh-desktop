@@ -1,5 +1,4 @@
 diff --git a/index.js b/index.js
-index cbf34ac..c1bc3ed 100644
 --- a/index.js
 +++ b/index.js
 @@ -175,3 +175,4 @@ const baseOpen = async options => {

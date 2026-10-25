@@ -3,11 +3,9 @@
 import { fileURLToPath } from 'node:url'
 import { existsSync } from 'node:fs'
 import { win32 } from 'node:path'
-import type { ShellExecRequest, ShellExecSpec } from '@deepseek-ai/dsh-shell'
+import type { ShellExecSpec, ShellExecution } from '@deepseek-ai/dsh-shell'
 import { SandboxPwshExecutor } from '@deepseek-ai/dsh-pwsh-sandbox'
 import type { Config as PwshConfig } from '@deepseek-ai/dsh-pwsh-local'
-import { createVolatile, type Volatile } from '@deepseek-ai/cosmokit'
-import { configValue } from './settings-access.ts'
 
 const RUN_AS_NODE = 'ELECTRON_RUN_AS_NODE'
 const UPSTREAM_RUNNER = fileURLToPath(import.meta.resolve('@deepseek-ai/dsh-sandbox-windows-acl/runner'))
@@ -52,23 +50,45 @@ export function desktopWindowsPwshPath(
 }
 
 /**
- * Keep explicit user config, otherwise avoid PATH-resolved portable pwsh in the Windows ACL sandbox.
- * @param config - parsed or caller-supplied pwsh configuration.
- * @param env - host environment used to locate a system PowerShell.
- * @param platform - host platform.
- * @param exists - path probe, injectable for deterministic tests.
- * @returns the same config when nothing changes, otherwise a config with a resolved pwsh path.
+ * Keep explicit user config, otherwise avoid PATH-resolved portable pwsh in the
+ * Windows ACL sandbox. `pwshPath` is a live config reference the settings
+ * runtime rewrites in place, so the desktop default is supplied by a reference
+ * that reads the declared value through on every access instead of a value
+ * unwrapped once at construction: a snapshot taken here would pin the desktop
+ * fallback for the lifetime of the plugin and silently ignore a later edit,
+ * because a volatile-only change commits into the caller's reference rather
+ * than reloading this plugin.
+ * @param config - the plugin config carrying the caller's live references.
+ * @param env - environment the Windows install locations are derived from.
+ * @param platform - host platform; only Windows gets a desktop default.
+ * @param exists - existence probe for the candidate executables.
+ * @returns the same config with a `pwshPath` reference that defaults only while the declared value is empty.
  */
-export function desktopWindowsPwshConfig<T extends object>(
-  config: T,
+export function desktopWindowsPwshConfig(
+  config: PwshConfig,
   env: NodeJS.ProcessEnv,
   platform: NodeJS.Platform,
   exists: (path: string) => boolean = existsSync,
-): T & { pwshPath?: Volatile<string | undefined> } {
-  const configured = configValue((config as { pwshPath?: unknown }).pwshPath as Volatile<string | undefined> | undefined)
-  if (configured !== undefined && configured.length > 0) return config
-  const pwshPath = desktopWindowsPwshPath(env, platform, exists)
-  return pwshPath === undefined ? config : { ...config, pwshPath: createVolatile(pwshPath) }
+): PwshConfig {
+  const declared = config.pwshPath
+  // The fallback is a property of the host, not of the config, so the
+  // filesystem probe runs at most once however often the reference is read.
+  let fallback: string | undefined
+  let probed = false
+  return {
+    ...config,
+    pwshPath: {
+      get: () => {
+        const configured = declared.get()
+        if (configured !== undefined && configured.length > 0) return configured
+        if (!probed) {
+          probed = true
+          fallback = desktopWindowsPwshPath(env, platform, exists)
+        }
+        return fallback
+      },
+    },
+  }
 }
 
 /** Executable and runner identities for this Host. */
@@ -103,7 +123,6 @@ export function adaptWindowsAclArgv(
 }
 
 /**
- * Insert the desktop Node-mode trampoline for the exact upstream ACL runner.
  * @param spec - resolved PowerShell execution spec.
  * @param argv - argv after the upstream sandbox provider has confined it.
  * @param adaptation - executable and runner identities for this Host.
@@ -125,26 +144,52 @@ export function adaptWindowsAclExecution(
   return { spec: { ...spec, env }, argv: adapted }
 }
 
-/** PowerShell sandbox executor that repairs only Electron-hosted Windows ACL launches. */
+/** PowerShell sandbox provider that repairs only Electron-hosted Windows ACL launches. */
 export class DesktopWindowsPwshSandbox extends SandboxPwshExecutor {
   constructor(ctx: ConstructorParameters<typeof SandboxPwshExecutor>[0], config: PwshConfig) {
     super(ctx, desktopWindowsPwshConfig(config, process.env, process.platform))
   }
 
-  override resolve(request: ShellExecRequest): ShellExecSpec {
-    const spec = super.resolve(request)
-    const adaptation = desktopWindowsAclAdaptation()
-    // The trampoline runs after the provider confines the argv, so the Electron
-    // environment it needs has to be stamped here, while the spec is still ours to
-    // edit. The provider inserts the trampoline itself; this is the env half.
-    if (adaptation.platform !== 'win32' || !adaptation.electron) return spec
-    if (spec.sandboxPolicy === undefined || spec.sandboxPolicy.mode === 'danger-full-access') return spec
-    const env = { ...spec.env }
-    for (const key of Object.keys(env)) {
-      if (key.toUpperCase() === RUN_AS_NODE) delete env[key]
+  private adapt(spec: ShellExecSpec, argv: readonly string[]): AdaptedWindowsAclExecution {
+    return adaptWindowsAclExecution(spec, argv, {
+      platform: process.platform,
+      electron: process.versions.electron !== undefined,
+      execPath: process.execPath,
+      upstreamRunner: UPSTREAM_RUNNER,
+      trampoline: DESKTOP_TRAMPOLINE,
+    })
+  }
+
+  /**
+   * Adapt the exact argv the upstream sandbox produced, keeping confinement
+   * preparation inside the caller's deadline. This is the single argv seam for
+   * both foreground and background callers - the executor publishes one
+   * execution handle and "foreground" is only what the caller awaits - so every
+   * confined launch passes through here. Preparation only yields argv after this
+   * executor has handed a spec to the local executor, so the runner-only
+   * Electron environment lands on this class's own spec copy at the moment the
+   * argv becomes known - strictly before the local executor reads the spec to
+   * build its spawn request.
+   * @param spec - resolved PowerShell execution spec.
+   * @param argvOrPrepare - exact argv, or preparation sharing the execution deadline.
+   * @param onStarted - the caller's provider-fact installer, forwarded untouched.
+   * @returns the live execution handle the local executor published.
+   */
+  protected override executeArgv(
+    spec: ShellExecSpec,
+    argvOrPrepare: readonly string[] | ((signal: AbortSignal) => Promise<readonly string[]>),
+    onStarted?: (process: ShellExecution) => void,
+  ): Promise<ShellExecution> {
+    if (typeof argvOrPrepare !== 'function') {
+      const adapted = this.adapt(spec, argvOrPrepare)
+      return super.executeArgv(adapted.spec, adapted.argv, onStarted)
     }
-    env[RUN_AS_NODE] = '1'
-    return { ...spec, env }
+    const pending: ShellExecSpec = { ...spec }
+    return super.executeArgv(pending, async signal => {
+      const adapted = this.adapt(spec, await argvOrPrepare(signal))
+      pending.env = adapted.spec.env
+      return adapted.argv
+    }, onStarted)
   }
 }
 

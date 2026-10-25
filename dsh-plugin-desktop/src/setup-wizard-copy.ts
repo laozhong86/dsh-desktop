@@ -13,6 +13,7 @@ export interface DesktopSetupWizardCopy {
   readonly aaNextBody: string
   readonly aaNextDesktop: string
   readonly beta: string
+  readonly experimental: string
   readonly title: string
   readonly profile: string
   readonly welcomeTitle: string
@@ -34,12 +35,14 @@ export interface DesktopSetupWizardCopy {
   readonly materialOffBody: string
   readonly materialTransparent: string
   readonly materialTransparentBody: string
-  readonly materialMica: string
-  readonly materialMicaBody: string
   readonly browserTitle: string
   readonly browserBody: string
   readonly openBrowser: string
   readonly browserCompatibilityNotice: string
+  readonly browserCompatibilityDialogTitle: string
+  readonly browserCompatibilityDialogBody: string
+  readonly confirmBrowserCompatibility: string
+  readonly cancelBrowserCompatibility: string
   readonly networkExposure: string
   readonly networkExposureBody: string
   readonly loopback: string
@@ -58,6 +61,8 @@ export interface DesktopSetupWizardCopy {
   readonly communityMarketBody: string
   readonly dshMarket: string
   readonly dshMarketBody: string
+  readonly officialMarket: string
+  readonly officialMarketBody: string
   readonly notificationsTitle: string
   readonly notificationsBody: string
   readonly notificationsEnabled: string
@@ -65,6 +70,8 @@ export interface DesktopSetupWizardCopy {
   readonly turnFailure: string
   readonly jobCompletion: string
   readonly jobFailure: string
+  readonly scheduleCompletion: string
+  readonly scheduleFailure: string
   readonly back: string
   readonly next: string
   readonly skip: string
@@ -91,6 +98,7 @@ const COPY: Record<DesktopLocale, DesktopSetupWizardCopy> = {
     aaNextDesktop: 'If the Agents-Anywhere desktop app is installed on this computer, manage the connection directly in that app.',
 
     beta: 'Beta',
+    experimental: 'Experimental',
     title: 'Set up DSH Desktop',
     profile: 'Profile',
     welcomeTitle: 'Welcome to DSH Desktop',
@@ -112,12 +120,14 @@ const COPY: Record<DesktopLocale, DesktopSetupWizardCopy> = {
     materialOffBody: 'Use a solid, opaque window background.',
     materialTransparent: 'Glass background',
     materialTransparentBody: 'Show a blurred view of the content behind the window.',
-    materialMica: 'Mica',
-    materialMicaBody: 'Use the native Windows Mica material when it is supported.',
     browserTitle: 'Set up browser access',
     browserBody: 'Allow browser access to the current Profile and choose which devices can reach it.',
     openBrowser: 'Allow opening this Profile in a browser',
-    browserCompatibilityNotice: 'Browser access works in every window mode on this computer. Access from other devices on the local network still requires compatibility mode.',
+    browserCompatibilityNotice: 'Browser access is only available in compatibility mode.',
+    browserCompatibilityDialogTitle: 'Switch to compatibility mode?',
+    browserCompatibilityDialogBody: 'Opening this Profile in a browser requires compatibility mode. Continue to switch the window mode and enable browser access.',
+    confirmBrowserCompatibility: 'Switch and enable',
+    cancelBrowserCompatibility: 'Cancel',
     networkExposure: 'Network access',
     networkExposureBody: 'Allow access from this computer only, or from other devices on the same local network over HTTPS.',
     loopback: 'This computer only',
@@ -129,13 +139,15 @@ const COPY: Record<DesktopLocale, DesktopSetupWizardCopy> = {
     confirmLan: 'Enable local-network access',
     cancelLan: 'Keep this computer only',
     marketTitle: 'Choose a plugin market',
-    marketBody: 'Choose a plugin market for the current Profile. Only one can be enabled at a time.',
+    marketBody: 'Choose a market to browse and install community plugins,\nor configure the custom plugin market.\nYou can also leave it off and decide later in Plugins.',
     marketDisabled: 'Turn off plugin market',
     marketDisabledBody: 'Do not load a plugin market interface.',
     communityMarket: 'dsh-community-market',
     communityMarketBody: 'The open market built into DSH Desktop, including custom data sources.',
     dshMarket: 'dsh-market',
     dshMarketBody: 'The popular community market powered by awesome-dsh-plugin data.',
+    officialMarket: 'Custom plugin markets',
+    officialMarketBody: 'Enable the official market with the dsh-market source preconfigured.',
     notificationsTitle: 'Set up Desktop notifications',
     notificationsBody: 'Receive system notifications when tasks finish or fail. Notifications do not show conversation content.',
     notificationsEnabled: 'Enable Desktop notifications',
@@ -143,6 +155,8 @@ const COPY: Record<DesktopLocale, DesktopSetupWizardCopy> = {
     turnFailure: 'Current turn failed',
     jobCompletion: 'Background job completed',
     jobFailure: 'Background job failed',
+    scheduleCompletion: 'Automation task completed',
+    scheduleFailure: 'Automation task failed',
     back: 'Previous',
     next: 'Next',
     skip: 'Skip setup',
@@ -167,6 +181,7 @@ const COPY: Record<DesktopLocale, DesktopSetupWizardCopy> = {
     aaNextDesktop: '如果本机已安装 Agents-Anywhere 桌面端，直接在桌面端管理连接即可。',
 
     beta: 'Beta',
+    experimental: '实验性',
     title: '设置 DSH Desktop',
     profile: 'Profile',
     welcomeTitle: '欢迎使用 DSH Desktop',
@@ -188,12 +203,14 @@ const COPY: Record<DesktopLocale, DesktopSetupWizardCopy> = {
     materialOffBody: '使用不透明的纯色窗口背景。',
     materialTransparent: '玻璃背景',
     materialTransparentBody: '透出窗口背后的内容，并呈现模糊效果。',
-    materialMica: 'Mica',
-    materialMicaBody: '在系统支持时使用 Windows 原生 Mica 材质。',
     browserTitle: '设置浏览器访问',
     browserBody: '允许在浏览器中打开当前 Profile，并选择可访问的设备范围。',
     openBrowser: '允许在浏览器中打开',
-    browserCompatibilityNotice: '浏览器访问在所有窗口模式下都可用（仅限这台电脑）。局域网内其他设备的访问仍需要兼容模式。',
+    browserCompatibilityNotice: '浏览器访问仅在兼容模式下可用。',
+    browserCompatibilityDialogTitle: '切换到兼容模式？',
+    browserCompatibilityDialogBody: '在浏览器中打开只能使用兼容模式。继续将把这个 Profile 的窗口模式切换为兼容模式，并开启浏览器访问。',
+    confirmBrowserCompatibility: '切换并开启',
+    cancelBrowserCompatibility: '取消',
     networkExposure: '网络访问范围',
     networkExposureBody: '选择仅允许这台电脑访问，或允许同一局域网中的其他设备通过 HTTPS 访问。',
     loopback: '仅这台电脑',
@@ -205,13 +222,15 @@ const COPY: Record<DesktopLocale, DesktopSetupWizardCopy> = {
     confirmLan: '开启局域网访问',
     cancelLan: '保持仅本机访问',
     marketTitle: '选择插件市场',
-    marketBody: '为当前 Profile 选择一个插件市场。一次只能启用一个。',
+    marketBody: '选择一个插件市场，浏览和安装社区插件；\n或配置自定义插件市场。\n也可以暂不开启，以后在插件页面调整。',
     marketDisabled: '关闭插件市场',
     marketDisabledBody: '不加载插件市场界面。',
     communityMarket: 'dsh-community-market',
     communityMarketBody: 'DSH Desktop 内置的开放市场，并支持自定义数据源。',
     dshMarket: 'dsh-market',
     dshMarketBody: '使用 awesome-dsh-plugin 数据的热门社区市场。',
+    officialMarket: '自定义插件市场',
+    officialMarketBody: '开启官方插件市场，并预置 dsh-market 索引源。',
     notificationsTitle: '设置桌面通知',
     notificationsBody: '在任务完成或失败时接收系统通知。通知不会显示会话内容。',
     notificationsEnabled: '启用桌面通知',
@@ -219,6 +238,8 @@ const COPY: Record<DesktopLocale, DesktopSetupWizardCopy> = {
     turnFailure: '本轮任务失败',
     jobCompletion: '后台任务完成',
     jobFailure: '后台任务失败',
+    scheduleCompletion: '自动化任务完成',
+    scheduleFailure: '自动化任务失败',
     back: '上一步',
     next: '下一步',
     skip: '跳过设置',

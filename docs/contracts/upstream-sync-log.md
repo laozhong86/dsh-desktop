@@ -4,6 +4,141 @@
 
 ---
 
+## 2026-10-25 · 验收达成：`corepack yarn check` = exit 0
+
+- **真实命令与结果**（受管环境 `env -u NODE_OPTIONS PATH=<managed node 22.22.2>/bin:/usr/bin:/bin:/usr/sbin:/sbin`，worktree `.worktrees/next-shell-merge-issue-3778`）：
+  ```
+  corepack yarn check
+  → exit 0
+  ```
+- **三个工作区全绿（真实计数）**：
+  - `dsh-community-market`：**14 文件 / 309 通过 / 0 失败**
+  - `dsh-plugin-desktop`：**162 文件 / 2055 通过 / 12 跳过 / 0 失败**（本轮起点为 131 失败）
+  - `dsh-desktop-next`：**86 文件 / 717 通过 / 3 跳过 / 0 失败**
+- **同批门禁（均通过）**：`verify-bilingual-docs`（53 记录 / 106 文档）、`verify-fabric-docs`（20 Markdown / 10 双语对）、`verify-market-docs`（12 Markdown / 6 双语对 / 4 schema）、`verify-layout`（workspace 与上游 `1f81c047fc` 一致）、`sync-vendored-runtime`（stable 344 包）、`verify-runtime-closure`（319 首方节点闭合）、`verify-host`（Web-composed Schedule 开关与重启持久化）、`verify-profile-boot`（Creator / 插件管理器 / 两代 Profile HMR）、`verify-operation-reliability`（7 操作 / 18 故障契约）、`verify-licenses`（629 生产包，2 个 LGPL-3.0-or-later 走 notice）、`verify-package-exports`、`verify-market-dependency-direction`、`verify-market-client-loader`、`contract-types`。
+- **本轮（收尾段）修掉的真实缺陷**：
+  1. `dsh-plugin-desktop/package.json` 的 `verify:operations` 仍引用被上游删除的 `scripts/operation-reliability.spec.mjs`，导致 `yarn check` 直接失败 → 按上游收口为 `node scripts/verify-operation-reliability.mjs`（上游已把该 spec 的 7/18 断言内联进 verifier，属**被取代**而非丢失）。
+  2. `exports` 缺 `./windows-acl-sandbox-provider`（`#3776` 行注入的消费者）→ 补声明；缺失时 Host 导入该行失败，并以 `****` 污染 `host-process-integration` 的日志断言（该用例此前被误判为「抖动」）。
+  3. `profile.ts` / `setup-wizard-settings.ts` 的 `networkExposure` 补回「LAN 仅兼容模式」闸门；包级 `cordis.patch.yml` 补回上游 `desktop-shell` 行的 `config.mode` 默认声明。
+- **分级与 C 级确认**：A 104 / B 68 / C 63 文件 → **13 项决定** / D 0；13 项 C 级**均经老板 2026-10-25 逐条确认**（见下方「C 级 13 项」表）。
+- **剩余未验证 / 遗留项（如实登记）**：
+  1. **未做**：`dist:mac-smoke` / `dist:win` 等真实打包与签名链路未在本轮重跑（老板已接受该判断，不为此额外花时间）。
+  2. **未做**：Electron 壳内 Setup 向导的实机验收（属 #3790 的范围）。
+  3. **遗留项**：`client/index.ts` 的原生标题栏双击接线未装回（改动因质量闭环门禁要求同捆端到端证据而回退，见上一条目）；`window-state.ts` 已被上游 `main-window-state.ts` 取代，生产无消费者，属死代码清理。
+  4. **策略取舍**：Setup 向导「浏览器访问在所有窗口模式可用」按上游流程收口，fork 策略跟进单 **#3790**。
+
+---
+
+## 2026-10-25 · Next 壳合并收尾（2c/2d）：分级、逐调用点核对与门禁结果
+
+- **分级记录（全量）**：本次「上游 551 提交 + 前向合并 `68de0b3dad`」的冲突分级为 **A 104 / B 68 / C 63 文件 → 13 项决定 / D 0**。13 项 C 级**均经老板 2026-10-25 逐条确认**（原文见本文件下方「C 级 13 项」表）；D 级 0 项（未出现需要立即拒绝的上游改动）。
+- **2c 收尾结论**：
+  1. **Electron 44.7.0 原生 prebuild（darwin x64/arm64）**：逐家族实测存在于 `dsh-plugin-desktop/node_modules` —— `node-pty`（18 文件 / 24.4 MB，双架构）、`koffi`（`@koromix/koffi-darwin-{arm64,x64}`）、`sharp`（`@img/sharp-darwin-*` + `sharp-libvips-darwin-*`，arm64 18.2 MB / x64 20.4 MB）、`ripgrep`（`@vscode/ripgrep-darwin-*`）、`uv`（`@dataiku/uv-darwin-*`，39.5 / 47.1 MB）、`node-addon-require-builtin-darwin-*`、`@deepseek-ai/node-addon-system-darwin-*` **全部到位**。`fs-ext` 不走 prebuild：由 `prepare:electron-native`（`scripts/prepare-fs-ext.ts`）用 Electron 头文件现编，产物 `node_modules/fs-ext/build/Release/fs_ext.node` 60,728 字节存在，`package:dir` / `dev` 链均包含该步骤。
+  2. **`asar:false` 后的路径解析**：`unpackedAsarPath()` 只做 `app.asar → app.asar.unpacked` 的字符串替换，非 ASAR 路径原样返回 → 在 `asar:false` 下**恒等**，不会指向不存在的 `app.asar.unpacked`；`module-resolution.ts` 的 `isAsarPath()` 正则同样在无 `app.asar` 段时返回 false，跳过 ASAR 专用解析分支；`profile.ts` 的 `INSTALL_ANCHOR`（`new URL('../package.json', import.meta.url)`）在 `asar:false` 下解析为 `resources/app/package.json` 这一真实路径（逻辑路径即物理路径），注释所述的「虚拟安装锚点」语义保持成立；`DESKTOP_PATCH_PATH` 同理指向包内真实 `cordis.patch.yml`。**结论：四处路径解析在 `asar:false` 下均正确，无需额外分支**。
+  3. **dshmarket 1.70.1 与 pnpm 11.28.5 补丁重做**：`dshmarket` 依赖为 `1.70.1`，root `resolutions` 为 `dshmarket@npm:1.70.1 → patch:dshmarket@npm%3A1.70.1#./.yarn/patches/dshmarket-desktop.patch`（补丁针对 1.70.1 重做，`client/client.js` 目标路径匹配）；`pnpm` 依赖 `11.28.5`，补丁 `patches/pnpm@11.28.5.patch` 目标 `dist/pnpm.mjs`。`yarn install --immutable` 通过即证明两处补丁与锁文件一致。
+- **2d：13 个 fork-only `src` 文件逐调用点核对**
+
+| 文件 | 调用点 | 是否保住 | 证据 |
+| --- | --- | --- | --- |
+| `client/titlebar-double-click.ts` | `client/index.ts` 里 `installDesktopTitleBarDoubleClick(platform)` 的安装调用 | **未保住（遗留项，另开单）** | 全仓除自身外无该符号引用；合并后 `client/index.ts` 为上游版，安装调用消失。`tests/titlebar-double-click.spec.ts` 仍绿（单测直接调用），即**测试绿但生产接线缺失**。已尝试重插该 effect：typecheck 与相关单测均通过，但 `src/client/index.ts` 属界面源码，提交被质量闭环门禁拦下（要求同捆端到端测试与实测证据）。按 #3790 的同一口径**不绕过、不造假**，改动已回退并登记为遗留项 |
+| `desktop-analytics.ts` | `main.ts`：`DesktopAnalyticsClient`、`extractStartupAnalyticsFromSummary` | 保住 | `main.ts` 命中 |
+| `desktop-first-run.ts` | `main.ts`：`settlesFirstRunSetup`、`defaultDesktopFirstRunSettings` | 保住 | 本任务补回（批准包决定 5 的第 5 个调用点），并新增 3 个测试钉住 |
+| `desktop-identity.ts` | `main.ts`：`isOmnimuxDevLaunch`、`applyOmnimuxDevEnvironment`、`resolveDevCdpPort` | 保住 | `main.ts` 命中 |
+| `desktop-mode-default.ts` | `desktop-first-run.ts`、`preset-profile.ts`、`setup-wizard-settings.ts` | 保住 | 3 处调用点命中 |
+| `managed-profile.ts` | `preset-profile.ts`：6 个符号 | 保住 | `preset-profile.ts` 命中 |
+| `preset-profile.ts` | `main.ts`（`seedOmnimuxProfile`、`completeOmnimuxProfileMaterialization`）+ `profile.ts`（`REQUIRED_BUNDLES`） | 保住 | 两处命中 |
+| `settings-access.ts` | — | **按决定 4 退役**（上游 `settings` 服务为唯一入口） | 文件已删除，全仓 0 引用 |
+| `titlebar-double-click.ts`（主进程） | `electron-shell-generation.ts`：`attachTitleBarDoubleClickListener` | 保住 | 命中 |
+| `web-server-port.ts` | `main.ts`、`updates.ts`：`requireWebServerPort` | 保住 | 2 处命中 |
+| `window-actions-bridge-contract.ts` | `client/titlebar-double-click.ts`、`titlebar-double-click.ts` | 保住 | 2 处命中 |
+| `window-state.ts` | 原 `electron-runtime.ts` 的窗口状态持久化 | **被上游取代（死代码）** | 合并后 `electron-runtime.ts` 改用上游 `main-window-state.ts` 的 `FileMainWindowStateStore`/`MainWindowStateStore`；本模块仅剩 `tests/window-state.spec.ts` 等直接引用，生产无消费者 |
+| `windows-acl-sandbox-provider.ts` | profile 行 `desktop-windows-acl-sandbox` 按包子路径加载（非 TS import） | 保住（本轮补回） | 本轮重插 profile 行 + 补 `exports['./windows-acl-sandbox-provider']`；缺失该子路径时 Host 导入失败并污染集成日志 |
+
+  结论：**9 项保住、1 项按决定退役、1 项被上游取代、1 项本轮补回**；另有 **1 项未保住**（`client/titlebar-double-click.ts` 的安装调用），已登记为遗留项，不在本次合并范围内擅自改写上游 `client/index.ts`。
+- **本轮补回的真实缺陷（合并引入）**：
+  1. `build` 链缺 `vite build --config vite.client.config.ts`，导致 `exports['./client']` 指向无人产出的 `lib/client.js`（前向合并条目已记）。
+  2. `profile.ts` 丢失 fork 的 `desktop-windows-acl-sandbox` 行注入（**#3776 交付物**），且 `exports` 未声明 `./windows-acl-sandbox-provider` → Host 导入该行失败。
+  3. `profile.ts` / `setup-wizard-settings.ts` 的 `networkExposure` 缺「LAN 仅兼容模式」闸门（fork 原有）。
+  4. 包级 `cordis.patch.yml` 丢失上游 `desktop-shell` 行的 `config.mode` 默认声明。
+  5. `profile.ts` 的 `desktop-windows-acl-sandbox` 行虽已重插，但 `exports` 未声明 `./windows-acl-sandbox-provider`，Host 导入失败并以 `****` 污染集成日志 —— 已补 `exports` 子路径。
+- **遗留项（不在本次合并范围，另开单）**：
+  1. `client/index.ts` 的原生标题栏双击接线（同上表），需连同端到端证据一并落地。
+  2. `window-state.ts` 已被上游 `main-window-state.ts` 取代，生产无消费者，仅剩单测引用 —— 属死代码清理，需与 `tests/window-state.spec.ts` 一并评估删除。
+- **策略取舍**：Setup 向导的「浏览器访问在所有窗口模式可用」不再装回，改用**上游流程**（`confirm-compatibility`）与上游文案；fork 的策略取舍单列 **#3790** 跟进。设置页（`client/desktop-settings-locales.ts`）为 fork 自有面且开关无模式门控，保留 fork 文案与行为。
+
+---
+
+## 2026-10-25 · 前向合并 `68de0b3dad`（与 #3776 / #3786 交付物对齐）
+
+- **范围**：把本分支（551 提交上游同步 + 本任务 11 个提交）与 `fork/omnimux` 的新 tip `68de0b3dad96e12c1ea4a6fbacc662a60187408c` 前向合并（**不是重做 `git merge origin/master`**，保住 2a/2b/2c 成果）。新 base 含 `1563675a4f`（#106 / #3776：Windows provider seam 核验 + 两处过期 CI 断言复位）与 `68de0b3dad`（#107 / #3786：macOS universal smoke 修复——sharp 钉版 `0.35.3→0.35.5` + `x64ArchFiles` 补三个 darwin 原生家族）。merge commit `19ee33171b`，父提交 `5350f70501` + `68de0b3dad`。
+- **冲突 6 项与解法**：
+  1. `dsh-community-market/package.json`：取本分支侧——保留上游新增的 `zod ^4.4.3`（`src/catalog/domain.ts` 直接 `import { z } from 'zod'`，是本次同步带进来的真实依赖）。
+  2. `dsh-plugin-desktop/package.json`：取本分支侧——上游的 `x64ArchFiles` 是超集（含 `Contents/Resources/runtime/**` 与 `#107` 补的三个家族 `@deepseek-ai/libreoffice-kit-darwin-*` / `meshcall-router-darwin-*` / `sherpa-onnx-darwin-*`），并保留 `asar: false`。sharp 两侧同为 `0.35.5`，自动合并。
+  3. `dsh-community-market/tests/market-settings-persistence.spec.ts`：**接受上游删除**（`git rm`，与 #3776 关闭评论口径一致）。
+  4. `dsh-plugin-desktop/tests/package.spec.ts`：**按决定 2（跟随上游 Electron 44.7.0）后的真实 manifest 取值**，不保留 #106 的临时 `43.0.0` 断言。
+  5. `dsh-plugin-desktop/tests/mac-universal.spec.ts`：**保留 #107 新增的「manifest / lockfile / 原生条目三处 sharp 版本一致」用例**，标题采用上游侧（`requires every CPU-specific file and repairs both uv binaries and node-pty helpers`）。
+  6. `dsh-plugin-desktop/tests/windows-pwsh-sandbox.spec.ts`：两侧是**不同测试套件**（本分支=上游的 `windows-console-host` 两套；fork 侧=#106 的 provider seam 套件）。按「保留用例语义、按上游结构改写写法」合成一个文件：**上游的 4 个 describe 全保留 + #106 的 `desktop Windows ACL sandbox provider seam` 套件（含「上游裁决对象不被就地修改」的变异检查）与其 `aclSeam` mock 追加**；`configValue`（来自已删除的 `settings-access.ts`）不引入，改用上游 `desktopWindowsPwshConfig` 的 `.get()` 语义。
+- **#3776 交付物确认落地**：`tests/profile.spec.ts` 自动合并带入 +10 行新 row id 断言（`desktop-windows-acl-sandbox` 存在、`disabled` 为假、旧 `desktop-windows-pwsh-sandbox` 不再出现）；`tests/windows-pwsh-sandbox.spec.ts` 带入 +77 行 provider seam 套件。
+- **顺带修掉一个真实缺陷（本次同步引入）**：551 提交同步带进了上游的 `vite.client.config.ts`，但本仓 `build` 脚本（按合同 B 级保我们的链）没有跑它，而 `package.json` 的 `exports['./client']` 指向 `lib/client.js` → **没有任何构建产物能满足自己的导出**。已把 `vite build --config vite.client.config.ts` 加入本仓 build 链（保留 `generate-*-omnimux.mjs` 图标链与 `vite.native-ui.config.ts`），重建后 `lib/client.js` 701,926 字节。
+- **`yarn.lock`**：以 `corepack yarn install` 结果为准（#107 的剪枝与上游重生成都包含在内）；`--immutable` 复跑通过。
+- **验证证据（前向合并后实测）**：
+  - typecheck：`dsh-plugin-desktop` / `dsh-desktop-next` / `dsh-community-market` **均 exit 0**。
+  - `check:layout`：exit 0（双语 53 记录 / 106 文档、vendored-runtime 344 包、verify-layout 通过）。
+  - `workspace dsh-plugin-desktop build`：**exit 0**。
+  - `workspace dsh-plugin-desktop test`：**162 文件 / 2037 通过 / 18 失败 / 12 跳过**（前向合并前为 21 失败；`package.spec.ts`、`verify-packaged-runtime.spec.ts`、`host-process-integration.spec.ts` 已转绿）。
+  - `tests/package.spec.ts` 单跑：**52 通过 / 1 跳过 / 0 失败**。
+  - `workspace dsh-desktop-next test`：**86 文件 / 717 通过 / 3 跳过 / 0 失败**。
+  - `corepack yarn check`：**仍未通过**，剩余 18 项见下。
+- **剩余 18 项（真实数字）**：`profile.spec` 5、`plugin.spec` 3、`client-environment.spec` 3、`dev-package.spec` 2、`setup-wizard-settings` 1、`setup-wizard-native-ui` 1、`desktop-runtime-environment` 1、`desktop-plugins` 1、`client-desktop-settings` 1。均为上游测试断言与本仓实现/品牌差异的逐项对账，无已知结构性阻塞。
+
+---
+
+## 2026-10-25 · 上游 551 提交大同步（Next 壳灰盒引入；C 级 13 项已获老板确认）
+
+- **上游范围**：`63e160ab4387988db894adef766865eab897cf80`（2026-09-12 同步落地的 origin/master tip）→ `092e2ecef750d10db43cedbab8e81fd48c8de38e`，共 **551 提交**；fork base `dca12ebdd2b5a7b572663f491c84833da3e487ce`（`fork/omnimux` tip）。上游产品 2.0.9 → 2.0.18；DSH 运行时两侧同 pin `1f81c047fc48fa190a683e469daa699857e9afe8`（`0.2.1-rc.3`），submodule gitlink 无差异。
+- **冲突规模**：`git diff --name-only --diff-filter=U` = **235 文件**（决策集）。`git merge-tree --write-tree --name-only` 的 `CONFLICT` 行 = 282（含 rename/delete 两侧路径，与 issue 的「260」同口径）。状态分布：`DU 119 · UU 81 · UD 13 · AA 8 · UA 7 · DD 7`。
+- **分级记录**：**A 104 / B 68 / C 63 文件 → 13 个决策项 / D 0**。C 级 13 项全部由老板于 2026-10-25 显式确认（见下）；D 级 0（根 `LICENSE` 两侧零 diff，`dsh-desktop-next/LICENSE.upstream` 为 MIT；上游反向**移除** DeepSeek 产品分析行；fork 专有的 preset 种子机制未被要求拆除）。
+- **C 级决策与逐项解法（老板已确认）**：
+  1. **Next 壳灰盒引入**：`dsh-desktop-next/**`（270 文件、**0 冲突纯新增**）进 workspace + 根 `build`/`typecheck`/`test` + 根 `check`（`dsh-desktop-next check`），**不打包、不品牌化、不发布**；「采纳 next 作产品壳」拆独立 issue。判定依据：上游 `dsh-plugin-desktop/src/next-transition-notice.ts` 明写「下个版本发布后计划用 Next 取代当前稳定版桌面端」；`verify-desktop-variants.mjs` 证明 beta 与 next 是同一份源码的两个频道变体；next 与 beta 各有 29 个跨包相对 import 指回 `dsh-plugin-desktop`（beta→next 为 0），故 legacy 是共享底座、不可删；next 无 preset 种子、无端口常量、无自动更新资格。
+  2. **维持单壳线**：不引入上游 `dsh-plugin-desktop-beta/**`（合并时整目录移除：51 modify/delete + 219 新增），`upstream.json` 保持单 `stable`（不加 `beta`/`next` channel），`activeChannel: stable`。
+  3. **不引入变体门禁**：`scripts/verify-desktop-variants.mjs` 不落地，根脚本无 `check:desktop-variants` / `sync:beta-to-next` / `sync:next-to-beta`；`settings-bridge.ts` 里指向该门禁的注释一并改写。
+  4. **依赖 major 全部跟随上游**：Electron `43.0.0 → 44.7.0`（含 `peerDependencies`）、`asar: { smartUnpack: true } → false`、`dshmarket 1.38.1 → 1.70.1`、`pnpm 11.8.0 → 11.28.5`、`@deepseek-ai/schemastery ^3.18.2 → ^3.18.5`、`node-addon-require-builtin ^0.1.4 → ^0.1.9`、`sharp 0.35.3 → 0.35.5`；**`koffi` 例外保我们的 `3.1.5`**（根 `resolutions` 已钉，比上游 `3.1.1` 新）。上游新增 devDeps（`papaparse`/`extract-zip`/`fflate`/`tar`）一并跟进。
+  5. **品牌/端口/身份/端点全保 OmniMux**：更新端点 `https://updates.omnimux.local/api/desktop/version`、Windows 产物名 `OmniMux-${version}-${arch}-Portable.${ext}`、NSIS `shortcutName`/`artifactName` = `OmniMux` / `OmniMux-${version}-${arch}-Setup.${ext}`、Linux 产物名 `OmniMux-*`、bin `omnimux`、`desktopName: omnimux.desktop`、`homeDirectoryName = .omnimux`（Dev 槽 `.omnimux-dev`）、第二身份位仍映射 Dev（`productName: OmniMux-Dev`、同一 `appId`）、桌面端口 `44120` / Dev `45120`（`desktop-port.ts` 未被上游改动，值原样保留）。
+  6. **更新频道口径（决定 3 与决定 1 的边界，可复核）**：**类型面接受上游三值联合 `stable | beta | next`**（保证 in-tree Next 包 typecheck 通过，且不改上游文件以免下次同步再冲突）；**运行时与默认值只走 `stable`** —— 删除上游 `parseCanonicalUpdateVersion` 的「Stable 可提升 Next 安装包」回退（`?? (channel === 'stable' ? parseCanonicalChannelVersion(input, 'next') : null)`），OmniMux 用户不会被 `updates.omnimux.local` 推送到 Next 安装包；`parseCanonicalChannelVersion` 的三频道准入规则保留，故 Next 包自身仍可 typecheck/测试。
+  7. **设置入口**：接受上游 `settings` 服务为唯一入口，fork 的直读设置层 `dsh-plugin-desktop/src/settings-access.ts` **已删除**（重接后全仓 0 引用）；`index.ts` 采上游 `inject = ['webServer','appExit','settings','connection']` + `createDesktopSettingsPort`。
+  8. **启动流程**：以上游新流程为基线（Setup Wizard `setupPending`/`beginDesktopSetupWizard`/`runtime.setupOnboarding` 状态机、`launchWorkspaceReady` 交接、`desktopPrimaryRuntime()`、`profileBoot.markReady()`、`observeDesktopPreferenceSettings`），重插 OmniMux 调用点；上游「共享数据目录迁移」弹窗在 OmniMux 禁用（新增 `SHARED_HOME_MIGRATION_PROMPT_ENABLED: boolean = false` 常量并置于该 `if` 首条件）。
+  9. **preset/seed**：`preset/**` 继续物化 OmniMux 插件（`preset/skeleton/*`、`owned-packages.json`、`seed-version`），agent-preset 名册交给上游 `agent-preset-registry`；`package:dir` 链保留 `yarn run stage:preset`，`files` 保留 `{from: preset, to: preset}`。
+  10. **门禁与 CI**：保 OmniMux 打包线（`ci.yml` 取本仓版本：`dsh-plugin-desktop` 矩阵 + OmniMux 产物名 + `verify:aa` 冒烟），**不加 linux job**，**不纳入 Next 的 4 个浏览器门禁**（window-controls / onboarding / protocol / sidebar-browser）。
+  11. **`IMMUTABLE_BUNDLES` 扩容**（`desktop-plugins.ts` 新增 `'dshmarket'`、`'@agents-anywhere/dsh-bridge-next'`，**合并无冲突静默接受**）→ 用 profile patch 禁用，延续 community-market 先例。
+  12. **`scripts/verify-layout.mjs` 重写**为本仓口径：workspaces 精确为 `['dsh-plugin-desktop','dsh-desktop-next','dsh-community-fabric','dsh-community-market']`、`activeChannel` 必须 `stable`、Next 必须 `private` 且其 `@deepseek-ai/dsh*` 依赖等于 `dsh-desktop-next/upstream-reference.json` 的 pin；删除上游的 beta 断言。
+  13. **`AA_WORKSPACES` 适配**：上游 `scripts/agents-anywhere-release-policy.mjs` 常量含 `dsh-plugin-desktop-beta` → 改为 `['dsh-plugin-desktop', 'dsh-desktop-next']`（`aa:prepare-release` 的 `packagePaths` 与 `runtimePeerRanges` 都读该常量）。
+- **A/B 级逐项解法**：
+  - **vendor/dsh-runtime（56 DU）**：上游保留全部历史运行时目录，本仓只留活动 rc。合并后 `git rm -r` 掉 `0.1.5-rc.2`、`0.1.7-alpha.2`、`0.1.7-rc.1`、`0.1.7-rc.2`、`0.2.0-rc.1`、`0.2.0-rc.2`、`0.2.1-alpha.1`、`0.2.1-alpha.2`，只留 `0.2.1-rc.3`（延续本仓剪枝策略）。`_deprecated/dsh-0.1.5-rc.2/**` 同样保留删除。
+  - **patches（27）**：8 个 AA 中 6 个与上游字节相同直接取、2 个差异重做（见「发现」）；7 DD / 7 UA / 5 DU 属废弃 rc，删除；随后按策略删掉合并带入的 143 个废弃 rc 补丁。最终保留 35 个（活动 rc `0.2.1-rc.3` 全套 + `app-builder-lib@26.15.7`、`fs-ext@2.1.1`、`open@11.0.1`、`open@11.0.4`、`vscode-ripgrep@1.18.0`、`pnpm@11.28.5`、`node-pty@1.2.0-beta.15`、`pi-ai@1.1.0`、`@electron__osx-sign@1.3.3` + 本仓专有 `dsh-better-sidebar/**`）。
+  - **根与文档**：`AGENTS.md` 保双方并去 beta（改写上游新增的 `dev:next`/变体镜像两条 bullet 为单壳线灰盒口径；`market:prepare` 段改为本仓 `resolutions` + `.yarn/patches/dshmarket-desktop.patch` 的实际口径）；`.gitignore` 并集（保本仓 preset/worktree 忽略 + 上游 Next 构建产物忽略，去掉 beta 专属行）；`README.md` 赞助行并集（保本仓 AstraFlow 新链接 + 上游 88API/立秋两行）；`dsh-plugin-desktop/README.md`/`README.zh.md` 逐 hunk 解（上游打包/运行时段落 + 本仓图标生成链与 rc3 版本号）；5 个 i18n 侧车（`README`、`PRIVACY`、`dsh-plugin-desktop/README`、`.agents/.../omnimux-ecosystem-map`、`dsh-community-market/docs/install-and-uninstall`）按 `git hash-object` 重算。
+  - **dsh-community-market（18）**：按上游侧解（`MarketSettingsScope` → `MarketStateStore` 重构、`install/service.ts` +284 行、`install/github.ts` 的 `BLOCKED_PACKAGES` 取上游 4 项）。唯一保留本仓差异：`tests/host-routes.spec.ts` 的 builtIns 期望补上本仓专有的 `DSH Marketplace`（`dsh-marketplace-qilewl`，fork 提交 `7b3207914c`，base 与上游均无）。
+  - **dsh-plugin-desktop 测试/脚本（25）**：取上游（含 13 个 UD 上游删除项接受删除、5 个 DU 恢复上游、2 个图标保本仓），后按合并后实现对齐断言（见下）。
+  - **dsh-plugin-desktop src（26）**：19 取上游、2 保本仓（`client/extended-styles.ts` 的 sidebar footer 布局、`client/styles.ts` 的 macOS advanced 内嵌与 sidebarCol 选择器）、`client/layout-state.ts` 保本仓（64px 迟滞 + `panelInfo` observable；上游的 `panelSnapshot` 重命名无外部引用，未采用）、`client/AdvancedFrame.tsx` 保本仓 `GlobalStandardProps` 并叠加上游新增的 `dshDesktop_sidebarCol` 锚点、`windows-pwsh-sandbox.ts` 以上游为基座并补回本仓 `desktopWindowsAclAdaptation()` / `adaptWindowsAclArgv()`（`windows-acl-sandbox-provider.ts` 需要）、`setup-wizard-copy.ts` 取上游新键、`electron-runtime.ts` 补回本仓原生多选文件选择器、`desktop-network.ts` 恢复上游导出名 `desktopBrowserAccessAvailable`。
+  - **根 `package.json`**：workspaces 4 个；`build`/`typecheck`/`test` 追加 `dsh-desktop-next`；`check` = `check:layout && fabric check && market check && desktop check && dsh-desktop-next check`；`resolutions` 取上游 703 条（688 条 `@deepseek-ai/dsh*` 指向 `vendor/dsh-runtime/0.2.1-rc.3/*`）并覆盖 `koffi@npm:^3.1.0 = 3.1.5`；`version` 取上游 `2.0.18`（`scripts/verify-version.mjs` 要求与桌面包一致）；保留本仓全部 `omnimux:*` / `dist:r2-*` / `package:dev` / `dist:win-release`。
+- **发现（本仓自身缺陷，已顺带修复）**：
+  1. **`patches/dsh-client-ui-directory-picker-browse@0.2.1-rc.3.patch` 引用了不存在的图标导出**：本仓补丁用 `IconFolderOpen16`，而 rc3 的 `@deepseek-ai/dsh-client-ui-primitives` 包里**没有该导出**（解包 `vendor/dsh-runtime/0.2.1-rc.3/deepseek-ai-dsh-client-ui-primitives-0.2.1-rc.3.tgz` 实测只有 `IconFolderOpen`/`IconFolderOpenRegular`/`IconFolderOpenOutline*`/`IconFolderOpenArtwork`/`IconFolderOpenMedium`）。该补丁作用于预构建 bundle，类型检查抓不到，属静默失效。已取上游补丁内容（`IconFolderOpenRegular`）修复。
+  2. **上游 `typecheck` 不覆盖 client**：上游脚本为 `run-parallel "tsc -p tsconfig.native-ui.json" "tsc -p tsconfig.tests.json" "tsc -p tsconfig.tests.client.json"`，**不含 `tsconfig.client.json`**；本仓的 `typecheck` 含全部五套 tsconfig。因此上游 client 源码在本仓更严门禁下暴露 `PropsRuntime<'root'>`（该 SlotMap 键在 rc3 已不存在）。已保本仓 `AdvancedFrame.tsx`（`GlobalStandardProps`）并叠加上游新增的 sidebar 锚点类。
+- **验证证据（本条提交时的真实状态）**：
+  - `corepack yarn install` 通过（1m24s）；`corepack yarn install --immutable` 通过（yarn.lock 重生 17927 行、无冲突标记）。
+  - `corepack yarn workspace dsh-plugin-desktop typecheck`：**exit 0**。
+  - `corepack yarn workspace dsh-desktop-next typecheck`：**exit 0**。
+  - `corepack yarn workspace dsh-community-market typecheck`：**exit 0**。
+  - `corepack yarn check:layout`：**exit 0**（`verify-bilingual-docs: 53 records and 106 documents are consistent`；`sync-vendored-runtime: stable 344 packages from 1f81c047fc are verified`；`verify-layout: Yarn workspace and upstream 1f81c047fc are consistent`）。
+  - `corepack yarn workspace dsh-community-market test`：**14 文件 / 309 通过**。
+  - `corepack yarn workspace dsh-plugin-desktop test`：**162 文件 / 1902 通过 / 20 失败 / 11 跳过**（首轮 131 → 48 → 20，逐项对账中；剩余项见文末「未完」）。
+  - `corepack yarn workspace dsh-desktop-next test`：**86 文件 / 717 通过 / 3 跳过 / 0 失败**（Next 灰盒工作区全绿）。
+  - **`corepack yarn check`：尚未通过** —— 阻塞项为 desktop 套件的 48 项断言对账，以及 `tests/package.spec.ts`（该文件由并行任务 #3776/#3786 所有，本次按上游侧保留，待其合并后前向对齐）。
+  - 环境：`env -u NODE_OPTIONS PATH=<managed node 22.22.2>/bin:/usr/bin:/bin:/usr/sbin:/sbin`（本机 `22.22.2-6` 目录名与合同示例的 `22.22.2` 不同）。
+- **批准包决定 5 的第 5 个调用点（老板 2026-10-25 追加确认补回）**：fork 的「release/Dev 构建首次启动直接落默认值、不弹 Setup Wizard」在本次合并中一度丢失。已按**上游新的** `setupPending` / `beginDesktopSetupWizard` 状态机语义重插：当上游判定 Setup 必需时，先写默认偏好、重跑 `prepareDesktopProfile`、用 `completeOrSkipDesktopSetupWizard(..., 'skipped', ...)` 把 Setup 记为已结算，再把 `setupPending` 置 false，因此向导不会打开、`runtime.setupOnboarding` 仍报告一致且已结算的文档；`OMNIMUX_FORCE_SETUP_WIZARD=1` 仍可强制走上游向导。新增 `settlesFirstRunSetup(required)` 作为可测决策点，并补 3 个测试（策略 2 个 + `main.ts` 接线 1 个）钉住「不弹向导 / 非 release 行为不变 / 接线在向导之前」。
+- **未完（本条提交时的真实状态）**：`corepack yarn check` 尚未通过。剩余 20 项 desktop 失败为上游测试断言与本仓实现差异的逐项对账（`profile.spec` 4、`plugin.spec` 3、`client-environment.spec` 3、`host-process-integration.spec` 2、`dev-package.spec` 2、`setup-wizard-settings` 1、`setup-wizard-native-ui` 1、`recovery-plugin-uninstall` 1、`desktop-runtime-environment` 1、`desktop-plugins` 1、`client-desktop-settings` 1），加上 `tests/package.spec.ts`（**并行任务 #3776/#3786 所有**，本次按上游侧保留，待其合并后前向对齐）与 `tests/verify-packaged-runtime.spec.ts`（需 `lib/` 构建产物，`yarn check` 会先 build，非缺陷）。
+
+---
+
 ## 2026-09-12 · 上游 2.0.9 全量同步（106 提交，C 级双项已获老板确认）
 
 - **上游范围**：`91b12fcd60fe85a39c6aa21dcd3056d89d0b69a4`（fork base 已含的上游 merge parent）→ `63e160ab43`（origin/master HEAD），共 106 个提交；fork base `6a8e66a35e`（fork/omnimux tip）。上游产品 2.0.5 → 2.0.9，DSH 运行时 `0.1.2-rc.1` → `0.1.5-rc.1`。

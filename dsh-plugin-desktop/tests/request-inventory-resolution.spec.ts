@@ -19,20 +19,31 @@ it('prepares request inventory for Desktop-owned entries and private-manifest pl
     try {
       writeFileSync(join(root, 'package.json'), '{"type":"module"}');
       const baseUrl = pathToFileURL(join(root, 'package.json')).href;
+      let warnings = [];
       const collect = async names => {
         let provider;
+        warnings = [];
         const tree = { ctx: { baseUrl }, entries: () => names.map(name => ({
           options: { name }, fiber: { state: 2 }, parent: { tree }
         })) };
-        // The upstream inventory plugin reads optional services through ctx.get.
-        apply({ baseUrl, get: () => undefined, logger: { warn: () => {}, error: () => {}, info: () => {}, debug: () => {} }, loader: tree, deepseekLlmApiExtensions: {
+        // 0.1.6 asks the Host for the active package index. A standalone
+        // Profile has none, which keeps the upstream filesystem lookup.
+        apply({ baseUrl, get: () => undefined, loader: tree,
+          logger: { warn: (format, name, error) => { warnings.push(String(error?.message ?? error)); } },
+          deepseekLlmApiExtensions: {
           register: (key, value) => { assert.equal(key, 'dsh_plugin_packages'); provider = value; }
         } }, {});
         return (await provider.prepare({})).value.packages;
       };
-      // The upstream inventory resolves an active entry from its own location,
-      // so a standalone Profile no longer fails closed for the Desktop package.
-      assert.deepEqual(await collect([desktop.name]), []);
+      // dsh 0.2.1-alpha.2 omits an unresolvable package with one warning
+      // instead of failing the whole request.
+      const omitted = async (names, pattern) => {
+        assert.deepEqual(await collect(names), []);
+        assert.equal(warnings.length, 1);
+        assert.match(warnings[0], pattern);
+      };
+      // A standalone Profile has no physical copy of the Desktop package.
+      await omitted([desktop.name], /cannot resolve active package/);
       release = installProfilePackageResolver(baseUrl);
       assert.deepEqual(await collect([
         desktop.name, desktop.name + '/terminal', desktop.name + '/pnpm',
@@ -46,11 +57,13 @@ it('prepares request inventory for Desktop-owned entries and private-manifest pl
       }));
       writeFileSync(join(plugin, 'index.js'), 'throw new Error("inventory evaluated plugin")');
       assert.deepEqual(await collect(['private-manifest-plugin']), [{ name: 'private-manifest-plugin', version: '1.2.3' }]);
-      assert.deepEqual(await collect(['inventory-nonexistent-package']), []);
+      await omitted(['inventory-nonexistent-package'], /cannot resolve.*package/);
       writeFileSync(join(plugin, 'package.json'), JSON.stringify({ name: 'private-manifest-plugin', exports: './index.js' }));
+      // 0.2.1-alpha.2 reports a named package without a version instead of rejecting it.
       assert.deepEqual(await collect(['private-manifest-plugin']), [{ name: 'private-manifest-plugin' }]);
+      assert.deepEqual(warnings, []);
       release(); release = undefined;
-      assert.deepEqual(await collect([desktop.name]), []);
+      await omitted([desktop.name], /cannot resolve active package/);
       console.log('request inventory passed');
     } finally { release?.(); rmSync(root, { recursive: true, force: true }); }
   `

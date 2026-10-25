@@ -150,8 +150,10 @@ export function DesktopOwnedFrame({
         {/* The official layout marks its sidebar column with `data-pane="sidebar"`,
             and third-party rows (the OmniMux hub coordinator among them) anchor to
             that marker. This frame replaces the official column, so it carries the
-            same marker for the slot content it hosts. */}
-        <div className="dshDesktopUpstreamSidebar" data-pane="sidebar">
+            same marker for the slot content it hosts. `dshDesktop_sidebarCol` also
+            carries the upstream CSS-module anchor plugins resolve against; it holds
+            no styles of its own. */}
+        <div className="dshDesktopUpstreamSidebar dshDesktop_sidebarCol" data-pane="sidebar">
           {renderSlot('sidebar', { collapsed, width: sidebarOwnerWidth })}
         </div>
       </aside>

@@ -1,5 +1,6 @@
 import { readFileSync, unlinkSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
+import { Readable } from 'node:stream'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DesktopShellSpec } from '../src/runtime.ts'
 import { desktopTrayLabel } from '../src/tray-locale.ts'
@@ -7,6 +8,9 @@ import { DESKTOP_FRAME_HEIGHT } from '../src/window-chrome.ts'
 
 const terminal = vi.hoisted(() => ({ open: vi.fn() }))
 const diagnostics = vi.hoisted(() => ({ export: vi.fn() }))
+const transitionNotice = vi.hoisted(() => ({ open: vi.fn(async () => {}) }))
+vi.mock('../src/next-transition-notice.ts', () => ({ NextTransitionNotice: class { open = transitionNotice.open } }))
+
 const updater = vi.hoisted(() => ({
   download: vi.fn(),
   filename: vi.fn(),
@@ -87,6 +91,7 @@ const electron = vi.hoisted(() => {
   const sessionFetch = vi.fn()
   const applicationMenuTemplates: unknown[][] = []
   const menuTemplates: unknown[][] = []
+  const popup = vi.fn()
   const notifications: Notification[] = []
   let zoomLevel = 0
   let devToolsOpened = false
@@ -110,7 +115,7 @@ const electron = vi.hoisted(() => {
   }
   const webContents = {
     id: 73,
-    session: { fetch: sessionFetch, webRequest },
+    session: { fetch: sessionFetch, webRequest, setPermissionCheckHandler: vi.fn(), setPermissionRequestHandler: vi.fn() },
     closeDevTools: vi.fn(() => { devToolsOpened = false }),
     executeJavaScript: vi.fn(async (_code: string, _userGesture?: boolean) => null as unknown),
     getZoomLevel: vi.fn(() => zoomLevel),
@@ -126,6 +131,8 @@ const electron = vi.hoisted(() => {
     focus: vi.fn(),
     isDestroyed: vi.fn(() => false),
     close: vi.fn(),
+    ipc: { handle: vi.fn(), removeHandler: vi.fn() },
+    mainFrame: { url: 'http://127.0.0.1:41234/' },
     loadURL,
   }
   const chromeWebContents = {
@@ -178,10 +185,9 @@ const electron = vi.hoisted(() => {
     readonly getNormalBounds = vi.fn(() => ({ x: 120, y: 80, width: 1280, height: 840 }))
     readonly flashFrame = vi.fn()
     readonly restore = vi.fn()
-    readonly maximize = vi.fn()
-    readonly unmaximize = vi.fn()
     readonly show = vi.fn()
     readonly hide = vi.fn()
+    readonly minimize = vi.fn()
     readonly focus = vi.fn()
     readonly on = browserWindowOn
     readonly off = browserWindowOff
@@ -266,14 +272,16 @@ const electron = vi.hoisted(() => {
         } else {
           menuTemplates.push(template)
         }
-        return { template }
+        // Non-enumerable so template equality assertions ignore the popup spy.
+        return Object.defineProperty({ template }, 'popup', { value: popup, configurable: true })
       }),
       setApplicationMenu: vi.fn(),
     },
     menuTemplates,
+    popup,
     nativeImage: { createFromPath },
     nativeTheme,
-    net: { fetch: vi.fn() },
+    net: { fetch: vi.fn(), request: vi.fn() },
     Notification,
     notifications,
     resetZoomLevel: () => { zoomLevel = 0 },
@@ -282,6 +290,12 @@ const electron = vi.hoisted(() => {
       getDisplayMatching: vi.fn(() => ({
         workArea: { x: 0, y: 0, width: 1920, height: 1080 },
       })),
+    },
+    desktopCapturer: { getSources: vi.fn(async () => []) },
+    systemPreferences: {
+      getMediaAccessStatus: vi.fn(() => 'not-determined'),
+      askForMediaAccess: vi.fn(async () => true),
+      isTrustedAccessibilityClient: vi.fn(() => false),
     },
     shell: {
       openExternal: vi.fn(async () => {}),
@@ -314,6 +328,8 @@ vi.mock('electron', () => ({
   BrowserWindow: electron.BrowserWindow,
   WebContentsView: electron.WebContentsView,
   dialog: electron.dialog,
+  desktopCapturer: electron.desktopCapturer,
+  systemPreferences: electron.systemPreferences,
   Menu: electron.Menu,
   nativeImage: electron.nativeImage,
   nativeTheme: electron.nativeTheme,
@@ -398,6 +414,59 @@ describe('Electron desktop runtime', () => {
     vi.restoreAllMocks()
   })
 
+  it('pops the official editing context menu over the application and command-bar documents', async () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const runtime = new ElectronDesktopRuntime(async () => {})
+    const release = runtime.schedule(spec)
+    await runtime.mountScheduled()
+
+    const window = electron.browserWindows[0]
+    type ContextMenuListener = (event: unknown, params: unknown) => void
+    const rendererListener = electron.webContents.on.mock.calls
+      .find(([event]) => event === 'context-menu')?.[1] as ContextMenuListener | undefined
+    const chromeListener = electron.chromeWebContents.on.mock.calls
+      .find(([event]) => event === 'context-menu')?.[1] as ContextMenuListener | undefined
+    expect(rendererListener).toEqual(expect.any(Function))
+    expect(chromeListener).toEqual(expect.any(Function))
+    const editFlags = {
+      canUndo: true,
+      canRedo: false,
+      canCut: true,
+      canCopy: true,
+      canPaste: true,
+      canDelete: true,
+      canSelectAll: true,
+      canEditRichly: false,
+    }
+    electron.menuTemplates.length = 0
+
+    rendererListener?.({}, { isEditable: true, selectionText: '', editFlags })
+    expect(electron.menuTemplates).toEqual([[
+      { role: 'undo', enabled: true, accelerator: '' },
+      { role: 'redo', enabled: false, accelerator: '' },
+      { type: 'separator', accelerator: '' },
+      { role: 'cut', enabled: true, accelerator: '' },
+      { role: 'copy', enabled: true, accelerator: '' },
+      { role: 'paste', enabled: true, accelerator: '' },
+      { type: 'separator', accelerator: '' },
+      { role: 'selectAll', enabled: true, accelerator: '' },
+    ]])
+    expect(electron.popup).toHaveBeenCalledWith({ window })
+
+    chromeListener?.({}, { isEditable: false, selectionText: 'Compatibility Mode', editFlags })
+    expect(electron.menuTemplates[1]).toEqual([{ role: 'copy', enabled: true, accelerator: '' }])
+    expect(electron.popup).toHaveBeenCalledTimes(2)
+
+    rendererListener?.({}, { isEditable: false, selectionText: '', editFlags })
+    expect(electron.menuTemplates).toHaveLength(2)
+    expect(electron.popup).toHaveBeenCalledTimes(2)
+
+    await release()
+    expect(electron.webContents.off).toHaveBeenCalledWith('context-menu', rendererListener)
+    expect(electron.chromeWebContents.off).toHaveBeenCalledWith('context-menu', chromeListener)
+  })
+
   it('uses the independent macOS compatibility frame, Dock icon, and template tray image', async () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
     electron.app.getPreferredSystemLanguages.mockReturnValue(['zh-Hans-CN', 'en-US'])
@@ -466,6 +535,42 @@ describe('Electron desktop runtime', () => {
     await release()
     expect(electron.browserWindowOff).toHaveBeenCalledWith('page-title-updated', titleListener)
     expect(electron.trays[0]?.off).toHaveBeenCalledWith('click', expect.any(Function))
+  })
+
+  it('limits setup persistence to the active renderer main frame and releases its handler', async () => {
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const runtime = new ElectronDesktopRuntime(async () => {})
+    const bridge = { read: vi.fn(async () => null), finish: vi.fn(async () => {}), dismissAccount: vi.fn(async () => {}), applyPending: vi.fn(async () => {}) }
+    runtime.setupOnboarding = bridge
+    const applySetupSettings = vi.fn(async () => {})
+    const release = runtime.schedule({ ...spec, applySetupSettings })
+    await runtime.mountScheduled()
+    const handler = electron.webContents.ipc.handle.mock.calls.find(([name]) => name === 'dsh-desktop:setup-onboarding')?.[1]
+    expect(handler).toBeTypeOf('function')
+    const previousUrl = electron.webContents.mainFrame.url
+    electron.webContents.mainFrame.url = spec.url
+    const sender = { sender: electron.webContents, senderFrame: electron.webContents.mainFrame }
+    await expect(handler(sender, { action: 'read' })).resolves.toBeNull()
+    await expect(handler({ ...sender, senderFrame: { url: sender.senderFrame.url } }, { action: 'read' })).rejects.toThrow('Untrusted')
+    await expect(handler(sender, { action: 'finish', profile: 'desktop', selection: { market: 'disabled' } })).rejects.toThrow('Invalid setup selection')
+    expect(bridge.finish).not.toHaveBeenCalled()
+    await handler(sender, { action: 'finish', profile: 'desktop' })
+    expect(bridge.finish).toHaveBeenCalledExactlyOnceWith('desktop', undefined, expect.any(Function))
+    // Setup saves through the renderer generation's own settings writer.
+    const settings = { mode: 'extended' }
+    await ((bridge.finish.mock.calls[0] as unknown[])[2] as (value: unknown) => Promise<void>)(settings)
+    expect(applySetupSettings).toHaveBeenCalledExactlyOnceWith(settings)
+    await expect(handler({ ...sender, senderFrame: { url: spec.url } }, { action: 'dismiss-account', profile: 'desktop' })).rejects.toThrow('Untrusted')
+    await handler(sender, { action: 'dismiss-account', profile: 'desktop' })
+    expect(bridge.dismissAccount).toHaveBeenCalledExactlyOnceWith('desktop')
+    await expect(handler({ ...sender, senderFrame: { url: spec.url } }, { action: 'apply-pending', profile: 'desktop' })).rejects.toThrow('Untrusted')
+    expect(bridge.applyPending).not.toHaveBeenCalled()
+    await handler(sender, { action: 'apply-pending', profile: 'desktop' })
+    expect(bridge.applyPending).toHaveBeenCalledExactlyOnceWith('desktop')
+    await release()
+    expect(electron.webContents.ipc.removeHandler).toHaveBeenCalledWith('dsh-desktop:setup-onboarding')
+    await expect(handler(sender, { action: 'read' })).rejects.toThrow('Untrusted')
+    electron.webContents.mainFrame.url = previousUrl
   })
 
   it('attaches the renderer capability to same-origin HTTP and WebSocket requests only', async () => {
@@ -678,59 +783,15 @@ describe('Electron desktop runtime', () => {
     move()
     expect(store.read()).toEqual({ x: 260, y: 140, width: 1440, height: 900 })
     await vi.advanceTimersByTimeAsync(250)
-    expect(store.read()).toEqual({
-      x: 320,
-      y: 180,
-      width: 1500,
-      height: 920,
-      isMaximized: false,
-      isFullScreen: false,
-    })
+    expect(store.read()).toEqual({ x: 320, y: 180, width: 1500, height: 920, isMaximized: false, isFullScreen: false })
 
     window?.getNormalBounds.mockReturnValue({ x: 360, y: 220, width: 1520, height: 940 })
     close({ preventDefault: vi.fn() })
-    expect(store.read()).toEqual({
-      x: 360,
-      y: 220,
-      width: 1520,
-      height: 940,
-      isMaximized: false,
-      isFullScreen: false,
-    })
+    expect(store.read()).toEqual({ x: 360, y: 220, width: 1520, height: 940, isMaximized: false, isFullScreen: false })
 
     await release()
     expect(electron.browserWindowOff).toHaveBeenCalledWith('move', move)
     expect(electron.browserWindowOff).toHaveBeenCalledWith('resize', expect.any(Function))
-    expect(electron.browserWindowOff).toHaveBeenCalledWith('maximize', expect.any(Function))
-    expect(electron.browserWindowOff).toHaveBeenCalledWith('enter-full-screen', expect.any(Function))
-  })
-
-  it('restores fullscreen or maximized window state on startup', async () => {
-    vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
-    const { FileMainWindowStateStore } = await import('../src/main-window-state.ts')
-    const store = new FileMainWindowStateStore('/tmp/dsh-desktop-user-data')
-    store.write({ x: 100, y: 50, width: 1440, height: 900, isFullScreen: true, isMaximized: false })
-
-    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
-    const runtime = new ElectronDesktopRuntime(async () => {})
-    const release = runtime.schedule(spec)
-
-    await runtime.mountScheduled()
-    const window = electron.browserWindows[0]
-    expect(window?.setFullScreen).toHaveBeenCalledWith(true)
-
-    await release()
-    clearMainWindowState()
-
-    // Test maximized restore
-    store.write({ x: 100, y: 50, width: 1440, height: 900, isFullScreen: false, isMaximized: true })
-    const runtime2 = new ElectronDesktopRuntime(async () => {})
-    const release2 = runtime2.schedule(spec)
-    await runtime2.mountScheduled()
-    const window2 = electron.browserWindows[1]
-    expect(window2?.maximize).toHaveBeenCalledOnce()
-
-    await release2()
   })
 
   it('fits stale saved bounds into the current display work area', async () => {
@@ -876,71 +937,50 @@ describe('Electron desktop runtime', () => {
     await release()
   })
 
-  it.each(['darwin', 'win32', 'linux'] as const)('selects multiple files in a parented %s dialog', async platform => {
-    vi.spyOn(process, 'platform', 'get').mockReturnValue(platform)
-    const paths = platform === 'win32' ? ['C:\\Work\\a.txt', 'C:\\Work\\b.mp4'] : ['/work/a.txt', '/work/b.mp4']
-    electron.dialog.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: paths })
+  it('routes the macOS native flow through a trusted renderer and a parented Electron dialog', async () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+    electron.dialog.showOpenDialog.mockResolvedValue({ canceled: false, filePaths: ['/Users/test/Work'] })
     const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
     const runtime = new ElectronDesktopRuntime(async () => {})
     const release = runtime.schedule(spec)
     await runtime.mountScheduled()
 
-    await expect(runtime.pickFiles()).resolves.toEqual(paths)
-    expect(electron.dialog.showOpenDialog).toHaveBeenCalledExactlyOnceWith(
-      electron.browserWindows[0],
-      { properties: ['openFile', 'multiSelections'] },
-    )
+    const handler = electron.webContents.ipc.handle.mock.calls
+      .find(([name]) => name === 'dsh-desktop:native-directory-picker')?.[1]
+    expect(handler).toEqual(expect.any(Function))
+    const frame = electron.webContents.mainFrame
+    const previousUrl = frame.url
+    frame.url = spec.url
+    try {
+      await expect(handler({ sender: electron.webContents, senderFrame: frame })).resolves.toBe('/Users/test/Work')
+      expect(electron.dialog.showOpenDialog).toHaveBeenCalledWith(
+        electron.browserWindows[0],
+        { title: 'Select Workspace Directory', properties: ['openDirectory', 'dontAddToRecent'] },
+      )
+      await expect(handler({ sender: electron.webContents, senderFrame: { url: spec.url } }))
+        .rejects.toThrow('untrusted directory picker sender')
+    } finally {
+      frame.url = previousUrl
+      await release()
+    }
+  })
+
+  it('uses Electron media consent without the microphone workaround or permission IPC', async () => {
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const runtime = new ElectronDesktopRuntime(async () => {})
+    const release = runtime.schedule(spec)
+    await runtime.mountScheduled()
+    expect(electron.webContents.ipc.handle.mock.calls.map(([name]) => name)).not.toContain('dsh-desktop:permissions')
+    expect(electron.webContents.session.setPermissionCheckHandler).not.toHaveBeenCalled()
+    expect(electron.webContents.session.setPermissionRequestHandler).not.toHaveBeenCalled()
     await release()
-  })
-
-  it('returns no files on cancellation and allows the next picker', async () => {
-    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
-    const runtime = new ElectronDesktopRuntime(async () => {})
-    electron.dialog.showOpenDialog.mockResolvedValueOnce({ canceled: true, filePaths: ['/discarded.txt'] })
-    await expect(runtime.pickFiles()).resolves.toEqual([])
-    electron.dialog.showOpenDialog.mockResolvedValueOnce({ canceled: false, filePaths: ['/chosen.txt'] })
-    await expect(runtime.pickFiles()).resolves.toEqual(['/chosen.txt'])
-    expect(electron.dialog.showOpenDialog).toHaveBeenNthCalledWith(1, { properties: ['openFile', 'multiSelections'] })
-  })
-
-  it('rejects overlapping file pickers and releases the guard after success or failure', async () => {
-    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
-    const runtime = new ElectronDesktopRuntime(async () => {})
-    const selected = Promise.withResolvers<{ canceled: boolean, filePaths: string[] }>()
-    electron.dialog.showOpenDialog.mockReturnValueOnce(selected.promise)
-    const first = runtime.pickFiles()
-    await expect(runtime.pickFiles()).rejects.toMatchObject({ code: 'native-picker-busy' })
-    expect(electron.dialog.showOpenDialog).toHaveBeenCalledOnce()
-    selected.resolve({ canceled: false, filePaths: ['/chosen.txt'] })
-    await expect(first).resolves.toEqual(['/chosen.txt'])
-
-    const failure = new Error('Native dialog failed')
-    electron.dialog.showOpenDialog.mockRejectedValueOnce(failure)
-    await expect(runtime.pickFiles()).rejects.toBe(failure)
-    await expect(runtime.pickFiles()).resolves.toEqual([])
-    expect(electron.dialog.showOpenDialog).toHaveBeenCalledTimes(3)
-  })
-
-  it('uses the current shell parent after a generation is replaced', async () => {
-    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
-    const runtime = new ElectronDesktopRuntime(async () => {})
-    const releaseFirst = runtime.schedule(spec)
-    await runtime.mountScheduled()
-    await runtime.pickFiles()
-    await releaseFirst()
-    const releaseSecond = runtime.schedule(spec)
-    await runtime.mountScheduled()
-    await runtime.pickFiles()
-    expect(electron.dialog.showOpenDialog).toHaveBeenNthCalledWith(2,
-      electron.browserWindows[1], { properties: ['openFile', 'multiSelections'] })
-    await releaseSecond()
   })
 
   it('blocks unsupported workspace volumes without returning a risky path', async () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
     const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
     const query = vi.fn(() => ({ root: 'E:\\', fileSystem: 'EXFAT', driveType: 2 }))
-    const logger = { error: vi.fn(), errorCause: vi.fn() }
+    const logger = { error: vi.fn(), errorCause: vi.fn(), info: vi.fn() }
     const runtime = new ElectronDesktopRuntime(async () => {}, undefined, logger, query)
 
     await expect(runtime.validateDirectory('E:\\repo')).resolves.toBe(false)
@@ -958,7 +998,7 @@ describe('Electron desktop runtime', () => {
     electron.dialog.showMessageBox.mockResolvedValue({ response: 1, checkboxChecked: false })
     const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
     const query = vi.fn(() => ({ root: 'E:\\', fileSystem: 'NTFS', driveType: 2 }))
-    const logger = { error: vi.fn(), errorCause: vi.fn() }
+    const logger = { error: vi.fn(), errorCause: vi.fn(), info: vi.fn() }
     const runtime = new ElectronDesktopRuntime(async () => {}, undefined, logger, query)
 
     await expect(runtime.validateDirectory('E:\\repo')).resolves.toBe(false)
@@ -975,10 +1015,77 @@ describe('Electron desktop runtime', () => {
     expect(logger.error).toHaveBeenCalledWith('dsh-plugin-desktop: workspace volume decision=confirmed path=E:\\repo')
   })
 
+  it('offers restart first when the supervised Host is gone, and names the exit code', async () => {
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const restart = vi.fn(async () => {})
+    const runtime = new ElectronDesktopRuntime(restart)
+
+    await runtime.showHostStoppedRecovery({ exitCode: 0 })
+
+    expect(electron.dialog.showMessageBox).toHaveBeenCalledWith(expect.objectContaining({
+      type: 'error',
+      buttons: ['Restart DSH Desktop', 'Open DSH Terminal', 'Dismiss'],
+      defaultId: 0,
+      cancelId: 2,
+      detail: expect.stringContaining('0 / 0x00000000'),
+    }))
+    // Response 0 walks the existing restart confirmation before relaunching.
+    expect(restart).toHaveBeenCalledOnce()
+  })
+
+  it('opens the terminal instead of restarting when the reader wants the logs first', async () => {
+    electron.dialog.showMessageBox.mockResolvedValue({ response: 1, checkboxChecked: false })
+    Object.defineProperty(process.versions, 'electron', { configurable: true, value: '43.4.0' })
+    try {
+      const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+      const restart = vi.fn(async () => {})
+      const runtime = new ElectronDesktopRuntime(restart)
+      const userDataPath = electron.app.getPath('userData')
+      runtime.configureTerminal({
+        profileName: 'desktop',
+        profileDir: join(userDataPath, 'profiles', 'desktop'),
+        homeDir: userDataPath,
+      })
+
+      await runtime.showHostStoppedRecovery({ exitCode: 3 })
+
+      expect(terminal.open).toHaveBeenCalledOnce()
+      expect(restart).not.toHaveBeenCalled()
+    } finally {
+      delete (process.versions as { electron?: string }).electron
+    }
+  })
+
+  it('shows one Host recovery dialog no matter how many failures land on it', async () => {
+    electron.dialog.showMessageBox.mockResolvedValue({ response: 2, checkboxChecked: false })
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const restart = vi.fn(async () => {})
+    const runtime = new ElectronDesktopRuntime(restart)
+
+    await Promise.all([
+      runtime.showHostStoppedRecovery({ exitCode: 0 }),
+      runtime.showHostStoppedRecovery({ exitCode: 0 }),
+      runtime.showHostStoppedRecovery({ exitCode: 0 }),
+    ])
+
+    expect(electron.dialog.showMessageBox).toHaveBeenCalledOnce()
+    expect(restart).not.toHaveBeenCalled()
+  })
+
+  it('stays silent about a Host exit that is part of quitting', async () => {
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const runtime = new ElectronDesktopRuntime(async () => {})
+
+    runtime.prepareToQuit()
+    await runtime.showHostStoppedRecovery({ exitCode: 0 })
+
+    expect(electron.dialog.showMessageBox).not.toHaveBeenCalled()
+  })
+
   it('logs renderer crashes with the Windows exception code', async () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
     const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
-    const logger = { error: vi.fn(), errorCause: vi.fn() }
+    const logger = { error: vi.fn(), errorCause: vi.fn(), info: vi.fn() }
     const runtime = new ElectronDesktopRuntime(async () => {}, undefined, logger)
     const release = runtime.schedule(spec)
     await runtime.mountScheduled()
@@ -998,7 +1105,7 @@ describe('Electron desktop runtime', () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
     const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
     const onRendererBoot = vi.fn(() => true)
-    const logger = { error: vi.fn(), errorCause: vi.fn() }
+    const logger = { error: vi.fn(), errorCause: vi.fn(), info: vi.fn() }
     const runtime = new ElectronDesktopRuntime(async () => {}, onRendererBoot, logger)
     const release = runtime.schedule(spec)
     const rendererBoot = runtime.beginRendererBootMonitoring({ commitHealthy: async () => {} })
@@ -1125,7 +1232,7 @@ describe('Electron desktop runtime', () => {
       vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
       const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
       const restart = vi.fn(async () => {})
-      const logger = { error: vi.fn(), errorCause: vi.fn() }
+      const logger = { error: vi.fn(), errorCause: vi.fn(), info: vi.fn() }
       const runtime = new ElectronDesktopRuntime(restart, undefined, logger)
       const release = runtime.schedule(spec)
       const commitHealthy = vi.fn(async () => {})
@@ -1233,19 +1340,62 @@ describe('Electron desktop runtime', () => {
       electron.webContents.executeJavaScript.mockResolvedValue(null)
     })
 
-    it('replaces a persistently unresponsive renderer without waiting for it to exit itself', async () => {
-      const { release, window, gone } = await mountHealthyRenderer()
+    it('replaces a persistently unresponsive renderer and reloads once its exit lands', async () => {
+      const { release, window, gone, logger } = await mountHealthyRenderer()
       window.isVisible.mockReturnValue(true)
       electron.webContents.executeJavaScript.mockImplementation(() => new Promise(() => {}))
-      electron.webContents.forcefullyCrashRenderer.mockImplementationOnce(() => {
-        gone({}, { reason: 'crashed', exitCode: 9 })
-      })
       await vi.advanceTimersByTimeAsync(30_001)
+      // forcefullyCrashRenderer() returns before the process is gone. A reload
+      // issued in the same turn goes to a RenderFrameHost that is already being
+      // torn down, and Chromium cancels it along with the process.
       expect(electron.webContents.forcefullyCrashRenderer).toHaveBeenCalledOnce()
+      expect(electron.webContents.reloadIgnoringCache).not.toHaveBeenCalled()
+      expect(logger.error).toHaveBeenCalledWith(
+        'dsh-plugin-desktop: terminating unresponsive renderer; the crash dump it produces is deliberate',
+      )
+      gone({}, { reason: 'killed', exitCode: -536870904 })
       expect(electron.webContents.reloadIgnoringCache).toHaveBeenCalledOnce()
+      expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('unresponsive renderer replaced'))
       expect(electron.dialog.showMessageBox).not.toHaveBeenCalled()
       await release()
       electron.webContents.executeJavaScript.mockResolvedValue(null)
+    })
+
+    it('reloads anyway when a forced termination never reports its exit', async () => {
+      const { release, window, logger } = await mountHealthyRenderer()
+      window.isVisible.mockReturnValue(true)
+      electron.webContents.executeJavaScript.mockImplementation(() => new Promise(() => {}))
+      await vi.advanceTimersByTimeAsync(30_001)
+      expect(electron.webContents.forcefullyCrashRenderer).toHaveBeenCalledOnce()
+      expect(electron.webContents.reloadIgnoringCache).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(10_000)
+      expect(electron.webContents.reloadIgnoringCache).toHaveBeenCalledOnce()
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.stringContaining('reported no exit within the deadline'),
+      )
+      await release()
+      electron.webContents.executeJavaScript.mockResolvedValue(null)
+    })
+
+    it('keeps a native reload reachable and clears an exhausted recovery through it', async () => {
+      const { runtime, release, exhaust, healthy, window } = await mountHealthyRenderer()
+      electron.dialog.showMessageBox.mockResolvedValueOnce({ response: 1, checkboxChecked: false })
+      await exhaust()
+      expect(electron.dialog.showMessageBox).toHaveBeenCalledOnce()
+      const reloads = electron.webContents.reloadIgnoringCache.mock.calls.length
+      const item = (electron.menuTemplates.at(-1) as Array<{ label?: string, click?: () => void }>)
+        .find(entry => entry.label === 'Reload Interface')
+      expect(item?.click).toBeTypeOf('function')
+      item!.click!()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(electron.webContents.reloadIgnoringCache).toHaveBeenCalledTimes(reloads + 1)
+      healthy()
+      // A recovered generation must not re-arm the degraded prompt on reveal.
+      window.isVisible.mockReturnValue(false)
+      runtime.show()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(electron.dialog.showMessageBox).toHaveBeenCalledOnce()
+      await release()
     })
 
     it('retries a failed main-frame load but ignores subframe errors and aborted navigation', async () => {
@@ -1464,7 +1614,7 @@ describe('Electron desktop runtime', () => {
   it('keeps external window links deny-by-default with a narrow protocol allowlist', async () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
     const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
-    const logger = { error: vi.fn(), errorCause: vi.fn() }
+    const logger = { error: vi.fn(), errorCause: vi.fn(), info: vi.fn() }
     const runtime = new ElectronDesktopRuntime(async () => {}, undefined, logger)
     const release = runtime.schedule(spec)
 
@@ -1568,6 +1718,36 @@ describe('Electron desktop runtime', () => {
     close(quittingCloseEvent)
     expect(quittingCloseEvent.preventDefault).not.toHaveBeenCalled()
     expect(window?.hide).toHaveBeenCalledOnce()
+
+    await release()
+  })
+
+  // `new Tray()` succeeds on Linux desktops that render no status area at all,
+  // so hiding the window there can strand a running Host with no way back.
+  it('minimizes instead of hiding when a Linux window is closed', async () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('linux')
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const runtime = new ElectronDesktopRuntime(async () => {})
+    const release = runtime.schedule(spec)
+
+    await runtime.mountScheduled()
+
+    const window = electron.browserWindows[0]
+    const close = electron.browserWindowOn.mock.calls.find(([event]) => event === 'close')?.[1]
+    expect(close).toEqual(expect.any(Function))
+
+    const closeEvent = { preventDefault: vi.fn() }
+    close(closeEvent)
+    expect(closeEvent.preventDefault).toHaveBeenCalledOnce()
+    expect(window?.minimize).toHaveBeenCalledOnce()
+    expect(window?.hide).not.toHaveBeenCalled()
+
+    // Quitting still tears the window down instead of leaving it minimized.
+    runtime.prepareToQuit()
+    const quittingCloseEvent = { preventDefault: vi.fn() }
+    close(quittingCloseEvent)
+    expect(quittingCloseEvent.preventDefault).not.toHaveBeenCalled()
+    expect(window?.minimize).toHaveBeenCalledOnce()
 
     await release()
   })
@@ -1936,7 +2116,7 @@ describe('Electron desktop runtime', () => {
 
     const labels = (electron.menuTemplates.at(-1) as Array<{ label?: string }>).map(item => item.label)
     expect(labels).toEqual([
-      'Open DSH Desktop', undefined,
+      'Open DSH Desktop', 'Reload Interface', undefined,
       'Earlier Tool', 'Later Tool', undefined,
       'Check for Updates…', undefined,
       'Mode: Compatibility Mode', undefined,
@@ -2206,7 +2386,7 @@ describe('Electron desktop runtime', () => {
   it('logs the renderer boot failure details for diagnostics', async () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
     const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
-    const logger = { error: vi.fn(), errorCause: vi.fn() }
+    const logger = { error: vi.fn(), errorCause: vi.fn(), info: vi.fn() }
     const runtime = new ElectronDesktopRuntime(async () => {}, () => {}, logger)
     const rendererBoot = runtime.beginRendererBootMonitoring({ commitHealthy: async () => {} })
 
@@ -2437,6 +2617,21 @@ describe('Electron desktop runtime', () => {
     expect(restart).toHaveBeenLastCalledWith('safe-mode')
   })
 
+  it('offers the transition notice during local development and explains a Next installer correctly', async () => {
+    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
+    const { DESKTOP_RELEASE_CHANNEL } = await import('../src/product-identity.ts')
+    electron.app.isPackaged = false
+    const runtime = new ElectronDesktopRuntime(async () => {})
+    const release = runtime.schedule(spec)
+    await runtime.mountScheduled()
+    expect(transitionNotice.open).toHaveBeenCalledWith('en', DESKTOP_RELEASE_CHANNEL, expect.any(Function))
+    await runtime.updates.confirmDownload('2.0.20-next', 'stable')
+    expect(electron.dialog.showMessageBox).toHaveBeenLastCalledWith(expect.anything(), expect.objectContaining({
+      detail: expect.stringContaining('DSH NEXT'),
+    }))
+    await release()
+  })
+
   it('uses Electron networking and confirmation-gated macOS update handoff', async () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
     const response = Response.json({ version: '2.1.0' })
@@ -2631,7 +2826,7 @@ describe('Electron desktop runtime', () => {
       canceled: false,
       filePath: 'C:\\Updates\\DSH-Desktop-2.1.0-windows.exe',
     })
-    const logger = { error: vi.fn(), errorCause: vi.fn() }
+    const logger = { error: vi.fn(), errorCause: vi.fn(), info: vi.fn() }
     const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
     const runtime = new ElectronDesktopRuntime(async () => {}, undefined, logger)
 
@@ -2763,35 +2958,7 @@ describe('Electron desktop runtime', () => {
     expect(electron.nativeTheme.themeSource).toBe('light')
   })
 
-  it('refreshes the Windows Mica backdrop after a live advanced theme change', async () => {
-    vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
-    electron.nativeTheme.themeSource = 'light'
-    const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
-    const runtime = new ElectronDesktopRuntime(async () => {})
-    const release = runtime.schedule({
-      ...spec,
-      mode: 'advanced',
-      material: 'mica',
-      windowsBuild: 22_631,
-      readThemeSource: () => 'light',
-    })
-
-    runtime.setThemeSource('dark')
-    expect(electron.nativeTheme.themeSource).toBe('light')
-    await runtime.mountScheduled()
-
-    const window = electron.browserWindows[0]
-    window?.setBackgroundMaterial.mockClear()
-    runtime.setThemeSource('dark')
-
-    expect(electron.nativeTheme.themeSource).toBe('dark')
-    expect(window?.setBackgroundMaterial).toHaveBeenCalledOnce()
-    expect(window?.setBackgroundMaterial).toHaveBeenCalledWith('mica')
-
-    await release()
-  })
-
-  it('keeps an extended Windows 10 window opaque when material is off', async () => {
+  it('keeps an extended Windows window opaque', async () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
     electron.nativeTheme.themeSource = 'light'
     const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
@@ -2800,7 +2967,6 @@ describe('Electron desktop runtime', () => {
       ...spec,
       mode: 'extended',
       material: 'off',
-      windowsBuild: 19_045,
       readThemeSource: () => 'dark',
     })
 
@@ -2820,7 +2986,7 @@ describe('Electron desktop runtime', () => {
     await release()
   })
 
-  it('does not install a native backdrop when Windows material is off', async () => {
+  it('never installs a native backdrop on Windows, even after a live theme change', async () => {
     vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
     electron.nativeTheme.themeSource = 'light'
     const { ElectronDesktopRuntime } = await import('../src/electron-runtime.ts')
@@ -2829,7 +2995,6 @@ describe('Electron desktop runtime', () => {
       ...spec,
       mode: 'extended',
       material: 'off',
-      windowsBuild: 22_621,
       readThemeSource: () => 'dark',
     })
 
@@ -2871,5 +3036,145 @@ describe('Electron desktop runtime', () => {
     expect(electron.webRequest.onBeforeSendHeaders).toHaveBeenLastCalledWith(null)
     await expect(release()).rejects.toThrow('renderer unavailable')
     expect(electron.nativeTheme.themeSource).toBe('light')
+  })
+})
+
+describe('desktop artifact request adapter', () => {
+  interface FakeHop {
+    /** Electron redirect-event arguments: status, method, redirect URL, headers. */
+    readonly redirect?: readonly [status: number, method: string, redirectUrl: string]
+    readonly status?: number
+    readonly body?: string
+    readonly headers?: Record<string, string>
+    readonly error?: Error
+  }
+
+  function fakeIncomingMessage(status: number, body: string, headers: Record<string, string> = {}) {
+    const incoming = Readable.from([Buffer.from(body, 'utf8')])
+    return Object.assign(incoming, { statusCode: status, headers })
+  }
+
+  function fakeNetRequest(hops: readonly FakeHop[]) {
+    const seenHeaders: Array<[string, string]> = []
+    const followRedirect = vi.fn()
+    const abort = vi.fn()
+    const listeners = new Map<string, Array<(...args: unknown[]) => void>>()
+    const request = {
+      on(event: string, listener: (...args: unknown[]) => void) {
+        listeners.set(event, [...(listeners.get(event) ?? []), listener])
+        return request
+      },
+      setHeader(key: string, value: string) { seenHeaders.push([key, value]) },
+      followRedirect,
+      abort() {
+        abort()
+        // Electron's ClientRequest.abort() emits the 'abort' event; the
+        // 'error' event is reserved for transport failures.
+        for (const listener of listeners.get('abort') ?? []) listener()
+      },
+      end() {
+        let hopIndex = 0
+        const advance = (): void => {
+          const hop = hops[hopIndex]
+          hopIndex += 1
+          if (hop === undefined) return
+          if (hop.redirect !== undefined) {
+            for (const listener of listeners.get('redirect') ?? []) listener(...hop.redirect)
+            // The adapter must explicitly follow each hop it accepts.
+            if (followRedirect.mock.calls.length < hopIndex) return
+            queueMicrotask(advance)
+            return
+          }
+          if (hop.error !== undefined) {
+            for (const listener of listeners.get('error') ?? []) listener(hop.error)
+            return
+          }
+          for (const listener of listeners.get('response') ?? []) {
+            listener(fakeIncomingMessage(hop.status ?? 200, hop.body ?? '', hop.headers))
+          }
+        }
+        advance()
+      },
+    }
+    return { request, seenHeaders, followRedirect, abort }
+  }
+
+  it('follows redirects with net.request and reports the settled final URL', async () => {
+    const mirror = 'https://modelscope.cn/models/t4wefan/deepseek-harness-desktop/resolve/master/DSH-Desktop-2.1.0-universal.dmg'
+    const fake = fakeNetRequest([
+      { redirect: [302, 'GET', mirror] },
+      { status: 200, body: 'installer', headers: { 'content-type': 'application/octet-stream' } },
+    ])
+    electron.net.request.mockImplementationOnce(() => fake.request)
+
+    const { requestDesktopArtifact } = await import('../src/electron-runtime.ts')
+    const settled = await requestDesktopArtifact('https://www.dshdesktop.cn/api/downloads/mac', {
+      method: 'GET',
+      cache: 'no-store',
+      headers: { accept: '*/*' },
+    })
+
+    expect(electron.net.request).toHaveBeenCalledWith(
+      expect.objectContaining({ url: 'https://www.dshdesktop.cn/api/downloads/mac', redirect: 'manual' }),
+    )
+    expect(fake.followRedirect).toHaveBeenCalledOnce()
+    expect(settled.finalUrl).toBe(mirror)
+    expect(settled.response.status).toBe(200)
+    expect(settled.response.headers.get('content-type')).toBe('application/octet-stream')
+    expect(await settled.response.text()).toBe('installer')
+  })
+
+  it('reports the fixed endpoint itself when no redirect happens', async () => {
+    const fake = fakeNetRequest([{ status: 200, body: 'direct' }])
+    electron.net.request.mockImplementationOnce(() => fake.request)
+
+    const { requestDesktopArtifact } = await import('../src/electron-runtime.ts')
+    const settled = await requestDesktopArtifact('https://www.dshdesktop.cn/api/downloads/windows', {
+      method: 'GET',
+    })
+
+    expect(settled.finalUrl).toBe('https://www.dshdesktop.cn/api/downloads/windows')
+    expect(await settled.response.text()).toBe('direct')
+    expect(fake.seenHeaders).toContainEqual(['cache-control', 'no-cache'])
+  })
+
+  it('rejects when the transport fails', async () => {
+    const fake = fakeNetRequest([{ error: new Error('offline') }])
+    electron.net.request.mockImplementationOnce(() => fake.request)
+
+    const { requestDesktopArtifact } = await import('../src/electron-runtime.ts')
+    await expect(requestDesktopArtifact('https://www.dshdesktop.cn/api/downloads/mac', {
+      method: 'GET',
+    })).rejects.toThrow('offline')
+  })
+
+  it('aborts the underlying request through the caller signal', async () => {
+    const controller = new AbortController()
+    // No hops: the request stays in flight until the signal aborts it.
+    const fake = fakeNetRequest([])
+    electron.net.request.mockImplementationOnce(() => fake.request)
+
+    const { requestDesktopArtifact } = await import('../src/electron-runtime.ts')
+    const pending = requestDesktopArtifact('https://www.dshdesktop.cn/api/downloads/mac', {
+      method: 'GET',
+      signal: controller.signal,
+    })
+    controller.abort()
+
+    await expect(pending).rejects.toThrow('operation was aborted')
+    expect(fake.abort).toHaveBeenCalledOnce()
+  })
+
+  it('resolves null-body statuses without constructing a body stream', async () => {
+    const fake = fakeNetRequest([{ status: 204, headers: {} }])
+    electron.net.request.mockImplementationOnce(() => fake.request)
+
+    const { requestDesktopArtifact } = await import('../src/electron-runtime.ts')
+    const settled = await requestDesktopArtifact('https://www.dshdesktop.cn/api/downloads/mac', {
+      method: 'GET',
+    })
+
+    expect(settled.response.status).toBe(204)
+    expect(await settled.response.text()).toBe('')
   })
 })

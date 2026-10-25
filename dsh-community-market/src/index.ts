@@ -15,7 +15,7 @@ import {
 } from './install/service.js'
 
 export const name = 'community-market'
-export const inject = ['webServer', 'settings']
+export const inject = ['webServer']
 // The settings service derives a namespace's form from its profile entry, so
 // the market's schema is declared here as the entry's config.
 export { SETTINGS_SCHEMA as Config } from './host/routes.js'
@@ -35,7 +35,11 @@ const npmRegistryHttp = createRestrictedHttpClient({
 })
 
 export function apply(ctx: Context): void {
-  const scope = registerMarketSettings(ctx)
+  // The settings service is only present when the upstream profile context is
+  // composed (not on the Electron-managed desktop profile), so fall back to the
+  // schema defaults when it is absent instead of blocking activation.
+  const settings = typeof ctx.get === 'function' ? ctx.get('settings') : undefined
+  const scope = registerMarketSettings(ctx, settings)
   let installService: MarketInstallService | undefined
   let desktopActions: DesktopActionsCapability | undefined
   let desktopPlugins: MarketDesktopPlugins | undefined

@@ -1218,20 +1218,35 @@ export function registerMarketRoutes(
   }
 }
 
-export function registerMarketSettings(ctx: Context): MarketSettingsScope {
+interface MarketSettingsService {
+  describe(): Array<{ ns: unknown; value: unknown }>
+  update(ns: string, patch: object): Promise<void> | unknown
+  replace(ns: string, section: object): Promise<void> | unknown
+}
+
+export function registerMarketSettings(ctx: Context, settings?: MarketSettingsService): MarketSettingsScope {
+  // The settings service is absent on hosts without a profile context (e.g. the
+  // Electron desktop shell); fall back to schema defaults rather than blocking.
+  const service = settings
+    ?? (typeof ctx.get === 'function' ? ctx.get('settings') as MarketSettingsService | undefined : undefined)
+    ?? (ctx as unknown as { settings?: MarketSettingsService }).settings
   return {
     get: () => {
-      const descriptor = ctx.settings
-        .describe()
-        .find(entry => String(entry.ns) === MARKET_SETTINGS_NAMESPACE)
+      const descriptor = service === undefined
+        ? undefined
+        : service.describe().find(entry => String(entry.ns) === MARKET_SETTINGS_NAMESPACE)
       // A profile entry publishes its form only once active; before that the
       // schema defaults are the value the service would resolve anyway.
       return descriptor === undefined
         ? settingsDefaults()
         : descriptor.value as MarketSettingsDocument
     },
-    update: patch => ctx.settings.update(MARKET_SETTINGS_NAMESPACE, patch),
-    replace: section => ctx.settings.replace(MARKET_SETTINGS_NAMESPACE, section),
+    update: async patch => {
+      await service?.update(MARKET_SETTINGS_NAMESPACE, patch)
+    },
+    replace: async section => {
+      await service?.replace(MARKET_SETTINGS_NAMESPACE, section)
+    },
   }
 }
 

@@ -4,6 +4,41 @@
 
 ---
 
+## 2026-10-25 · Next 壳合并收尾（2c/2d）：分级、逐调用点核对与门禁结果
+
+- **分级记录（全量）**：本次「上游 551 提交 + 前向合并 `68de0b3dad`」的冲突分级为 **A 104 / B 68 / C 63 文件 → 13 项决定 / D 0**。13 项 C 级**均经老板 2026-10-25 逐条确认**（原文见本文件下方「C 级 13 项」表）；D 级 0 项（未出现需要立即拒绝的上游改动）。
+- **2c 收尾结论**：
+  1. **Electron 44.7.0 原生 prebuild（darwin x64/arm64）**：逐家族实测存在于 `dsh-plugin-desktop/node_modules` —— `node-pty`（18 文件 / 24.4 MB，双架构）、`koffi`（`@koromix/koffi-darwin-{arm64,x64}`）、`sharp`（`@img/sharp-darwin-*` + `sharp-libvips-darwin-*`，arm64 18.2 MB / x64 20.4 MB）、`ripgrep`（`@vscode/ripgrep-darwin-*`）、`uv`（`@dataiku/uv-darwin-*`，39.5 / 47.1 MB）、`node-addon-require-builtin-darwin-*`、`@deepseek-ai/node-addon-system-darwin-*` **全部到位**。`fs-ext` 不走 prebuild：由 `prepare:electron-native`（`scripts/prepare-fs-ext.ts`）用 Electron 头文件现编，产物 `node_modules/fs-ext/build/Release/fs_ext.node` 60,728 字节存在，`package:dir` / `dev` 链均包含该步骤。
+  2. **`asar:false` 后的路径解析**：`unpackedAsarPath()` 只做 `app.asar → app.asar.unpacked` 的字符串替换，非 ASAR 路径原样返回 → 在 `asar:false` 下**恒等**，不会指向不存在的 `app.asar.unpacked`；`module-resolution.ts` 的 `isAsarPath()` 正则同样在无 `app.asar` 段时返回 false，跳过 ASAR 专用解析分支；`profile.ts` 的 `INSTALL_ANCHOR`（`new URL('../package.json', import.meta.url)`）在 `asar:false` 下解析为 `resources/app/package.json` 这一真实路径（逻辑路径即物理路径），注释所述的「虚拟安装锚点」语义保持成立；`DESKTOP_PATCH_PATH` 同理指向包内真实 `cordis.patch.yml`。**结论：四处路径解析在 `asar:false` 下均正确，无需额外分支**。
+  3. **dshmarket 1.70.1 与 pnpm 11.28.5 补丁重做**：`dshmarket` 依赖为 `1.70.1`，root `resolutions` 为 `dshmarket@npm:1.70.1 → patch:dshmarket@npm%3A1.70.1#./.yarn/patches/dshmarket-desktop.patch`（补丁针对 1.70.1 重做，`client/client.js` 目标路径匹配）；`pnpm` 依赖 `11.28.5`，补丁 `patches/pnpm@11.28.5.patch` 目标 `dist/pnpm.mjs`。`yarn install --immutable` 通过即证明两处补丁与锁文件一致。
+- **2d：13 个 fork-only `src` 文件逐调用点核对**
+
+| 文件 | 调用点 | 是否保住 | 证据 |
+| --- | --- | --- | --- |
+| `client/titlebar-double-click.ts` | `client/index.ts` 里 `installDesktopTitleBarDoubleClick(platform)` 的安装调用 | **未保住（待修）** | 全仓除自身外无该符号引用；合并后 `client/index.ts` 为上游版，安装调用消失。`tests/titlebar-double-click.spec.ts` 仍绿（单测直接调用），即**测试绿但生产接线缺失** |
+| `desktop-analytics.ts` | `main.ts`：`DesktopAnalyticsClient`、`extractStartupAnalyticsFromSummary` | 保住 | `main.ts` 命中 |
+| `desktop-first-run.ts` | `main.ts`：`settlesFirstRunSetup`、`defaultDesktopFirstRunSettings` | 保住 | 本任务补回（批准包决定 5 的第 5 个调用点），并新增 3 个测试钉住 |
+| `desktop-identity.ts` | `main.ts`：`isOmnimuxDevLaunch`、`applyOmnimuxDevEnvironment`、`resolveDevCdpPort` | 保住 | `main.ts` 命中 |
+| `desktop-mode-default.ts` | `desktop-first-run.ts`、`preset-profile.ts`、`setup-wizard-settings.ts` | 保住 | 3 处调用点命中 |
+| `managed-profile.ts` | `preset-profile.ts`：6 个符号 | 保住 | `preset-profile.ts` 命中 |
+| `preset-profile.ts` | `main.ts`（`seedOmnimuxProfile`、`completeOmnimuxProfileMaterialization`）+ `profile.ts`（`REQUIRED_BUNDLES`） | 保住 | 两处命中 |
+| `settings-access.ts` | — | **按决定 4 退役**（上游 `settings` 服务为唯一入口） | 文件已删除，全仓 0 引用 |
+| `titlebar-double-click.ts`（主进程） | `electron-shell-generation.ts`：`attachTitleBarDoubleClickListener` | 保住 | 命中 |
+| `web-server-port.ts` | `main.ts`、`updates.ts`：`requireWebServerPort` | 保住 | 2 处命中 |
+| `window-actions-bridge-contract.ts` | `client/titlebar-double-click.ts`、`titlebar-double-click.ts` | 保住 | 2 处命中 |
+| `window-state.ts` | 原 `electron-runtime.ts` 的窗口状态持久化 | **被上游取代（死代码）** | 合并后 `electron-runtime.ts` 改用上游 `main-window-state.ts` 的 `FileMainWindowStateStore`/`MainWindowStateStore`；本模块仅剩 `tests/window-state.spec.ts` 等直接引用，生产无消费者 |
+| `windows-acl-sandbox-provider.ts` | profile 行 `desktop-windows-acl-sandbox` 按包子路径加载（非 TS import） | 保住（本轮补回） | 本轮重插 profile 行 + 补 `exports['./windows-acl-sandbox-provider']`；缺失该子路径时 Host 导入失败并污染集成日志 |
+
+  结论：**9 项保住、1 项按决定退役、1 项被上游取代、1 项本轮补回**；另有 **1 项未保住**（`client/titlebar-double-click.ts` 的安装调用），已登记为遗留项，不在本次合并范围内擅自改写上游 `client/index.ts`。
+- **本轮补回的真实缺陷（合并引入）**：
+  1. `build` 链缺 `vite build --config vite.client.config.ts`，导致 `exports['./client']` 指向无人产出的 `lib/client.js`（前向合并条目已记）。
+  2. `profile.ts` 丢失 fork 的 `desktop-windows-acl-sandbox` 行注入（**#3776 交付物**），且 `exports` 未声明 `./windows-acl-sandbox-provider` → Host 导入该行失败。
+  3. `profile.ts` / `setup-wizard-settings.ts` 的 `networkExposure` 缺「LAN 仅兼容模式」闸门（fork 原有）。
+  4. 包级 `cordis.patch.yml` 丢失上游 `desktop-shell` 行的 `config.mode` 默认声明。
+- **策略取舍**：Setup 向导的「浏览器访问在所有窗口模式可用」不再装回，改用**上游流程**（`confirm-compatibility`）与上游文案；fork 的策略取舍单列 **#3790** 跟进。设置页（`client/desktop-settings-locales.ts`）为 fork 自有面且开关无模式门控，保留 fork 文案与行为。
+
+---
+
 ## 2026-10-25 · 前向合并 `68de0b3dad`（与 #3776 / #3786 交付物对齐）
 
 - **范围**：把本分支（551 提交上游同步 + 本任务 11 个提交）与 `fork/omnimux` 的新 tip `68de0b3dad96e12c1ea4a6fbacc662a60187408c` 前向合并（**不是重做 `git merge origin/master`**，保住 2a/2b/2c 成果）。新 base 含 `1563675a4f`（#106 / #3776：Windows provider seam 核验 + 两处过期 CI 断言复位）与 `68de0b3dad`（#107 / #3786：macOS universal smoke 修复——sharp 钉版 `0.35.3→0.35.5` + `x64ArchFiles` 补三个 darwin 原生家族）。merge commit `19ee33171b`，父提交 `5350f70501` + `68de0b3dad`。

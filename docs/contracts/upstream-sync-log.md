@@ -15,7 +15,7 @@
 
 | 文件 | 调用点 | 是否保住 | 证据 |
 | --- | --- | --- | --- |
-| `client/titlebar-double-click.ts` | `client/index.ts` 里 `installDesktopTitleBarDoubleClick(platform)` 的安装调用 | **未保住（待修）** | 全仓除自身外无该符号引用；合并后 `client/index.ts` 为上游版，安装调用消失。`tests/titlebar-double-click.spec.ts` 仍绿（单测直接调用），即**测试绿但生产接线缺失** |
+| `client/titlebar-double-click.ts` | `client/index.ts` 里 `installDesktopTitleBarDoubleClick(platform)` 的安装调用 | **未保住（遗留项，另开单）** | 全仓除自身外无该符号引用；合并后 `client/index.ts` 为上游版，安装调用消失。`tests/titlebar-double-click.spec.ts` 仍绿（单测直接调用），即**测试绿但生产接线缺失**。已尝试重插该 effect：typecheck 与相关单测均通过，但 `src/client/index.ts` 属界面源码，提交被质量闭环门禁拦下（要求同捆端到端测试与实测证据）。按 #3790 的同一口径**不绕过、不造假**，改动已回退并登记为遗留项 |
 | `desktop-analytics.ts` | `main.ts`：`DesktopAnalyticsClient`、`extractStartupAnalyticsFromSummary` | 保住 | `main.ts` 命中 |
 | `desktop-first-run.ts` | `main.ts`：`settlesFirstRunSetup`、`defaultDesktopFirstRunSettings` | 保住 | 本任务补回（批准包决定 5 的第 5 个调用点），并新增 3 个测试钉住 |
 | `desktop-identity.ts` | `main.ts`：`isOmnimuxDevLaunch`、`applyOmnimuxDevEnvironment`、`resolveDevCdpPort` | 保住 | `main.ts` 命中 |
@@ -35,6 +35,10 @@
   2. `profile.ts` 丢失 fork 的 `desktop-windows-acl-sandbox` 行注入（**#3776 交付物**），且 `exports` 未声明 `./windows-acl-sandbox-provider` → Host 导入该行失败。
   3. `profile.ts` / `setup-wizard-settings.ts` 的 `networkExposure` 缺「LAN 仅兼容模式」闸门（fork 原有）。
   4. 包级 `cordis.patch.yml` 丢失上游 `desktop-shell` 行的 `config.mode` 默认声明。
+  5. `profile.ts` 的 `desktop-windows-acl-sandbox` 行虽已重插，但 `exports` 未声明 `./windows-acl-sandbox-provider`，Host 导入失败并以 `****` 污染集成日志 —— 已补 `exports` 子路径。
+- **遗留项（不在本次合并范围，另开单）**：
+  1. `client/index.ts` 的原生标题栏双击接线（同上表），需连同端到端证据一并落地。
+  2. `window-state.ts` 已被上游 `main-window-state.ts` 取代，生产无消费者，仅剩单测引用 —— 属死代码清理，需与 `tests/window-state.spec.ts` 一并评估删除。
 - **策略取舍**：Setup 向导的「浏览器访问在所有窗口模式可用」不再装回，改用**上游流程**（`confirm-compatibility`）与上游文案；fork 的策略取舍单列 **#3790** 跟进。设置页（`client/desktop-settings-locales.ts`）为 fork 自有面且开关无模式门控，保留 fork 文案与行为。
 
 ---

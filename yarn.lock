@@ -2099,12 +2099,12 @@ __metadata:
 
 "@deepseek-ai/dsh-client-ui-settings-account@patch:@deepseek-ai/dsh-client-ui-settings-account@file%3Avendor/dsh-runtime/0.2.1-rc.3/deepseek-ai-dsh-client-ui-settings-account-0.2.1-rc.3.tgz#./patches/dsh-client-ui-settings-account@0.2.1-rc.3.patch::locator=deepseek-harness-desktop%40workspace%3A.":
   version: 0.2.1-rc.3
-  resolution: "@deepseek-ai/dsh-client-ui-settings-account@patch:@deepseek-ai/dsh-client-ui-settings-account@file%3Avendor/dsh-runtime/0.2.1-rc.3/deepseek-ai-dsh-client-ui-settings-account-0.2.1-rc.3.tgz%23vendor/dsh-runtime/0.2.1-rc.3/deepseek-ai-dsh-client-ui-settings-account-0.2.1-rc.3.tgz%3A%3Ahash=c20509&locator=deepseek-harness-desktop%2540workspace%253A.#./patches/dsh-client-ui-settings-account@0.2.1-rc.3.patch::version=0.2.1-rc.3&hash=36a3f3&locator=deepseek-harness-desktop%40workspace%3A."
+  resolution: "@deepseek-ai/dsh-client-ui-settings-account@patch:@deepseek-ai/dsh-client-ui-settings-account@file%3Avendor/dsh-runtime/0.2.1-rc.3/deepseek-ai-dsh-client-ui-settings-account-0.2.1-rc.3.tgz%23vendor/dsh-runtime/0.2.1-rc.3/deepseek-ai-dsh-client-ui-settings-account-0.2.1-rc.3.tgz%3A%3Ahash=c20509&locator=deepseek-harness-desktop%2540workspace%253A.#./patches/dsh-client-ui-settings-account@0.2.1-rc.3.patch::version=0.2.1-rc.3&hash=e999db&locator=deepseek-harness-desktop%40workspace%3A."
   dependencies:
     "@deepseek-ai/schemastery": "npm:~3.18.5"
   peerDependencies:
     "@deepseek-ai/cordis": ~4.0.5
-  checksum: 10c0/5c446de808524662fc6fc2a4f4fae4ea7e148bb65eabaef83578a648ace8c1e9fef895c9c83647b685f3894beec532b7358160c0ee0c7ce4be3cdc85b7947a0a
+  checksum: 10c0/09c99d7e07aca390a3cac1bac19e36446e6c31b9377a1ca3b96e99447b85b0bc21e48ba0ff78cb652f8600d9f29a8149c2e18a8e0d04d7f10fc99ac29cd8184d
   languageName: node
   linkType: hard
 

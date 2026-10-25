@@ -1,0 +1,1438 @@
+{
+  "merge_base": "63e160ab4387988db894adef766865eab897cf80",
+  "ours": "dca12ebdd2b5a7b572663f491c84833da3e487ce",
+  "theirs": "092e2ecef750d10db43cedbab8e81fd48c8de38e",
+  "unmerged_total": 235,
+  "counts": {
+    "A": 104,
+    "C": 63,
+    "B": 68
+  },
+  "by_group": {
+    "dsh-community-market|B": 18,
+    "dsh-plugin-desktop|A": 20,
+    "dsh-plugin-desktop|B": 41,
+    "dsh-plugin-desktop|C": 7,
+    "dsh-plugin-desktop-beta|C": 51,
+    "patches|A": 25,
+    "patches|B": 2,
+    "root/docs|A": 3,
+    "root/docs|B": 5,
+    "root/docs|C": 3,
+    "scripts|B": 2,
+    "scripts|C": 2,
+    "vendor/dsh-runtime|A": 56
+  },
+  "paths": {
+    ".agents/notes/implemented/architecture/2026-08-21-omnimux-ecosystem-map.i18n.yaml": {
+      "code": "UU",
+      "bucket": "A",
+      "why": "false rename pairing of bilingual hash sidecars",
+      "note": ""
+    },
+    ".github/workflows/ci.yml": {
+      "code": "UU",
+      "bucket": "C",
+      "why": "packaging matrix moved to beta only; dsh-plugin-desktop dropped from CI; adds desktop-linux + Next Playwright gates",
+      "note": ""
+    },
+    ".gitignore": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "union: upstream next/beta build dirs + our preset/worktree ignores",
+      "note": ""
+    },
+    "AGENTS.md": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "keep both; append upstream's Next/variant bullets",
+      "note": ""
+    },
+    "PRIVACY.i18n.yaml": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "bilingual hash sidecar; regenerate",
+      "note": ""
+    },
+    "README.i18n.yaml": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "bilingual hash sidecar; regenerate",
+      "note": ""
+    },
+    "README.md": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "docs merge: upstream sponsor table + our brand",
+      "note": ""
+    },
+    "_deprecated/dsh-0.1.5-rc.2/dsh-settings-legacy-compat.spec.ts": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "upstream _deprecated archive; the fork does not carry it",
+      "note": ""
+    },
+    "dsh-community-market/docs/install-and-uninstall.i18n.yaml": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "market refactor: follow upstream, keep our settings-persistence delta",
+      "note": ""
+    },
+    "dsh-community-market/package.json": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "deps: schemastery bump + dropped upstream deps",
+      "note": ""
+    },
+    "dsh-community-market/src/catalog/source-store.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "market refactor: follow upstream, keep our settings-persistence delta",
+      "note": ""
+    },
+    "dsh-community-market/src/client/MarketSettingsTab.tsx": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "market refactor: follow upstream, keep our settings-persistence delta",
+      "note": ""
+    },
+    "dsh-community-market/src/host/routes.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "market refactor: follow upstream, keep our settings-persistence delta",
+      "note": ""
+    },
+    "dsh-community-market/src/index.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "market refactor: follow upstream, keep our settings-persistence delta",
+      "note": ""
+    },
+    "dsh-community-market/src/install/github.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "market refactor: follow upstream, keep our settings-persistence delta",
+      "note": ""
+    },
+    "dsh-community-market/src/install/service.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "market refactor: follow upstream, keep our settings-persistence delta",
+      "note": ""
+    },
+    "dsh-community-market/tests/client-index.spec.ts": {
+      "code": "UD",
+      "bucket": "B",
+      "why": "market refactor: follow upstream, keep our settings-persistence delta",
+      "note": ""
+    },
+    "dsh-community-market/tests/client-launcher.spec.tsx": {
+      "code": "UD",
+      "bucket": "B",
+      "why": "market refactor: follow upstream, keep our settings-persistence delta",
+      "note": ""
+    },
+    "dsh-community-market/tests/client-overlay.spec.tsx": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "market refactor: follow upstream, keep our settings-persistence delta",
+      "note": ""
+    },
+    "dsh-community-market/tests/host-routes.spec.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "market refactor: follow upstream, keep our settings-persistence delta",
+      "note": ""
+    },
+    "dsh-community-market/tests/market-host-lifecycle.spec.ts": {
+      "code": "UD",
+      "bucket": "B",
+      "why": "market refactor: follow upstream, keep our settings-persistence delta",
+      "note": ""
+    },
+    "dsh-community-market/tests/market-install.spec.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "market refactor: follow upstream, keep our settings-persistence delta",
+      "note": ""
+    },
+    "dsh-community-market/tests/market-runtime.spec.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "market refactor: follow upstream, keep our settings-persistence delta",
+      "note": ""
+    },
+    "dsh-community-market/tests/market-settings-persistence.spec.ts": {
+      "code": "UD",
+      "bucket": "B",
+      "why": "market refactor: follow upstream, keep our settings-persistence delta",
+      "note": "BOUNDARY: owned by teammate #3776 — record only, do not resolve"
+    },
+    "dsh-community-market/tests/setup.tsx": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "market refactor: follow upstream, keep our settings-persistence delta",
+      "note": ""
+    },
+    "dsh-community-market/tests/source-store.spec.ts": {
+      "code": "UD",
+      "bucket": "B",
+      "why": "market refactor: follow upstream, keep our settings-persistence delta",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/README.i18n.yaml": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/README.md": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/README.zh.md": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/THIRD_PARTY_NOTICES.md": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/build/app-icon-mac.png": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/build/app-icon.png": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/build/installer.nsh": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/cordis.patch.yml": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/docs/plugin-services.md": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/docs/plugin-services.zh.md": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/package.json": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/scripts/verify-mac-release.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/scripts/verify-mac-smoke.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/scripts/verify-win-installer.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/src/client/DesktopSettingsSection.tsx": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/src/client/desktop-settings-styles.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/src/client/directory-picker.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/src/client/index.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/src/client/styles.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/src/desktop-browser-access.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/src/desktop-cli.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/src/desktop-terminal.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/src/diagnostics.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/src/host-process.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/src/lan-https-certificate.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/src/lan-https-ingress.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/src/lan-https-runtime.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/src/main.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/src/native-ui/vite-env.d.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/src/notifications.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/src/pnpm-policy.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/src/profiles.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/src/renderer-recovery.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/src/updates.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/src/webserver.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/src/window-material.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/tests/client-directory-picker.spec.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/tests/desktop-cli.spec.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/tests/desktop-terminal.spec.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/tests/diagnostics.spec.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/tests/host-process.spec.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/tests/lan-https-certificate.spec.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/tests/notifications.spec.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/tests/package.spec.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/tests/profiles.spec.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/tests/renderer-recovery.spec.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/tests/updates.spec.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/tsconfig.json": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/tsdown.config.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/vite.native-ui.config.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop-beta/vitest.config.ts": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "upstream maintains the Beta variant package; fork dropped it in 2026-09-12 (C). 51 modify/delete + 219 new files",
+      "note": ""
+    },
+    "dsh-plugin-desktop/README.i18n.yaml": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "docs: brand + upstream content",
+      "note": ""
+    },
+    "dsh-plugin-desktop/README.md": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "docs: brand + upstream content",
+      "note": ""
+    },
+    "dsh-plugin-desktop/README.zh.md": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "docs: brand + upstream content",
+      "note": ""
+    },
+    "dsh-plugin-desktop/build/app-icon-mac.png": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "brand icon asset",
+      "note": ""
+    },
+    "dsh-plugin-desktop/build/app-icon.png": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "brand icon asset",
+      "note": ""
+    },
+    "dsh-plugin-desktop/package.json": {
+      "code": "UU",
+      "bucket": "C",
+      "why": "brand/version(B) + asar smartUnpack->false, electron 43->44, dshmarket 1.38.1->1.70.1, pnpm 11.8->11.28 (C)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/scripts/build-windows-nsis-ab.ts": {
+      "code": "UD",
+      "bucket": "B",
+      "why": "build/verify script chain: keep ours + absorb upstream flags",
+      "note": ""
+    },
+    "dsh-plugin-desktop/scripts/package-linux.ts": {
+      "code": "DU",
+      "bucket": "B",
+      "why": "build/verify script chain: keep ours + absorb upstream flags",
+      "note": ""
+    },
+    "dsh-plugin-desktop/scripts/verify-mac-smoke.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "build/verify script chain: keep ours + absorb upstream flags",
+      "note": ""
+    },
+    "dsh-plugin-desktop/scripts/verify-packaged-runtime.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "build/verify script chain: keep ours + absorb upstream flags",
+      "note": ""
+    },
+    "dsh-plugin-desktop/scripts/verify-profile-boot.mjs": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "build/verify script chain: keep ours + absorb upstream flags",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/bin.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "CLI help string: keep `omnimux`, adopt upstream's `[folder]`",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/client/AdvancedFrame.tsx": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "settings/layout UI: follow upstream rename, keep our narrow-screen + titlebar deltas",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/client/DesktopSettingsSection.tsx": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "settings/layout UI: follow upstream rename, keep our narrow-screen + titlebar deltas",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/client/desktop-settings.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "settings/layout UI: follow upstream rename, keep our narrow-screen + titlebar deltas",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/client/extended-styles.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "settings/layout UI: follow upstream rename, keep our narrow-screen + titlebar deltas",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/client/index.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "settings/layout UI: follow upstream rename, keep our narrow-screen + titlebar deltas",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/client/layout-state.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "settings/layout UI: follow upstream rename, keep our narrow-screen + titlebar deltas",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/client/styles.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "settings/layout UI: follow upstream rename, keep our narrow-screen + titlebar deltas",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/electron-runtime.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "mechanical + next-transition-notice wiring",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/host-bootstrap.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "mechanical",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/host-process-entry.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "mechanical",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/index.ts": {
+      "code": "UU",
+      "bucket": "C",
+      "why": "plugin inject surface + settings port creation reworked (inject gains 'settings'; createDesktopSettingsPort/watchUiThemeSource/watchPlatformLogin)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/main.ts": {
+      "code": "UU",
+      "bucket": "C",
+      "why": "startup flow reordered by upstream (Setup Wizard rework, launchWorkspace hand-off, primary runtime, profileBoot, analytics call sites)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/native-dialog-copy.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "copy",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/native-ui/profile-selector/App.tsx": {
+      "code": "DU",
+      "bucket": "B",
+      "why": "setup-wizard / profile-selector UI copy",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/native-ui/setup-wizard/App.tsx": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "setup-wizard / profile-selector UI copy",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/notifications.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "mechanical",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/packaged-runtime-smoke.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "mechanical",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/preload.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "mechanical",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/product-identity.ts": {
+      "code": "UU",
+      "bucket": "C",
+      "why": "identity table gains homeDirectoryName + beta packageName; beta identity is a C-level decision (2026-09-12)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/profile-selection-window.ts": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "upstream source evolution, no fork delta at this path",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/profile.ts": {
+      "code": "UU",
+      "bucket": "C",
+      "why": "settings-row / preset-registry / upstream-analytics-row mechanism reworked",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/setup-wizard-contract.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "setup wizard contract/settings/copy",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/setup-wizard-settings.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "setup wizard contract/settings/copy",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/update-checker.ts": {
+      "code": "UU",
+      "bucket": "C",
+      "why": "release-channel mechanism: ours stable-only vs upstream stable|beta|next",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/update-download.ts": {
+      "code": "UU",
+      "bucket": "C",
+      "why": "artifact naming + version admission now channel-aware (DSH-NEXT / DSH-Desktop-Beta)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/update-lifecycle.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "mechanical (channel plumbing)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/src/windows-pwsh-sandbox.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "mechanical",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/bin.spec.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "test carries a fork brand/port assertion -> keep our value, follow upstream structure",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/client-desktop-settings.spec.ts": {
+      "code": "UU",
+      "bucket": "A",
+      "why": "upstream test evolution (no brand assertion on our side)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/client-desktop-update-settings.spec.ts": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "upstream test evolution (no brand assertion on our side)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/client-directory-picker-browse-patch.spec.ts": {
+      "code": "UD",
+      "bucket": "A",
+      "why": "upstream test evolution (no brand assertion on our side)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/client-environment.spec.ts": {
+      "code": "UU",
+      "bucket": "A",
+      "why": "upstream test evolution (no brand assertion on our side)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/desktop-network.spec.ts": {
+      "code": "UD",
+      "bucket": "A",
+      "why": "upstream test evolution (no brand assertion on our side)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/desktop-runtime-environment.spec.ts": {
+      "code": "UU",
+      "bucket": "A",
+      "why": "upstream test evolution (no brand assertion on our side)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/electron-runtime.spec.ts": {
+      "code": "UU",
+      "bucket": "A",
+      "why": "upstream test evolution (no brand assertion on our side)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/host-launch-environment.spec.ts": {
+      "code": "UD",
+      "bucket": "A",
+      "why": "upstream test evolution (no brand assertion on our side)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/installer-messages.spec.ts": {
+      "code": "UD",
+      "bucket": "B",
+      "why": "test carries a fork brand/port assertion -> keep our value, follow upstream structure",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/main-window-state.spec.ts": {
+      "code": "UD",
+      "bucket": "A",
+      "why": "upstream test evolution (no brand assertion on our side)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/market-pnpm-integration.spec.ts": {
+      "code": "UD",
+      "bucket": "A",
+      "why": "upstream test evolution (no brand assertion on our side)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/notifications.spec.ts": {
+      "code": "UU",
+      "bucket": "A",
+      "why": "upstream test evolution (no brand assertion on our side)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/package.spec.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "test carries a fork brand/port assertion -> keep our value, follow upstream structure",
+      "note": "BOUNDARY: owned by teammate #3776 — record only, do not resolve"
+    },
+    "dsh-plugin-desktop/tests/plugin.spec.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "test carries a fork brand/port assertion -> keep our value, follow upstream structure",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/preset-resolution.spec.ts": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "upstream test evolution (no brand assertion on our side)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/profile.spec.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "test carries a fork brand/port assertion -> keep our value, follow upstream structure",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/recovery-plugin-uninstall.spec.ts": {
+      "code": "UU",
+      "bucket": "A",
+      "why": "upstream test evolution (no brand assertion on our side)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/request-inventory-resolution.spec.ts": {
+      "code": "UU",
+      "bucket": "A",
+      "why": "upstream test evolution (no brand assertion on our side)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/setup-wizard-copy.spec.ts": {
+      "code": "UU",
+      "bucket": "A",
+      "why": "upstream test evolution (no brand assertion on our side)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/updates.spec.ts": {
+      "code": "UU",
+      "bucket": "A",
+      "why": "upstream test evolution (no brand assertion on our side)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/verify-mac-smoke.spec.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "test carries a fork brand/port assertion -> keep our value, follow upstream structure",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/verify-packaged-runtime.spec.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "test carries a fork brand/port assertion -> keep our value, follow upstream structure",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/verify-win-portable.spec.ts": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "test carries a fork brand/port assertion -> keep our value, follow upstream structure",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/webserver.spec.ts": {
+      "code": "UU",
+      "bucket": "A",
+      "why": "upstream test evolution (no brand assertion on our side)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/windows-nsis-ab.spec.ts": {
+      "code": "UD",
+      "bucket": "A",
+      "why": "upstream test evolution (no brand assertion on our side)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tests/windows-pwsh-sandbox.spec.ts": {
+      "code": "UU",
+      "bucket": "A",
+      "why": "upstream test evolution (no brand assertion on our side)",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tsconfig.json": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "mechanical union",
+      "note": ""
+    },
+    "dsh-plugin-desktop/tsconfig.tests.client.json": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "mechanical union",
+      "note": ""
+    },
+    "package.json": {
+      "code": "UU",
+      "bucket": "C",
+      "why": "workspaces/check/CI semantics: adopt dsh-desktop-next (+beta?) workspace, upstream drops dsh-plugin-desktop from `check`",
+      "note": ""
+    },
+    "patches/dsh-agent-presets@0.1.5-rc.2.patch": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "deleted by us (superseded rc), updated upstream; keep deleted",
+      "note": ""
+    },
+    "patches/dsh-client-modules@0.1.5-rc.1.patch": {
+      "code": "DD",
+      "bucket": "A",
+      "why": "upstream-only patch for a superseded rc; the fork prunes it",
+      "note": ""
+    },
+    "patches/dsh-client-modules@0.1.5-rc.2.patch": {
+      "code": "UA",
+      "bucket": "A",
+      "why": "upstream-only patch for a superseded rc; the fork prunes it",
+      "note": ""
+    },
+    "patches/dsh-client-modules@0.2.1-rc.3.patch": {
+      "code": "AA",
+      "bucket": "A",
+      "why": "both sides added the identical active-rc patch (byte-identical)",
+      "note": ""
+    },
+    "patches/dsh-client-ui-directory-picker-browse@0.1.5-rc.1.patch": {
+      "code": "DD",
+      "bucket": "A",
+      "why": "upstream-only patch for a superseded rc; the fork prunes it",
+      "note": ""
+    },
+    "patches/dsh-client-ui-directory-picker-browse@0.1.5-rc.2.patch": {
+      "code": "UA",
+      "bucket": "A",
+      "why": "upstream-only patch for a superseded rc; the fork prunes it",
+      "note": ""
+    },
+    "patches/dsh-client-ui-directory-picker-browse@0.2.1-rc.3.patch": {
+      "code": "AA",
+      "bucket": "B",
+      "why": "active-rc patch content differs -> rebase the fork patch",
+      "note": ""
+    },
+    "patches/dsh-client-ui-primitives@0.1.5-rc.1.patch": {
+      "code": "DD",
+      "bucket": "A",
+      "why": "upstream-only patch for a superseded rc; the fork prunes it",
+      "note": ""
+    },
+    "patches/dsh-client-ui-primitives@0.1.5-rc.2.patch": {
+      "code": "UA",
+      "bucket": "A",
+      "why": "upstream-only patch for a superseded rc; the fork prunes it",
+      "note": ""
+    },
+    "patches/dsh-client-ui-primitives@0.2.1-rc.3.patch": {
+      "code": "AA",
+      "bucket": "A",
+      "why": "both sides added the identical active-rc patch (byte-identical)",
+      "note": ""
+    },
+    "patches/dsh-client-ui-settings-general@0.1.5-rc.1.patch": {
+      "code": "DD",
+      "bucket": "A",
+      "why": "upstream-only patch for a superseded rc; the fork prunes it",
+      "note": ""
+    },
+    "patches/dsh-client-ui-settings-general@0.1.5-rc.2.patch": {
+      "code": "UA",
+      "bucket": "A",
+      "why": "upstream-only patch for a superseded rc; the fork prunes it",
+      "note": ""
+    },
+    "patches/dsh-client-ui-settings-general@0.2.1-rc.3.patch": {
+      "code": "AA",
+      "bucket": "A",
+      "why": "both sides added the identical active-rc patch (byte-identical)",
+      "note": ""
+    },
+    "patches/dsh-host-directory-picker-browse@0.1.5-rc.1.patch": {
+      "code": "DD",
+      "bucket": "A",
+      "why": "upstream-only patch for a superseded rc; the fork prunes it",
+      "note": ""
+    },
+    "patches/dsh-host-directory-picker-browse@0.1.5-rc.2.patch": {
+      "code": "UA",
+      "bucket": "A",
+      "why": "upstream-only patch for a superseded rc; the fork prunes it",
+      "note": ""
+    },
+    "patches/dsh-host-directory-picker-browse@0.2.1-rc.3.patch": {
+      "code": "AA",
+      "bucket": "A",
+      "why": "both sides added the identical active-rc patch (byte-identical)",
+      "note": ""
+    },
+    "patches/dsh-plugin-package-inventory-deepseek@0.1.5-rc.1.patch": {
+      "code": "DD",
+      "bucket": "A",
+      "why": "upstream-only patch for a superseded rc; the fork prunes it",
+      "note": ""
+    },
+    "patches/dsh-plugin-package-inventory-deepseek@0.1.5-rc.2.patch": {
+      "code": "UA",
+      "bucket": "A",
+      "why": "upstream-only patch for a superseded rc; the fork prunes it",
+      "note": ""
+    },
+    "patches/dsh-plugin-package-inventory-deepseek@0.2.1-rc.3.patch": {
+      "code": "AA",
+      "bucket": "A",
+      "why": "both sides added the identical active-rc patch (byte-identical)",
+      "note": ""
+    },
+    "patches/dsh-settings@0.1.5-rc.2.patch": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "deleted by us (superseded rc), updated upstream; keep deleted",
+      "note": ""
+    },
+    "patches/dsh-subprocess-local@0.1.5-rc.2.patch": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "deleted by us (superseded rc), updated upstream; keep deleted",
+      "note": ""
+    },
+    "patches/dsh-web-app@0.1.5-rc.1.patch": {
+      "code": "DD",
+      "bucket": "A",
+      "why": "upstream-only patch for a superseded rc; the fork prunes it",
+      "note": ""
+    },
+    "patches/dsh-web-app@0.1.5-rc.2.patch": {
+      "code": "UA",
+      "bucket": "A",
+      "why": "upstream-only patch for a superseded rc; the fork prunes it",
+      "note": ""
+    },
+    "patches/dsh-web-app@0.2.1-rc.3.patch": {
+      "code": "AA",
+      "bucket": "A",
+      "why": "both sides added the identical active-rc patch (byte-identical)",
+      "note": ""
+    },
+    "patches/dsh-win32-process@0.1.5-rc.2.patch": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "deleted by us (superseded rc), updated upstream; keep deleted",
+      "note": ""
+    },
+    "patches/dsh@0.1.5-rc.2.patch": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "deleted by us (superseded rc), updated upstream; keep deleted",
+      "note": ""
+    },
+    "patches/open@11.0.4.patch": {
+      "code": "AA",
+      "bucket": "B",
+      "why": "active-rc patch content differs -> rebase the fork patch",
+      "note": ""
+    },
+    "scripts/prepare-agents-anywhere-release.mjs": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "single-package vs upstream AA_WORKSPACES",
+      "note": ""
+    },
+    "scripts/sync-vendored-runtime.mjs": {
+      "code": "UU",
+      "bucket": "B",
+      "why": "drop beta/other-channel branch (2026-09-12 decision)",
+      "note": ""
+    },
+    "scripts/verify-desktop-variants.mjs": {
+      "code": "DU",
+      "bucket": "C",
+      "why": "new next<->beta byte-parity gate (sync:beta-to-next / sync:next-to-beta) that the fork has no equivalent of",
+      "note": ""
+    },
+    "scripts/verify-layout.mjs": {
+      "code": "UU",
+      "bucket": "C",
+      "why": "hard-asserts the 5-workspace list incl. beta+next and next's upstream-reference pin",
+      "note": ""
+    },
+    "upstream.json": {
+      "code": "UU",
+      "bucket": "C",
+      "why": "reintroduces a beta channel, reversing the 2026-09-12 C-level single-stable decision",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-agent-loop-testkit-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-agent-presets-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-anonymous-user-id-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-api-gateway-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-api-remotes-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-api-session-controller-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-api-workspace-controller-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-atomic-write-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-brand-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-chunked-list-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-client-connection-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-client-file-upload-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-client-hmr-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-client-store-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-client-ui-dockkit-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-client-ui-renderer-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-client-ui-settings-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-cmdline-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-code-runtime-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-code-runtime-worker-thread-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-command-compact-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-commands-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-cordis-client-runner-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-cordis-host-runner-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-file-reference-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-fs-local-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-goal-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-headless-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-host-directory-picker-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-host-open-in-app-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-launch-environment-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-llm-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-output-retention-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-persona-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-repeat-tool-reminder-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-schedule-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-scope-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-session-format-v0-to-v1-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-session-persistence-jsonl-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-session-projection-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-session-telemetry-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-session-title-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-skill-badge-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-storage-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-storage-domain-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-storage-sqlite-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-tool-cordis-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-tools-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-typert-generator-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-typert-protocol-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-typert-registry-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-util-time-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-web-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-web-search-perplexity-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "vendor/dsh-runtime/0.1.5-rc.2/deepseek-ai-dsh-win32-process-0.1.5-rc.2.tgz": {
+      "code": "DU",
+      "bucket": "A",
+      "why": "old runtime vendor dir kept upstream, pruned by the fork (established policy)",
+      "note": ""
+    },
+    "yarn.lock": {
+      "code": "UU",
+      "bucket": "A",
+      "why": "regenerated by `corepack yarn install`",
+      "note": ""
+    }
+  }
+}

@@ -5,6 +5,8 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import type { Config as PwshConfig } from '@deepseek-ai/dsh-pwsh-local'
 import type { ShellExecSpec } from '@deepseek-ai/dsh-shell'
+import type { ConfinedArgv, SandboxPolicy } from '@deepseek-ai/dsh-sandbox'
+import { LocalSandboxProvider } from '@deepseek-ai/dsh-sandbox-local'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   ensureWindowsConsoleHost,
@@ -17,7 +19,26 @@ import {
   desktopWindowsPwshPath,
   type WindowsAclAdaptation,
 } from '../src/windows-pwsh-sandbox.ts'
+import { DesktopWindowsAclSandboxProvider } from '../src/windows-acl-sandbox-provider.ts'
 const RUN_AS_NODE = 'ELECTRON_RUN_AS_NODE'
+
+// The provider reads the live Host identity and the trampoline only applies on
+// an Electron-hosted win32 process; this fixture stands in for that Host so the
+// seam is exercised on every platform CI runs.
+const aclSeam = vi.hoisted(() => ({
+  adaptation: {
+    platform: 'win32' as NodeJS.Platform,
+    electron: true,
+    execPath: 'C:\\Program Files\\DSH Desktop\\DSH Desktop.exe',
+    upstreamRunner: 'C:\\Program Files\\DSH Desktop\\resources\\app.asar\\runner.js',
+    trampoline: 'C:\\Program Files\\DSH Desktop\\resources\\app.asar\\desktop-runner.js',
+  },
+}))
+
+vi.mock('../src/windows-pwsh-sandbox.ts', async importOriginal => ({
+  ...await importOriginal<typeof import('../src/windows-pwsh-sandbox.ts')>(),
+  desktopWindowsAclAdaptation: () => aclSeam.adaptation,
+}))
 
 function consoleApi(overrides: Partial<WindowsConsoleHostApi> = {}): WindowsConsoleHostApi {
   return {
@@ -584,4 +605,63 @@ describe.runIf(process.platform === 'win32')('Windows ACL runner console host on
       sandbox.dispose()
     }
   }, 60_000)
+})
+
+describe('desktop Windows ACL sandbox provider seam', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const policy: SandboxPolicy = { mode: 'read-only', workspaceRoot: 'C:\\workspace' }
+  const runnerArgv = [
+    aclSeam.adaptation.execPath,
+    aclSeam.adaptation.upstreamRunner,
+    '--',
+    'powershell.exe',
+    '-Command',
+    'Write-Output ok',
+  ]
+
+  function providerUnderTest(): DesktopWindowsAclSandboxProvider {
+    return Object.create(DesktopWindowsAclSandboxProvider.prototype) as DesktopWindowsAclSandboxProvider
+  }
+
+  it('inserts the trampoline into the argv the upstream provider already confined', async () => {
+    const confined: ConfinedArgv = {
+      argv: [...runnerArgv],
+      enforcement: 'partial',
+      denialSignatures: ['access is denied'],
+      runnerFailureRules: [],
+    }
+    const upstream = vi.spyOn(LocalSandboxProvider.prototype, 'confine').mockResolvedValue(confined)
+
+    const result = await providerUnderTest().confine(confined.argv, policy)
+
+    expect(upstream).toHaveBeenCalledWith(confined.argv, policy, undefined)
+    expect(result.argv).toEqual([
+      aclSeam.adaptation.execPath,
+      aclSeam.adaptation.trampoline,
+      aclSeam.adaptation.upstreamRunner,
+      '--',
+      'powershell.exe',
+      '-Command',
+      'Write-Output ok',
+    ])
+    expect(result.enforcement).toBe('partial')
+    expect(result.denialSignatures).toEqual(['access is denied'])
+    // The upstream verdict is never mutated in place.
+    expect(confined.argv).toEqual(runnerArgv)
+  })
+
+  it('returns the upstream confinement object unchanged when no trampoline applies', async () => {
+    const confined: ConfinedArgv = {
+      argv: ['/usr/bin/sandbox-exec', '-p', 'profile', 'bash'],
+      enforcement: 'full',
+      denialSignatures: [],
+      runnerFailureRules: [],
+    }
+    vi.spyOn(LocalSandboxProvider.prototype, 'confine').mockResolvedValue(confined)
+
+    expect(await providerUnderTest().confine(confined.argv, policy)).toBe(confined)
+  })
 })

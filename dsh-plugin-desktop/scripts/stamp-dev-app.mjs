@@ -15,6 +15,16 @@ import { execFileSync } from 'node:child_process'
 
 const packageRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 
+/** Locate the packaged release-channel marker: `asar: false` keeps app content in
+ * `Resources/app`, while an asar build would unpack it to `app.asar.unpacked`. */
+function packagedMarkerPath(appPath) {
+  const candidates = [
+    join(appPath, 'Contents', 'Resources', 'app', 'preset', 'plugins', 'omnimux', 'src', 'release-channel.json'),
+    join(appPath, 'Contents', 'Resources', 'app.asar.unpacked', 'preset', 'plugins', 'omnimux', 'src', 'release-channel.json'),
+  ]
+  return candidates.find(candidate => existsSync(candidate)) ?? candidates[0]
+}
+
 function findCandidateApp() {
   const armDir = join(packageRoot, 'dist', 'mac-arm64')
   if (existsSync(armDir)) {
@@ -39,7 +49,7 @@ export function stampDevApp(appPath = findCandidateApp()) {
   const plistPath = join(appPath, 'Contents', 'Info.plist')
   if (!existsSync(plistPath)) throw new Error(`stamp-dev-app: Info.plist not found at ${plistPath}`)
 
-  const markerPath = join(appPath, 'Contents', 'Resources', 'app.asar.unpacked', 'preset', 'plugins', 'omnimux', 'src', 'release-channel.json')
+  const markerPath = packagedMarkerPath(appPath)
   let marker
   try {
     marker = JSON.parse(readFileSync(markerPath, 'utf8'))

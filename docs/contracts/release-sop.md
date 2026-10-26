@@ -32,7 +32,7 @@
 
 ### 2.1 存储桶元数据
 - **存储桶名称**：`omnimux-dist`
-- **Account ID**：`861a8093c2f17a53b4f5a8375a347ff0`
+- **Account ID**：由 CI secret `CLOUDFLARE_ACCOUNT_ID` 提供（不写入文档）
 - **绑定自定义域名**：`https://dl.omnimux.ai` (Zone: `omnimux.ai`, 证书与 SSL: 活跃)
 
 ### 2.2 存储路径标准拓扑

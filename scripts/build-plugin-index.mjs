@@ -82,6 +82,30 @@ function readManifest(pluginsRoot, dir) {
   return manifest
 }
 
+/**
+ * Confirm the exact version an entry names is actually installable.
+ *
+ * The index is only useful if `name@version` resolves: the market client builds that
+ * spec verbatim, so publishing an entry for an unpublished version sends every user
+ * who clicks install into a 404.
+ */
+async function assertPublished(name, version) {
+  const url = `https://registry.npmjs.org/${encodeURIComponent(name).replace(/^%40/u, '@')}`
+  let payload
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(15_000) })
+    if (response.status === 404) throw new Error(`${name} is not published on npm`)
+    if (!response.ok) throw new Error(`npm registry answered ${String(response.status)} for ${name}`)
+    payload = await response.json()
+  } catch (error) {
+    throw new Error(`cannot verify ${name}@${version}: ${error.message}`)
+  }
+  const versions = Object.keys(payload?.versions ?? {})
+  if (!versions.includes(version)) {
+    throw new Error(`${name}@${version} is not published on npm (available: ${versions.join(', ') || 'none'})`)
+  }
+}
+
 function entryFor(pluginsRoot, spec) {
   const manifest = readManifest(pluginsRoot, spec.dir)
   const repositoryUrl = repositoryHref(manifest.repository)
@@ -149,6 +173,16 @@ async function main() {
   if (!pluginsRoot) throw new Error(`cannot locate the plugin sources; tried:\n  ${candidates.join('\n  ')}`)
 
   const index = buildIndex(pluginsRoot)
+  // An entry naming an unpublished version sends every user who clicks install into a
+  // 404, so confirm each one resolves before it ships. `--offline` skips the check for
+  // air-gapped runs; it must never be used for a real publish.
+  if (!args.includes('--offline')) {
+    for (const plugin of index.plugins) {
+      await assertPublished(plugin.name, plugin.versions[0].version)
+    }
+  } else {
+    console.warn('skipping the npm publish check (--offline)')
+  }
   // Validate with the reader's own parser before anything is written. A generator
   // that only round-trips its own output cannot notice a format violation, and the
   // market client would be the first to find out.

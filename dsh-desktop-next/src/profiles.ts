@@ -15,7 +15,36 @@ import { removeLinkProjectionsSafely } from '../../dsh-plugin-desktop/src/link-p
 import { insideArchive, unpackedPath } from './asar-archive-policy.ts'
 
 export const NEXT_PACKAGE = fileURLToPath(new URL('../package.json', import.meta.url))
-export const WEB_BUNDLES = [...PROFILE_TEMPLATES.web!.bundles]
+
+/**
+ * Product plugins every OmniMux profile starts with.
+ *
+ * These ship as ordinary npm bundles rather than a preset tree, so the Host resolves
+ * them from node_modules like any other package and they update independently of the
+ * application. `dsh-better-sidebar` comes first because the others register their
+ * shell entries through it.
+ *
+ * `omnimux-market` is included: its catalog images live on the CDN and the package is
+ * code-only, so the 142 MB publish failure that once forced it out is gone.
+ */
+export const OMNIMUX_PRODUCT_BUNDLES = [
+  'dsh-better-sidebar',
+  'omnimux',
+  'omnimux-accounts',
+  'omnimux-analytics',
+  'omnimux-assets',
+  'omnimux-automation',
+  'omnimux-clip',
+  'omnimux-forms',
+  'omnimux-inspiration',
+  'omnimux-market',
+  'omnimux-products',
+  'omnimux-publish',
+  'omnimux-video',
+  'omnimux-workflow',
+] as const
+
+export const WEB_BUNDLES = [...new Set([...OMNIMUX_PRODUCT_BUNDLES, ...PROFILE_TEMPLATES.web!.bundles])]
 const NEXT_BUNDLE_PATCH = fileURLToPath(new URL('../cordis.patch.yml', import.meta.url))
 export const AA_PACKAGE = '@agents-anywhere/dsh-bridge-next'
 export const COMMUNITY_MARKET_PACKAGE = 'dsh-community-market'

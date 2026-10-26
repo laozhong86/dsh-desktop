@@ -22,6 +22,10 @@ describe('development app packaging', () => {
     expect(appPath).toBe(join(packageRoot, 'dist', arch === 'arm64' ? 'mac-arm64' : 'mac', 'OmniMux.app'))
     expect(run.mock.calls.map(([command, args]) => [command, args])).toEqual([
       ['corepack', ['yarn', 'run', 'build']],
+      // Mirrors `package:dir`: the native prebuild (Electron ABI) and the primary
+      // runtime payload must exist before electron-builder packs the bundle.
+      [process.execPath, [join(packageRoot, 'scripts', 'prepare-fs-ext.ts')]],
+      [process.execPath, [join(packageRoot, 'scripts', 'prepare-runtime.ts')]],
       [process.execPath, [join(packageRoot, 'scripts', 'stage-preset-profile.ts'), '--channel', 'development']],
       [process.execPath, [join(packageRoot, 'scripts', 'package-dir.mjs')]],
       [process.execPath, [stampScript, appPath]],
@@ -39,7 +43,7 @@ describe('development app packaging', () => {
     expect(desktop.scripts['package:dir']).toBe('yarn run build && yarn run prepare:electron-native && yarn run prepare:runtime && yarn run stage:preset && node scripts/package-dir.mjs')
   })
 
-  it.each([1, 2, 3, 4, 5])('stops at the first failing packaging step %i', failedStep => {
+  it.each([1, 2, 3, 4, 5, 6, 7])('stops at the first failing packaging step %i', failedStep => {
     const run = vi.fn<Run>().mockImplementation(() => ({
       status: run.mock.calls.length === failedStep ? 1 : 0,
     }))

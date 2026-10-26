@@ -92,6 +92,30 @@ R2 步骤带条件判断：`CLOUDFLARE_API_TOKEN` 与 `CLOUDFLARE_ACCOUNT_ID` **
 
 **Account ID 与 API Token 一律不进仓库**。`r2-dist-sync.mjs` 要求 `CLOUDFLARE_ACCOUNT_ID` 必填，缺失时明确报错。本地凭据统一由 1Password 托管，不使用 `~/.wrangler/config/default.toml` 这类明文落盘文件。
 
+### 2.5 应用内自动更新的版本元数据
+
+应用检查更新时轮询**每通道一个静态对象**，与安装包同批上传：
+
+```
+https://dl.omnimux.ai/api/desktop/version-stable.json
+https://dl.omnimux.ai/api/desktop/version-beta.json
+https://dl.omnimux.ai/api/desktop/version-next.json
+```
+
+响应格式（由 `dsh-plugin-desktop/src/update-checker.ts` 解析）：
+
+```json
+{ "version": "2.0.20-next", "channel": "next", "sha256": { "mac": "<hex>", "windows": "<hex>" } }
+```
+
+**为什么每通道一个文件**：响应必须自报通道名，客户端会校验 `channel` 与请求通道一致。单文件无法同时满足多个通道。
+
+**生成方式**：`scripts/build-release-metadata.mjs` 按版本号的预发布标签判定通道（`x.y.z` → stable、`x.y.z-next` → next），并计算安装包真实 SHA256。`--check` 供 CI 校验是否过期。release workflow 在发布前生成，`r2-dist-sync` 负责上传。
+
+**注意**：`.json` 必须带 `application/json` content-type，否则客户端解析失败（脚本已映射）。
+
+**历史问题**：此前端点为 `updates.omnimux.local`，一个开发期占位域名，解析到 `198.18.34.17`（RFC 2544 保留测试网段），实测 HTTP `000` 完全不可达——安装后的用户永远检查不到更新。
+
 ---
 
 ## 3. Cloudflare R2 亚太 CDN 存储与直链拓扑

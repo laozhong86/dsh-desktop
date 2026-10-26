@@ -11,7 +11,7 @@ import { verifyNextMacRuntime } from './verify-mac-runtime.ts'
 
 export function verifyNextMac(signed: boolean): void {
   const smokeSlices = signed ? undefined : macSmokeExecutableSlices(macSmokeArchitecture(process.env))
-  verifyMacRelease({ distDir: resolve(process.argv[2] ?? `dist/${signed ? 'mac-release' : 'mac-smoke'}`), productName: 'DSH NEXT', nativeEntries: NEXT_MAC_NATIVE_ENTRIES,
+  verifyMacRelease({ distDir: resolve(process.argv[2] ?? `dist/${signed ? 'mac-release' : 'mac-smoke'}`), productName: 'OmniMux', nativeEntries: NEXT_MAC_NATIVE_ENTRIES,
     // Next archives its application; native files live beside the archive.
     unpackedRoot: appPath => join(appPath, 'Contents', 'Resources', 'app.asar.unpacked'),
     listDmgs: path => readdirSync(path).filter(name => name.endsWith('.dmg')).map(name => join(path, name)).filter(path => statSync(path).isFile()),

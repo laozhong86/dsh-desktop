@@ -19,7 +19,7 @@ it('archives the application like upstream Desktop while keeping fuses and nativ
   expect(next.version).toBe('2.0.20-next')
   expect(next.desktopName).toBe(`${next.build.linux.executableName}.desktop`)
   expect(next.repository).toEqual({ type: 'git', url: stable.repository.url, directory: 'dsh-desktop-next' })
-  expect(next.build.appId).toBe('ai.deepseek.dsh.desktop.next')
+  expect(next.build.appId).toBe('ai.omnimux.desktop')
   expect(next.build.asar).toBe(true)
   for (const platform of ['mac', 'win', 'linux']) expect(next.build[platform].asar, platform).toBeUndefined()
   // Both CPU builds archive identical bytes, so the universal build keeps one archive. Merging would

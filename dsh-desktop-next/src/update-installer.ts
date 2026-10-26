@@ -4,17 +4,18 @@ import { constants } from 'node:fs'
 import { access, lstat, mkdir, readdir, readFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
+import { DESKTOP_APP_ID } from './product-identity.ts'
 
 const execute = promisify(execFile)
-export const NEXT_APP_ID = 'ai.deepseek.dsh.desktop.next'
+export const NEXT_APP_ID = DESKTOP_APP_ID
 
 const MAC_PROGRESS_UI_SCRIPT = `
 ObjC.import("Cocoa");
 const app = $.NSApplication.sharedApplication;
 app.setActivationPolicy($.NSApplicationActivationPolicyAccessory);
 const env = $.NSProcessInfo.processInfo.environment;
-const title = ObjC.unwrap(env.objectForKey("DSH_UPDATE_TITLE")) || "DSH NEXT";
-const message = ObjC.unwrap(env.objectForKey("DSH_UPDATE_MESSAGE")) || "Updating DSH NEXT…";
+const title = ObjC.unwrap(env.objectForKey("DSH_UPDATE_TITLE")) || "OmniMux";
+const message = ObjC.unwrap(env.objectForKey("DSH_UPDATE_MESSAGE")) || "Updating OmniMux…";
 const win = $.NSWindow.alloc.initWithContentRectStyleMaskBackingDefer($.NSMakeRect(0, 0, 380, 110), $.NSTitledWindowMask, $.NSBackingStoreBuffered, false);
 win.setTitle($(title));
 win.setLevel($.NSFloatingWindowLevel);
@@ -77,7 +78,7 @@ export function assertNextMacBundle(identifier: string, manifest: unknown, versi
 }
 
 export function assertNextWindowsInstaller(info: { ProductName?: unknown; ProductVersion?: unknown }, version: string): void {
-  if (info.ProductName !== 'DSH NEXT' || info.ProductVersion !== version) throw new Error('The installer does not match this Next release')
+  if (info.ProductName !== 'OmniMux' || info.ProductVersion !== version) throw new Error('The installer does not match this Next release')
 }
 
 export class NextUpdateInstaller {
@@ -150,7 +151,7 @@ export class NextUpdateInstaller {
       const prepared = this.prepared
       if (!this.nativeReady || !prepared?.bundle || !prepared.installed || !prepared.directory) throw new Error('No prepared update installer')
       const zh = (this.options.language?.() ?? 'en').toLowerCase().startsWith('zh')
-      const message = zh ? `正在更新 DSH NEXT 至 ${prepared.version}，请稍候…` : `Updating DSH NEXT to ${prepared.version}, please wait…`
+      const message = zh ? `正在更新 OmniMux 至 ${prepared.version}，请稍候…` : `Updating OmniMux to ${prepared.version}, please wait…`
       await new Promise<void>((resolve, reject) => {
         const child = spawn('/bin/sh', ['-c', MAC_UPDATE_SCRIPT], {
           detached: true, stdio: 'ignore', shell: false, cwd: '/',
@@ -160,7 +161,7 @@ export class NextUpdateInstaller {
             DSH_UPDATE_STAGED: prepared.bundle!,
             DSH_UPDATE_INSTALLED: prepared.installed!,
             DSH_UPDATE_DIR: prepared.directory!,
-            DSH_UPDATE_TITLE: 'DSH NEXT',
+            DSH_UPDATE_TITLE: 'OmniMux',
             DSH_UPDATE_MESSAGE: message,
             DSH_UPDATE_UI_SCRIPT: MAC_PROGRESS_UI_SCRIPT,
           },

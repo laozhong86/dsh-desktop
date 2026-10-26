@@ -3,8 +3,9 @@ import { readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { isAbsolute, join, relative, resolve } from 'node:path'
 import { privateDirectory, readPrivateFile } from './private-files.ts'
+import { DESKTOP_HOME_DIRECTORY_NAME } from './product-identity.ts'
 
-export function defaultDataDirectory(userHome = homedir()): string { return join(userHome, '.dsh') }
+export function defaultDataDirectory(userHome = homedir()): string { return join(userHome, DESKTOP_HOME_DIRECTORY_NAME) }
 
 export function readDataDirectory(defaultHome: string, locationRoot = defaultHome): { home: string; error?: string } {
   try {

@@ -274,7 +274,7 @@ export async function preparePayload(options: PreparePayloadOptions): Promise<De
     writeWindowsCodeFiles(output, windowsCode)
     log(`Discovered ${String(windowsCode.size)} Windows PE files while hashing the payload`)
   }
-  log(`Sealed the prepared payload: ${String(descriptor.files.length)} files; DSH NEXT ${release.version}, dsh ${release.dshVersion}, Electron ${release.electronVersion}, pnpm ${release.pnpmVersion}`)
+  log(`Sealed the prepared payload: ${String(descriptor.files.length)} files; OmniMux ${release.version}, dsh ${release.dshVersion}, Electron ${release.electronVersion}, pnpm ${release.pnpmVersion}`)
   return descriptor
 }
 

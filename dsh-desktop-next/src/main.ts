@@ -11,6 +11,7 @@ import { appRequestHeaders, forwardWebRequest, serveWebDocument } from './web-do
 import { installAppDownloads } from './app-downloads.ts'
 import { claimDesktopSingleInstance } from './single-instance.ts'
 import { NEXT_PACKAGE, parseFeatures, profileName } from './profiles.ts'
+import { DESKTOP_PRODUCT_NAME, DESKTOP_USER_DATA_DIRECTORY_NAME } from './product-identity.ts'
 import { APP_URL, IPC, SHELL_URL } from './ipc.ts'
 import { WINDOWS_TITLEBAR_HEIGHT } from './windows-layout.ts'
 import { preferredDesktopLocale, resolveDesktopLocale } from './menu-locale.ts'
@@ -55,13 +56,13 @@ const defaultHome = resolve(process.env.DSH_DESKTOP_NEXT_HOME ?? defaultDataDire
 // The location preference stays at its former Next-owned anchor so previously
 // chosen custom directories survive a change to the default home.
 const locationRoot = process.env.DSH_DESKTOP_NEXT_HOME ? defaultHome
-  : app.isPackaged ? join(app.getPath('appData'), 'DSH NEXT', 'home') : join(root, '.desktop-next', 'home')
+  : app.isPackaged ? join(app.getPath('appData'), DESKTOP_USER_DATA_DIRECTORY_NAME, 'home') : join(root, '.desktop-next', 'home')
 const locationFile = join(locationRoot, 'desktop-next-location.json')
 const dataLocation = readDataDirectory(defaultHome, locationRoot)
 const home = dataLocation.home
 const normalElectronData = join(home, 'electron-user-data')
 privateDirectory(normalElectronData)
-app.setName('DSH NEXT')
+app.setName(DESKTOP_PRODUCT_NAME)
 // Keep one application owner across normal and safe launches, before switching
 // Chromium storage to the disposable environment.
 app.setPath('userData', normalElectronData)
@@ -253,7 +254,7 @@ const WINDOWS_CAPTION_FILL = '#00000000'
 
 function createWindow(preload: string, primary = false): BrowserWindow {
   const window = new BrowserWindow({ width: 1280, height: 840, minWidth: 800, minHeight: 580,
-    show: false, title: 'DSH NEXT',
+    show: false, title: 'OmniMux',
     ...(process.platform !== 'darwin' ? { icon: unpackedPath(join(root, 'build', process.platform === 'win32' ? 'app-icon.ico' : 'app-icon.png')) } : {}),
     ...(!primary ? auxiliaryWindowChromeOptions() : {}),
     ...(process.platform === 'win32' && primary ? {
@@ -477,7 +478,7 @@ function raiseDialogOwner(): BrowserWindow | undefined {
 
 async function confirmed(message: string, detail = t('将停止当前 Host，正在运行的任务会被中断。', 'This stops the current Host and interrupts running tasks.')): Promise<boolean> {
   const owner = raiseDialogOwner()
-  const options = { type: 'question' as const, title: 'DSH NEXT', message, detail,
+  const options = { type: 'question' as const, title: 'OmniMux', message, detail,
     buttons: [t('继续', 'Continue'), t('取消', 'Cancel')], defaultId: 1, cancelId: 1 }
   const result = await (owner === undefined ? dialog.showMessageBox(options) : dialog.showMessageBox(owner, options))
   return result.response === 0 && !quitting
@@ -495,7 +496,7 @@ async function promptAvailableUpdate(): Promise<void> {
   const owner = raiseDialogOwner()
   const options = {
     type: 'info' as const,
-    title: 'DSH NEXT',
+    title: 'OmniMux',
     message: updateLabel(snapshot, windowsLanguage),
     buttons: [t('下载更新', 'Download update'), t('稍后', 'Later')],
     defaultId: 0,
@@ -547,7 +548,7 @@ async function performCommand(input: Record<string, unknown>, type: string, sour
         if (snapshot.phase === 'available' && snapshot.installable) await promptAvailableUpdate()
         else {
           const owner = raiseDialogOwner()
-          const options = { type: 'info' as const, title: 'DSH NEXT', message: updateLabel(snapshot, windowsLanguage) }
+          const options = { type: 'info' as const, title: 'OmniMux', message: updateLabel(snapshot, windowsLanguage) }
           await (owner === undefined ? dialog.showMessageBox(options) : dialog.showMessageBox(owner, options))
         }
       }).catch(error => runtime.diagnostics.append(String(error), 'warn'))
@@ -594,7 +595,7 @@ async function performCommand(input: Record<string, unknown>, type: string, sour
     if (type === 'restart-app' || type === 'restart-recovery') {
       if (!await confirmed(type === 'restart-recovery'
         ? t('重启应用并进入恢复模式？', 'Restart the application in recovery mode?')
-        : t('现在重启 DSH NEXT？', 'Restart DSH NEXT now?'), type === 'restart-recovery'
+        : t('现在重启 OmniMux？', 'Restart OmniMux now?'), type === 'restart-recovery'
         ? t('应用将先打开恢复助手，暂不加载当前 Profile 和插件。正在运行的任务会中断。', 'The recovery assistant will open before loading the current Profile and plugins. Running tasks will be interrupted.')
         : undefined)) return
       relaunch = relaunchArguments(process.argv.slice(1), type === 'restart-recovery', runtime.safeMode)
@@ -772,7 +773,7 @@ async function recoveryAction(input: Record<string, unknown>): Promise<void> {
   const action = input.action
   recoveryNotice = undefined
   if (action === 'restart') {
-    if (!await confirmed(runtime.safeMode ? t('退出安全模式并重启？', 'Exit Safe Mode and restart?') : t('现在重启 DSH NEXT？', 'Restart DSH NEXT now?'),
+    if (!await confirmed(runtime.safeMode ? t('退出安全模式并重启？', 'Exit Safe Mode and restart?') : t('现在重启 OmniMux？', 'Restart OmniMux now?'),
       runtime.safeMode
         ? t('应用将返回原 Profile，并移除临时环境。临时数据不会保留，正在运行的任务会中断。', 'The app will return to the original Profile and remove the temporary environment. Temporary data will not be kept, and running tasks will be interrupted.')
         : t('应用将退出恢复助手，重新启动原 Profile。', 'The app will leave the recovery assistant and restart the original Profile.'))) return
@@ -1076,7 +1077,7 @@ async function main(): Promise<void> {
   native.createTray()
   updates.start()
   Menu.setApplicationMenu(process.platform === 'win32' ? null : Menu.buildFromTemplate([
-    { label: 'DSH NEXT', submenu: native.items() }, { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' },
+    { label: 'OmniMux', submenu: native.items() }, { role: 'editMenu' }, { role: 'viewMenu' }, { role: 'windowMenu' },
   ]))
   if (process.platform === 'win32') {
     ipcMain.handle(IPC.windowsMenu, (event, name: unknown, x: unknown, y: unknown) => {

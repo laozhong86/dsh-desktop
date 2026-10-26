@@ -320,8 +320,8 @@
     ]
   },
   "build": {
-    "appId": "ai.deepseek.dsh.desktop.next",
-    "productName": "DSH NEXT",
+    "appId": "ai.omnimux.desktop",
+    "productName": "OmniMux",
     "asar": true,
     "beforeBuild": "./scripts/before-build.ts",
     "beforePack": "./scripts/prepare-pack.ts",
@@ -356,7 +356,7 @@
       }
     ],
     "mac": {
-      "artifactName": "DSH-NEXT-${version}-${arch}.${ext}",
+      "artifactName": "OmniMux-${version}-${arch}.${ext}",
       "target": [
         "dir"
       ],
@@ -368,9 +368,9 @@
           "en",
           "zh_CN"
         ],
-        "NSMicrophoneUsageDescription": "DSH NEXT uses the microphone when you enable a feature that records audio.",
-        "NSAudioCaptureUsageDescription": "DSH NEXT captures screen audio when you request it.",
-        "NSLocalNetworkUsageDescription": "DSH NEXT connects to devices on your local network when you enable network access.",
+        "NSMicrophoneUsageDescription": "OmniMux uses the microphone when you enable a feature that records audio.",
+        "NSAudioCaptureUsageDescription": "OmniMux captures screen audio when you request it.",
+        "NSLocalNetworkUsageDescription": "OmniMux connects to devices on your local network when you enable network access.",
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
         }
@@ -407,7 +407,7 @@
           ]
         }
       ],
-      "artifactName": "DSH-NEXT-${version}-${arch}-Portable.${ext}",
+      "artifactName": "OmniMux-${version}-${arch}-Portable.${ext}",
       "icon": "build/app-icon.ico",
       "extraResources": [
         {
@@ -424,9 +424,9 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "differentialPackage": false,
-      "shortcutName": "DSH NEXT",
+      "shortcutName": "OmniMux",
       "useZip": false,
-      "artifactName": "DSH-NEXT-${version}-${arch}-Setup.${ext}",
+      "artifactName": "OmniMux-${version}-${arch}-Setup.${ext}",
       "installerIcon": "build/app-icon.ico",
       "uninstallerIcon": "build/app-icon.ico",
       "include": "../dsh-plugin-desktop/build/installer.nsh"
@@ -436,7 +436,7 @@
         "dir"
       ],
       "icon": "build/app-icon.png",
-      "artifactName": "DSH-NEXT-${version}-${arch}.${ext}",
+      "artifactName": "OmniMux-${version}-${arch}.${ext}",
       "category": "Development",
       "synopsis": "Agentic coding desktop for the DeepSeek Harness (Next)",
       "maintainer": "DeepSeek <dsh-desktop@deepseek.com>",

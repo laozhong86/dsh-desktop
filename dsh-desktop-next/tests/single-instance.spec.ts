@@ -6,10 +6,10 @@ describe('desktop single-instance ownership', () => {
     let listener: ((event?: unknown, argv?: string[]) => void) | undefined
     const app = { requestSingleInstanceLock: () => true, quit: vi.fn(), on: (_event: 'second-instance', handler: typeof listener) => { listener = handler } }
     const focus = vi.fn()
-    expect(claimDesktopSingleInstance(app, focus, { platform: 'win32', argv: ['DSH NEXT.exe'] })).toBe(true)
-    listener?.({}, ['DSH NEXT.exe', '--dsh-installer-quit'])
+    expect(claimDesktopSingleInstance(app, focus, { platform: 'win32', argv: ['OmniMux.exe'] })).toBe(true)
+    listener?.({}, ['OmniMux.exe', '--dsh-installer-quit'])
     expect(app.quit).toHaveBeenCalledOnce(); expect(focus).not.toHaveBeenCalled()
-    expect(claimDesktopSingleInstance(app, focus, { platform: 'win32', argv: ['DSH NEXT.exe', '--dsh-installer-quit'] })).toBe(false)
+    expect(claimDesktopSingleInstance(app, focus, { platform: 'win32', argv: ['OmniMux.exe', '--dsh-installer-quit'] })).toBe(false)
     expect(app.quit).toHaveBeenCalledTimes(2)
   })
   it('quits a second process without registering lifecycle work', () => {

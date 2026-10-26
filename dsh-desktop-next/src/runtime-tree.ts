@@ -430,7 +430,7 @@ export function readInstalledPackageVersion(appRoot: string, name: string): stri
 export function verifyPackagedRuntimeIdentity(descriptorFile: string, identity: PackagedRuntimeIdentity): DesktopRuntimeDescriptor {
   const descriptor = readDesktopRuntime(descriptorFile)
   if (descriptor.release.version !== identity.version) {
-    throw new Error(`desktop runtime: payload ${descriptor.release.version} does not belong to DSH NEXT ${identity.version}`)
+    throw new Error(`desktop runtime: payload ${descriptor.release.version} does not belong to OmniMux ${identity.version}`)
   }
   if (descriptor.release.dshVersion !== identity.dshVersion) {
     throw new Error(`desktop runtime: payload declares dsh ${descriptor.release.dshVersion} but ${identity.dshVersion} is installed`)

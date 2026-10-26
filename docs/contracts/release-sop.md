@@ -116,6 +116,26 @@ https://dl.omnimux.ai/api/desktop/version-next.json
 
 **历史问题**：此前端点为 `updates.omnimux.local`，一个开发期占位域名，解析到 `198.18.34.17`（RFC 2544 保留测试网段），实测 HTTP `000` 完全不可达——安装后的用户永远检查不到更新。
 
+### 2.6 插件索引的前置条件：插件必须先在 npm 发布
+
+索引条目最终会被市场客户端拼成 `name@version` 的安装规格，所以**索引里出现的每个版本都必须已在 npm 上可安装**。
+
+`scripts/build-plugin-index.mjs` 生成时会联网核对，未发布直接失败：
+
+```
+Error: omnimux@0.1.2 is not published on npm (available: 0.1.0, 0.1.1)
+```
+
+**发布顺序不能颠倒**：
+
+1. `npm publish` 插件包（如 `omnimux@0.1.2`、`omnimux-market`）
+2. 生成插件索引（此时版本校验通过）
+3. 索引随发布上传到 `plugins/dsh-index.json`
+
+**为什么必须卡住**：索引指向不存在的版本，用户点安装就是 404，而且错误发生在客户端，服务端日志里看不到。
+
+`--offline` 可跳过该校验，**仅供离线验证，真实发布不得使用**。
+
 ---
 
 ## 3. Cloudflare R2 亚太 CDN 存储与直链拓扑

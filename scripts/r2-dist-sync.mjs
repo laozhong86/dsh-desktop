@@ -21,9 +21,20 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID || '861a8093c2f17a53b4f5a8375a347ff0'
+const ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID
 const BUCKET_NAME = process.env.CLOUDFLARE_R2_BUCKET || 'omnimux-dist'
 const CDN_BASE_URL = process.env.OMNIMUX_DIST_BASE_URL || 'https://dl.omnimux.ai'
+
+/**
+ * Resolve the Cloudflare account ID from the environment.
+ *
+ * The ID is deliberately not baked in as a fallback: this repository is public,
+ * and a committed account identifier leaks the deployment's Cloudflare account.
+ */
+function resolveAccountId() {
+  if (!ACCOUNT_ID) throw new Error('CLOUDFLARE_ACCOUNT_ID is required for R2 distribution commands')
+  return ACCOUNT_ID
+}
 
 /**
  * 读取 Cloudflare 鉴权 Token
@@ -54,7 +65,7 @@ function resolveCloudflareToken() {
  * 列出 R2 存储桶中的所有对象
  */
 async function listBucketObjects(token) {
-  const url = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/r2/buckets/${BUCKET_NAME}/objects`
+  const url = `https://api.cloudflare.com/client/v4/accounts/${resolveAccountId()}/r2/buckets/${BUCKET_NAME}/objects`
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   })
@@ -78,7 +89,7 @@ async function uploadObjectToR2(token, key, filePath, maxRetries = 3) {
     try {
       process.stdout.write(`  ⏳ [${attempt}/${maxRetries}] 正在上传 ${key} (${sizeMB} MB)... `)
       const encodedKey = encodeURIComponent(key).replace(/%2F/g, '/')
-      const url = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/r2/buckets/${BUCKET_NAME}/objects/${encodedKey}`
+      const url = `https://api.cloudflare.com/client/v4/accounts/${resolveAccountId()}/r2/buckets/${BUCKET_NAME}/objects/${encodedKey}`
 
       let contentType = 'application/octet-stream'
       if (key.endsWith('.exe')) contentType = 'application/x-msdownload'

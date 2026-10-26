@@ -136,6 +136,12 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    # `secrets` is not available in a step-level `if` expression, so surface the
+    # configured state through job-level env and test that instead. Without this the
+    # R2 step silently never runs even when the credentials are set.
+    env:
+      R2_TOKEN_SET: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+      R2_ACCOUNT_SET: ${{ secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
       - name: Download build artifacts
@@ -170,9 +176,15 @@ jobs:
             release-assets/**/*.zip
           fail_on_unmatched_files: false
       - name: Sync to Cloudflare R2 (dl.omnimux.ai)
-        if: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
+        if: ${{ env.R2_TOKEN_SET == 'true' && env.R2_ACCOUNT_SET == 'true' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           node scripts/r2-dist-sync.mjs upload --dir release-assets
+      # Without this the publish job looks green while the CDN stayed empty.
+      - name: Report skipped R2 sync
+        if: ${{ env.R2_TOKEN_SET != 'true' || env.R2_ACCOUNT_SET != 'true' }}
+        run: |
+          echo "::warning::R2 sync skipped: CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not both configured."
+          echo "GitHub Release published, but dl.omnimux.ai was not updated — installed clients cannot see this release."

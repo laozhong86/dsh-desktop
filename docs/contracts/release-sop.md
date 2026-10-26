@@ -181,3 +181,44 @@ omnimux-dist (Bucket Root)
 - **Product ID**：`18c7607a-4248-4706-b796-c104bbf2ed42`
 - **状态**：**不要重提**。上次认证因 Policy 10.2.9 / `Unsigned` 失败（报告 `aebe26db-16c8-4aa4-abe8-62963eca5bba`）。
 - 若未来恢复商店：必须先付费完成 Authenticode（Trusted Signing 或 OV/EV），再按 `windows-trusted-signing-sop.md` 签名后重提；**禁止**再用 unsigned `dist:win` 作为 Package URL。
+
+---
+
+## 6. 发布后验收：自动更新链路
+
+发布完成不等于链路可用。必须确认装机的应用能真的发现新版本。
+
+### 6.1 应用侧的检查时机（来自 `dsh-desktop-next/src/updates.ts`）
+
+| 项 | 行为 |
+| --- | --- |
+| 首次检查 | 启动后 **30 秒** |
+| 轮询间隔 | 每 **6 小时** |
+| 生效条件 | `app.isPackaged` 为真，且平台是 `darwin` 或 `win32` |
+| 请求端点 | `https://dl.omnimux.ai/api/desktop/version-<channel>.json` |
+| 超时 | 20 秒 |
+
+**关键约束**：开发模式（源码直跑）**不会**触发更新检查。验收必须用真实安装包。
+
+### 6.2 验收步骤
+
+1. 装一个较低版本的真实包
+2. 确认 `dl.omnimux.ai/api/desktop/version-<channel>.json` 上的版本**高于**已装版本
+3. 启动应用，等待 30 秒
+4. 确认出现「发现新版本」提示
+5. 触发升级，确认安装包下载并完成替换
+
+### 6.3 常见失败点
+
+| 现象 | 原因 |
+| --- | --- |
+| 永远不提示更新 | 端点返回 404 或版本号不高于当前 |
+| 提示了但下载失败 | 安装包 URL 不可达，或 `sha256` 与实际文件不符 |
+| 提示 `service` 错误 | 端点不可达、超时，或 `channel` 字段与请求通道不匹配 |
+
+### 6.4 为什么 GitHub Release 不能做更新源
+
+GitHub Release 的资源 URL 会 **302 跳转**到 `objects.githubusercontent.com`，而更新检查器固定使用 `redirect: 'error'`（安全设计：防止更新请求被重定向到不可信地址）。因此：
+
+- **R2（`dl.omnimux.ai`）**：唯一能支撑自动更新的渠道
+- **GitHub Release**：只做人工下载与版本归档

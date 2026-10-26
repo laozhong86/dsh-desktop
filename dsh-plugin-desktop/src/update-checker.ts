@@ -6,17 +6,35 @@ import {
   type DesktopInstallationId,
 } from './desktop-installation-id.ts'
 
-/** Public endpoint returning the latest DSH Desktop version for a requested channel. */
-export const DESKTOP_VERSION_ENDPOINT = 'https://updates.omnimux.local/api/desktop/version'
+/** Release streams supported by the Desktop service. */
+export type DesktopReleaseChannel = 'stable' | 'beta' | 'next'
+
+/**
+ * Base URL of the static release metadata served from the distribution bucket.
+ *
+ * One object per channel sits next to the installers it points at, because the
+ * response has to name its own channel and a single file cannot do that for both
+ * streams.
+ *
+ * The former `updates.omnimux.local` host was a development placeholder that
+ * resolved into the RFC 2544 benchmarking range and never answered, so installed
+ * builds could not discover a release at all.
+ */
+export const DESKTOP_VERSION_ENDPOINT_BASE = 'https://dl.omnimux.ai/api/desktop'
+
+/** Fixed endpoint for the default (stable) stream, kept for existing callers. */
+export const DESKTOP_VERSION_ENDPOINT = `${DESKTOP_VERSION_ENDPOINT_BASE}/version-stable.json`
+
+/** Resolve the version endpoint for one release channel. */
+export function desktopVersionEndpoint(channel: DesktopReleaseChannel = 'stable'): string {
+  return `${DESKTOP_VERSION_ENDPOINT_BASE}/version-${channel}.json`
+}
 
 /** Header carrying the installed Desktop version to the fixed version endpoint. */
 export const DESKTOP_CURRENT_VERSION_HEADER = 'X-DSH-Desktop-Version'
 
 /** Header selecting an isolated Desktop release stream. */
 export const DESKTOP_RELEASE_CHANNEL_HEADER = 'X-DSH-Desktop-Channel'
-
-/** Release streams supported by the Desktop service. */
-export type DesktopReleaseChannel = 'stable' | 'beta' | 'next'
 
 /** Maximum response body bytes accepted from the version service. */
 export const MAX_VERSION_RESPONSE_BYTES = 4 * 1024
@@ -146,7 +164,7 @@ export async function checkForDesktopUpdate(
 
   let response: Response
   try {
-    response = await request(DESKTOP_VERSION_ENDPOINT, init)
+    response = await request(desktopVersionEndpoint(options.channel), init)
   } catch {
     return null
   }

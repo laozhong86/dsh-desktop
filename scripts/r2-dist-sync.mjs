@@ -16,7 +16,7 @@
  *   node scripts/r2-dist-sync.mjs verify --version 2.0.4
  */
 
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -95,6 +95,8 @@ async function uploadObjectToR2(token, key, filePath, maxRetries = 3) {
       if (key.endsWith('.exe')) contentType = 'application/x-msdownload'
       else if (key.endsWith('.dmg')) contentType = 'application/x-apple-diskimage'
       else if (key.endsWith('.zip')) contentType = 'application/zip'
+      // The desktop updaters parse these, so they must not arrive as octet-stream.
+      else if (key.endsWith('.json')) contentType = 'application/json; charset=utf-8'
       else if (key.endsWith('.txt') || key.endsWith('.yml')) contentType = 'text/plain; charset=utf-8'
 
       const res = await fetch(url, {
@@ -343,6 +345,21 @@ async function main() {
         { key: `releases/latest/OmniMux-mac.dmg`, file: macDmgPath, size: macStat.size },
         { key: `releases/latest/DSH-Desktop.dmg`, file: macDmgPath, size: macStat.size },
       )
+    }
+
+    // Release metadata the desktop updaters poll. It lives at a fixed path beside
+    // nothing else, so it is uploaded as-is rather than under releases/.
+    const metadataDir = join(searchDir ?? join(ROOT_DIR, 'dist/release-download'), 'api', 'desktop')
+    if (existsSync(metadataDir)) {
+      for (const name of readdirSync(metadataDir)) {
+        if (!name.endsWith('.json')) continue
+        const file = join(metadataDir, name)
+        const stat = statSync(file)
+        uploadPlan.push({ key: `api/desktop/${name}`, file, size: stat.size })
+      }
+      console.log(`  • 版本元数据: ${metadataDir}`)
+    } else {
+      console.log(`  ⚠️  未找到版本元数据目录 ${metadataDir}；应用将无法发现更新`)
     }
 
     console.log(`\n📤 开始同步 ${uploadPlan.length} 个分发节点...`)

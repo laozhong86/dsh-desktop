@@ -3,6 +3,7 @@ import {
   DESKTOP_CURRENT_VERSION_HEADER,
   DESKTOP_RELEASE_CHANNEL_HEADER,
   DESKTOP_VERSION_ENDPOINT,
+  desktopVersionEndpoint,
   MAX_VERSION_RESPONSE_BYTES,
   checkForStableUpdate,
   checkForDesktopUpdate,
@@ -21,6 +22,23 @@ const INSTALLATION_ID = assertDesktopInstallationId('01234567-89ab-4cde-8f01-234
 function versionResponse(version: unknown, init: ResponseInit = {}): Response {
   return Response.json({ version }, init)
 }
+
+describe('desktop version endpoint', () => {
+  it('addresses one static object per release channel', () => {
+    // A single file cannot name its own channel for both streams, so each channel
+    // gets its own object beside the installers it points at.
+    expect(desktopVersionEndpoint()).toBe(DESKTOP_VERSION_ENDPOINT)
+    expect(desktopVersionEndpoint('stable')).toBe(DESKTOP_VERSION_ENDPOINT)
+    expect(desktopVersionEndpoint('next')).toBe('https://dl.omnimux.ai/api/desktop/version-next.json')
+    expect(desktopVersionEndpoint('beta')).toBe('https://dl.omnimux.ai/api/desktop/version-beta.json')
+  })
+
+  it('never points at the retired development host', () => {
+    for (const channel of ['stable', 'beta', 'next'] as const) {
+      expect(desktopVersionEndpoint(channel)).not.toContain('omnimux.local')
+    }
+  })
+})
 
 describe('strict SemVer parsing', () => {
   it('accepts a three-part version, optional lowercase v, prerelease, and build metadata', () => {

@@ -148,6 +148,13 @@ jobs:
         run: |
           tag="v$(node -p "require('./package.json').version")"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+      # The desktop updaters poll a fixed per-channel object beside the installers.
+      # Generate it before publishing so both channels carry it in the same upload.
+      - name: Generate release metadata
+        run: |
+          node scripts/build-release-metadata.mjs \
+            --version "$(node -p "require('./package.json').version")" \
+            --dir release-assets
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2
         with:

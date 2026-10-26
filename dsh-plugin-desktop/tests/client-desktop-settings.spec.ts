@@ -194,15 +194,17 @@ describe('Desktop settings API', () => {
     expect(zh.openBrowser).not.toMatch(/启动后|自动/u)
     expect(zh.webIntro).not.toMatch(/启动后|自动/u)
     expect(zh.browserCompatibilityNotice).toContain('兼容模式')
-    // OmniMux keeps browser access on its own switch in every window mode and
-    // scopes compatibility mode to local-network access only.
-    expect(zh.browserCompatibilityNotice).toContain('所有窗口模式')
+    // Browser access is gated to the compatibility shell: the settings toggle is
+    // disabled in every other mode (`desktopBrowserAccessAvailable`), so the copy
+    // must not promise access outside compatibility mode.
+    expect(zh.browserCompatibilityNotice).not.toContain('所有窗口模式')
     expect(zh.browserCompatibilityNotice).toContain('局域网')
     expect(zh.browserCompatibilityNotice).not.toContain('切换到兼容模式')
     expect(en.openBrowser).toMatch(/allow.+(?:open|opening).+browser/iu)
     expect(en.openBrowser).not.toMatch(/after startup|automatically/iu)
     expect(en.webIntro).not.toMatch(/after startup|automatically/iu)
-    expect(en.browserCompatibilityNotice).toMatch(/every window mode/iu)
+    expect(en.browserCompatibilityNotice).not.toMatch(/every window mode/iu)
+    expect(en.browserCompatibilityNotice).toMatch(/compatibility mode/iu)
     expect(en.browserCompatibilityNotice).toMatch(/local-network/iu)
     expect(en.browserCompatibilityNotice).not.toMatch(/switch(?:es|ing)?.+profile/iu)
     expect(zh.lanTrustNotice).toContain('安装并信任')

@@ -279,8 +279,8 @@ function normalizedUpdate(
   if (typeof value.openBrowser !== 'boolean') {
     throw new TypeError(`${BIN_NAME}: Setup Wizard openBrowser must be a boolean`)
   }
-  // OmniMux keeps browser access on its own switch in every window mode; the LAN
-  // listener stays a compatibility-shell feature.
+  // Browser access is gated to the compatibility shell (see
+  // `desktopBrowserAccessAvailable`); outside it the wizard records loopback only.
   const openBrowser = value.openBrowser
   const networkExposure = desktopNetworkExposureForBrowserAccess(
     openBrowser,

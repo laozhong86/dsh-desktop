@@ -15,11 +15,39 @@
  *   node scripts/build-plugin-index.mjs --out <path>    # custom output path
  */
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+
+/**
+ * Publication timestamp recorded on every version entry.
+ *
+ * Format 1 requires an integer Unix-seconds value. It is derived from the plugin
+ * manifest's mtime rather than "now" so that regenerating an unchanged index is a
+ * no-op and `--check` stays meaningful.
+ */
+function publishTimestamp(pluginsRoot, dir) {
+  try {
+    return Math.floor(statSync(join(pluginsRoot, dir, 'package.json')).mtimeMs / 1000)
+  } catch {
+    return Math.floor(Date.now() / 1000)
+  }
+}
+
+/**
+ * Normalize a manifest repository URL to the plain http(s) form format 1 accepts.
+ *
+ * npm manifests commonly carry a `git+https://…` prefix and a trailing `.git`;
+ * the index validator rejects both.
+ */
+function repositoryHref(value) {
+  const raw = typeof value === "string" ? value : value?.url
+  if (typeof raw !== "string" || raw.length === 0) return undefined
+  const href = raw.replace(/^git\+/u, "").replace(/\.git$/u, "")
+  return /^https?:\/\//u.test(href) ? href : undefined
+}
 
 /** Plugins we publish. Keep this list explicit so nothing ships unreviewed. */
 const PUBLISHED_PLUGINS = [
@@ -56,7 +84,7 @@ function readManifest(pluginsRoot, dir) {
 
 function entryFor(pluginsRoot, spec) {
   const manifest = readManifest(pluginsRoot, spec.dir)
-  const repositoryUrl = typeof manifest.repository === 'string' ? manifest.repository : manifest.repository?.url
+  const repositoryUrl = repositoryHref(manifest.repository)
   const entry = {
     name: manifest.name,
     title: spec.title,
@@ -69,7 +97,10 @@ function entryFor(pluginsRoot, spec) {
     versions: [
       {
         version: manifest.version,
-        source: repositoryUrl ? { type: 'git', url: repositoryUrl } : { type: 'npm', name: manifest.name },
+        // Format 1 requires a publication timestamp; a git source additionally needs
+        // a 40-hex commit, which we do not track here, so npm is the only honest shape.
+        publishTimestamp: publishTimestamp(pluginsRoot, spec.dir),
+        source: { type: 'npm' },
       },
     ],
   }
@@ -86,11 +117,19 @@ function buildIndex(pluginsRoot) {
       en: 'Plugins reviewed and published by the OmniMux team.',
       zh: '由 OmniMux 团队审核并发布的插件。',
     },
+    // Every category a plugin names must be declared here first: the format-1
+    // validator rejects a `metadata.category` that references an unknown id.
+    metadata: {
+      categories: {
+        core: { title: { en: 'Core', zh: '核心' } },
+        market: { title: { en: 'Market', zh: '市场' } },
+      },
+    },
     plugins: PUBLISHED_PLUGINS.map(spec => entryFor(pluginsRoot, spec)),
   }
 }
 
-function main() {
+async function main() {
   const args = process.argv.slice(2)
   const check = args.includes('--check')
   const outIndex = args.indexOf('--out')
@@ -110,6 +149,17 @@ function main() {
   if (!pluginsRoot) throw new Error(`cannot locate the plugin sources; tried:\n  ${candidates.join('\n  ')}`)
 
   const index = buildIndex(pluginsRoot)
+  // Validate with the reader's own parser before anything is written. A generator
+  // that only round-trips its own output cannot notice a format violation, and the
+  // market client would be the first to find out.
+  const { parseMarketIndex } = await import(
+    join(ROOT_DIR, 'dsh-desktop-next', 'node_modules', '@deepseek-ai', 'dsh-plugin-market-index', 'lib', 'index.js')
+  )
+  try {
+    parseMarketIndex(index, 'https://dl.omnimux.ai/plugins/dsh-index.json')
+  } catch (error) {
+    throw new Error(`generated index violates format 1: ${error.message}${error.path ? ` (at ${error.path})` : ''}`)
+  }
   const serialized = `${JSON.stringify(index, null, 2)}\n`
 
   if (check) {
@@ -126,4 +176,4 @@ function main() {
   for (const plugin of index.plugins) console.log(`  - ${plugin.name}@${plugin.versions[0].version}`)
 }
 
-main()
+await main()

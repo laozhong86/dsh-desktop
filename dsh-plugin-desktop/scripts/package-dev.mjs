@@ -23,6 +23,12 @@ export function packageDev({ platform = process.platform, arch = process.arch, r
   const appPath = join(packageRoot, 'dist', arch === 'arm64' ? 'mac-arm64' : 'mac', `${build.productName}.app`)
   const steps = [
     ['corepack', ['yarn', 'run', 'build']],
+    // `package:dir` runs these two before staging; without them electron-builder
+    // fails on the native prebuild (Electron ABI mismatch) or on the missing
+    // primary-runtime payload. Keep the same order so a Dev build and a plain
+    // directory build cannot drift apart again.
+    [process.execPath, [join(packageRoot, 'scripts', 'prepare-fs-ext.ts')]],
+    [process.execPath, [join(packageRoot, 'scripts', 'prepare-runtime.ts')]],
     [process.execPath, [join(packageRoot, 'scripts', 'stage-preset-profile.ts'), '--channel', 'development']],
     [process.execPath, [join(packageRoot, 'scripts', 'package-dir.mjs')]],
     [process.execPath, [join(packageRoot, 'scripts', 'stamp-dev-app.mjs'), appPath]],

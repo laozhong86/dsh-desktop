@@ -6,6 +6,32 @@
 
 ---
 
+## 0. 打包环境前置条件
+
+打包脚本对 Node 版本有硬性要求，**版本不符会直接拒绝**，不是警告：
+
+```
+macOS DMG smoke requires Node 22.19+ or Node 24.x with bundled Corepack; received 25.8.0
+```
+
+- **允许**：Node `22.19+`（22.x 线）或 Node `24.x`
+- **拒绝**：Node `25.x` 及更高（未验证的 V8 与 Corepack 组合）
+- **必须带 Corepack**：脚本通过 Corepack 解析 Yarn 4.18.0，裸装的 Node 不够
+
+本机若默认 Node 是 25.x，打包前先切版本：
+
+```sh
+export PATH="$HOME/.nvm/versions/node/v24.18.1/bin:$PATH"
+node --version   # 确认 24.18.1
+```
+
+打包前还需按仓库契约完成两项准备，否则会启动崩溃或依赖解析失败：
+
+1. **stage preset**：`OMNIMUX_PLUGINS_DIR=<插件目录> yarn omnimux:stage`（未 stage 会触发 `missing dsh-better-sidebar` 恢复窗口）
+2. **依赖完整**：`corepack yarn install --immutable`（依赖树空心会让 electron-builder 在缺生产依赖时中断）
+
+---
+
 ## 1. 跨平台产物架构规范
 
 ### 1.1 macOS 产物规范（Apple Silicon vs Intel）

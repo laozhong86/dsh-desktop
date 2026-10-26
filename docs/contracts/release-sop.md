@@ -26,16 +26,58 @@
 
 ---
 
-## 2. Cloudflare R2 亚太 CDN 存储与直链拓扑
+## 2. 双渠道分发：GitHub Release + Cloudflare R2
+
+发行版资产**只构建一次**，随后由同一次 workflow 上传到**两个独立渠道**。渠道是分发手段的差异，不是构建流程的差异——不存在"GitHub 专用包"或"R2 专用包"。
+
+### 2.1 渠道职责
+
+| 渠道 | 定位 | 优势 | 国内可用性 |
+| --- | --- | --- | --- |
+| **GitHub Release** | 开源社区门面 + 版本归档 | 免费、公开可见、有历史版本 | 一般（受网络影响） |
+| **Cloudflare R2**（`dl.omnimux.ai`） | 国内主分发 | 亚太节点、免出站流量费 | 好 |
+
+两个渠道承载**完全相同的文件**。用户从任一处下载得到的安装包字节一致。
+
+### 2.2 发布流程（单次构建，双渠道上传）
+
+`.github/workflows/release.yml` 的 `publish` job 顺序执行：
+
+1. **汇总产物**：`download-artifact` 把 `build-mac` / `build-win` 的产物合并到 `release-assets/`
+2. **上传 GitHub Release**：`softprops/action-gh-release` 按 `release-assets/**/*.{dmg,exe,zip}` 发布
+3. **同步 R2**：`node scripts/r2-dist-sync.mjs upload --dir release-assets`
+
+### 2.3 渠道解耦（重要）
+
+两个渠道**互不阻塞**：
+
+- **GitHub Release 失败** → 整个 publish 失败，需要排查。
+- **R2 失败或未配置** → 只跳过 R2，GitHub Release 照常发布。
+
+R2 步骤带条件判断：`CLOUDFLARE_API_TOKEN` 与 `CLOUDFLARE_ACCOUNT_ID` **两个 secret 都齐备**时才执行。缺任一个就跳过，不会因拼出 `accounts/undefined` 的 URL 而静默失败。
+
+### 2.4 凭据管理
+
+| 环境 | 存放位置 | 注入方式 |
+| --- | --- | --- |
+| CI 发布 | GitHub Actions Secrets | workflow 直接读 `secrets.*` |
+| 本地开发 | 1Password Environment | `op run --environment <id> -- <cmd>` |
+| 代码仓库 | **不存放任何凭据** | 只读 `process.env` |
+
+**Account ID 与 API Token 一律不进仓库**。`r2-dist-sync.mjs` 要求 `CLOUDFLARE_ACCOUNT_ID` 必填，缺失时明确报错。本地凭据统一由 1Password 托管，不使用 `~/.wrangler/config/default.toml` 这类明文落盘文件。
+
+---
+
+## 3. Cloudflare R2 亚太 CDN 存储与直链拓扑
 
 所有发行版二进制资产均托管于 Cloudflare R2 亚太存储桶（亚太位置，国内与全球下载免出站流量费），并通过自定义域名 `https://dl.omnimux.ai` 全球 CDN 加速。
 
-### 2.1 存储桶元数据
+### 3.1 存储桶元数据
 - **存储桶名称**：`omnimux-dist`
 - **Account ID**：由 CI secret `CLOUDFLARE_ACCOUNT_ID` 提供（不写入文档）
 - **绑定自定义域名**：`https://dl.omnimux.ai` (Zone: `omnimux.ai`, 证书与 SSL: 活跃)
 
-### 2.2 存储路径标准拓扑
+### 3.2 存储路径标准拓扑
 ```
 omnimux-dist (Bucket Root)
 ├── health.txt                                          # 监控与探活探针
@@ -56,7 +98,7 @@ omnimux-dist (Bucket Root)
 
 ---
 
-## 3. Agent 发版命令速查表（CLI Matrix）
+## 4. Agent 发版命令速查表（CLI Matrix）
 
 | 阶段 | 命令 | 说明 |
 | :--- | :--- | :--- |
@@ -75,15 +117,15 @@ omnimux-dist (Bucket Root)
 
 ---
 
-## 4. 分发渠道策略
+## 5. 分发渠道策略
 
-### 4.1 官网（当前 Windows 主路径）
+### 5.1 官网（当前 Windows 主路径）
 - Installer URL：`https://dl.omnimux.ai/releases/v<version>/OmniMux-<version>-x64-Setup.exe`
 - 最新指针：`https://dl.omnimux.ai/releases/latest/OmniMux-Setup.exe`
 - SmartScreen / 未知发布者文案：见 [windows-website-distribution.md](./windows-website-distribution.md)
 - 下载页信息架构 / 主 CTA / 禁止链：见 [download-page-spec.md](./download-page-spec.md)
 
-### 4.2 Microsoft Store（暂停）
+### 5.2 Microsoft Store（暂停）
 - **开发者账号**：`laozhong86@gmail.com`（个人开发者资质认证已通过；一次性注册费 ≠ 代码签名费）
 - **应用名称**：`OmniMux`
 - **Product ID**：`18c7607a-4248-4706-b796-c104bbf2ed42`

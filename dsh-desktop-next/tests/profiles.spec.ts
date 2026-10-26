@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { afterEach, expect, it, vi } from 'vitest'
 import { composeEntries, loadOverlayPatches, loadProfileDirectory, OPTIONAL_BUNDLES } from '@deepseek-ai/dsh-app-boot'
 import { AA_PACKAGE, COMMUNITY_MARKET_PACKAGE, DSH_MARKET_PACKAGE, loadNextProfile, NEXT_PACKAGE, NextProfiles, OFFICIAL_MARKET_PACKAGE, profileName, readNextProfilePatches, WEB_BUNDLES } from '../src/profiles.ts'
-import { DEFAULT_OFFICIAL_MARKET_INDEX_URL } from '../src/profile-plugin-market.ts'
+import { DEFAULT_OFFICIAL_MARKET_INDEX_URL, OMNIMUX_MARKET_INDEX_URL } from '../src/profile-plugin-market.ts'
 import * as privateFiles from '../src/private-files.ts'
 import * as linkProjections from '../../dsh-plugin-desktop/src/link-projections.ts'
 
@@ -128,7 +128,7 @@ it('enables the official custom plugin market bundle and preconfigures the built
   const profile = loadNextProfile(dir, manager.home)
   const rows = composeEntries([...profile.layers.map(layer => layer.patches), profile.patches])
   expect(rows.find(row => row.id === 'plugin-market')?.config).toEqual({
-    indexes: [DEFAULT_OFFICIAL_MARKET_INDEX_URL, 'https://example.com/custom-index.json'],
+    indexes: [OMNIMUX_MARKET_INDEX_URL, DEFAULT_OFFICIAL_MARKET_INDEX_URL, 'https://example.com/custom-index.json'],
   })
   manager.finishOnboarding('desktop', { features: { market: false, dshMarket: true, officialMarket: true, remoteControl: false }, computerUse: false })
   expect(manager.features('desktop')).toEqual({ market: false, dshMarket: true, officialMarket: true, remoteControl: false })

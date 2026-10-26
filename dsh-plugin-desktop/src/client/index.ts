@@ -27,6 +27,7 @@ import { applyExtendedShell } from './extended-shell.ts'
 import { installDesktopLaunchWorkspaceBridge } from './launch-workspace.ts'
 import { DESKTOP_SETTINGS_FORMS_SERVICE } from './settings-bridge.ts'
 import { installSidebarFooterStyles } from './sidebar-footer-styles.ts'
+import { installDesktopTitleBarDoubleClick } from './titlebar-double-click.ts'
 import { desktopWindowService, provideDesktopWindow } from './window-service.ts'
 
 export { applyAdvancedShell } from './advanced-shell.ts'
@@ -156,6 +157,12 @@ export function apply(ctx: ClientContext): void {
     ctx.effect(
       () => installDesktopDirectoryPickerBridge(),
       'dsh-plugin-desktop: native directory picker bridge',
+    )
+  }
+  if (environment.platform !== 'linux') {
+    ctx.effect(
+      () => installDesktopTitleBarDoubleClick(environment.platform),
+      'dsh-plugin-desktop: native titlebar double-click',
     )
   }
   if (environment.mode === 'advanced') applyAdvancedShell(ctx, environment)

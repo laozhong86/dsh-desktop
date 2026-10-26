@@ -41,10 +41,12 @@ function mockSpawnSuccess() {
 }
 
 it('rejects Stable installers and an unexpected release even when the archive is valid', () => {
-  expect(() => assertNextMacBundle('ai.deepseek.dsh.desktop.next', { name: 'dsh-desktop-next', version: '2.0.14-next' }, '2.0.14-next')).not.toThrow()
-  expect(() => assertNextMacBundle('ai.deepseek.dsh.desktop', { name: 'dsh-desktop-next', version: '2.0.14-next' }, '2.0.14-next')).toThrow()
-  expect(() => assertNextMacBundle('ai.deepseek.dsh.desktop.next', { name: 'dsh-desktop-next', version: '2.0.13-next' }, '2.0.14-next')).toThrow()
-  expect(() => assertNextWindowsInstaller({ ProductName: 'DSH NEXT', ProductVersion: '2.0.14-next' }, '2.0.14-next')).not.toThrow()
+  // OmniMux shares one bundle identifier across editions, so the package name and the
+  // embedded version carry the distinction: the Stable shell ships dsh-plugin-desktop.
+  expect(() => assertNextMacBundle('ai.omnimux.desktop', { name: 'dsh-desktop-next', version: '2.0.14-next' }, '2.0.14-next')).not.toThrow()
+  expect(() => assertNextMacBundle('ai.omnimux.desktop', { name: 'dsh-plugin-desktop', version: '2.0.14-next' }, '2.0.14-next')).toThrow()
+  expect(() => assertNextMacBundle('ai.omnimux.desktop', { name: 'dsh-desktop-next', version: '2.0.13-next' }, '2.0.14-next')).toThrow()
+  expect(() => assertNextWindowsInstaller({ ProductName: 'OmniMux', ProductVersion: '2.0.14-next' }, '2.0.14-next')).not.toThrow()
   expect(() => assertNextWindowsInstaller({ ProductName: 'DSH Desktop', ProductVersion: '2.0.14-next' }, '2.0.14-next')).toThrow()
 })
 
@@ -54,14 +56,14 @@ it('launches the Windows NSIS installer visibly without /S so progress is shown 
   await writeFile(exe, 'installer')
   execFileMock.mockImplementation((_file: string, _args: string[], _opts: unknown, callback: (err: Error | null, stdout: string, stderr: string) => void) => {
     callback(null, JSON.stringify({
-      ProductName: 'DSH NEXT',
+      ProductName: 'OmniMux',
       ProductVersion: '2.0.18-next.1',
     }), '')
   })
   mockSpawnSuccess()
   const installer = new NextUpdateInstaller({
     platform: 'win32',
-    executable: 'C:\\Users\\user\\AppData\\Local\\Programs\\DSH NEXT\\DSH NEXT.exe',
+    executable: 'C:\\Users\\user\\AppData\\Local\\Programs\\OmniMux\\OmniMux.exe',
     log: vi.fn(),
   })
   await installer.prepare(exe, '2.0.18-next.1', root, new AbortController().signal)
@@ -78,8 +80,8 @@ it('launches the Windows NSIS installer visibly without /S so progress is shown 
 it('stages the verified macOS app bundle and launches the detached progress updater script', async () => {
   const root = await mkdtemp(join(tmpdir(), 'next-mac-update-')); roots.push(root)
   const applications = join(root, 'Applications')
-  const installedBundle = join(applications, 'DSH NEXT.app')
-  const installedExecutable = join(installedBundle, 'Contents', 'MacOS', 'DSH NEXT')
+  const installedBundle = join(applications, 'OmniMux.app')
+  const installedExecutable = join(installedBundle, 'Contents', 'MacOS', 'OmniMux')
   await mkdir(join(installedBundle, 'Contents', 'MacOS'), { recursive: true })
   await writeFile(installedExecutable, 'binary')
   const staging = join(root, 'staging')
@@ -90,7 +92,7 @@ it('stages the verified macOS app bundle and launches the detached progress upda
   execFileMock.mockImplementation((file: string, args: string[], _opts: unknown, callback: (err: Error | null, stdout: string, stderr: string) => void) => {
     if (file === '/usr/bin/hdiutil' && args[0] === 'attach') {
       const mountPoint = args[args.indexOf('-mountpoint') + 1]!
-      const mountedBundle = join(mountPoint, 'DSH NEXT.app')
+      const mountedBundle = join(mountPoint, 'OmniMux.app')
       mkdir(join(mountedBundle, 'Contents', 'Resources', 'app'), { recursive: true })
         .then(() => writeFile(join(mountedBundle, 'Contents', 'Resources', 'app', 'package.json'), JSON.stringify({
           name: 'dsh-desktop-next',
@@ -100,7 +102,7 @@ it('stages the verified macOS app bundle and launches the detached progress upda
       return
     }
     if (file === '/usr/libexec/PlistBuddy') {
-      callback(null, 'ai.deepseek.dsh.desktop.next\n', '')
+      callback(null, 'ai.omnimux.desktop\n', '')
       return
     }
     if (file === '/usr/bin/codesign' && args[0] === '--verify') {
@@ -139,7 +141,7 @@ it('stages the verified macOS app bundle and launches the detached progress upda
   expect(command).toBe('/bin/sh')
   expect(args[0]).toBe('-c')
   expect(spawnOptions.detached).toBe(true)
-  expect(spawnOptions.env.DSH_UPDATE_STAGED).toBe(join(staging, 'DSH NEXT.app'))
+  expect(spawnOptions.env.DSH_UPDATE_STAGED).toBe(join(staging, 'OmniMux.app'))
   expect(spawnOptions.env.DSH_UPDATE_INSTALLED).toBe(installedBundle)
   expect(spawnOptions.env.DSH_UPDATE_MESSAGE).toContain('2.0.18-next.1')
 })

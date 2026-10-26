@@ -1,6 +1,6 @@
 {
   "source": "app-icon.icon",
-  "sourceSha256": "005450a20348fe258498e0ad3f01db7455f5ff334764e0b31519d8c0da09934a",
+  "sourceSha256": "e81c260981b054333e32dcd738eeaba2f6d1d10118ce01eb41dc275d38c424fe",
   "mac": {
     "input": "app-icon.icon",
     "legacy": "app-icon.icns",
@@ -13,9 +13,9 @@
     "size": 1024
   },
   "outputs": {
-    "app-icon.png": "b6103232a0769bb05522370bb2690b5b66caa5e81c2abbefdd6f65d7e6d78df6",
-    "app-icon-mac.png": "aa7364928b221e4e595e57c3e1fb3c8e8837085d0a9e696d93e56e2592493a42",
-    "app-icon.ico": "e1ea4b54e6192c52272d069562fb99cb8ad076b6ec7523c0edc6933a802feb49",
-    "app-icon.icns": "e8af0bda87cdb2c51ed4a7741b8c9a9d0ceb2871dcd8c770971083b2c7c12bb8"
+    "app-icon.png": "5f3397c1cf30178c355c3de2570e305ecc954830b30949ba6d4ff4c893d9343c",
+    "app-icon-mac.png": "8eeb7303491caf58687e52d69098b7c102691f1c6d16b99b2c0f5d35a69031a3",
+    "app-icon.ico": "dd3770edac0bfb64197866f3bb76b64933ab600e95e3fcafe3ed994656642a27",
+    "app-icon.icns": "0d4afe6df8887d73e5b9031e485b9e4ffa6071097b570cbbf6195241bda968e8"
   }
 }

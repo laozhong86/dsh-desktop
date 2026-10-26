@@ -129,7 +129,7 @@ it('materializes, cleans and seals the payload the archive is later checked agai
   expect(() => verifyNextPayload(physicalPayload(output))).not.toThrow()
   expect(log).toEqual([expect.stringMatching(/^Materialized \d+ packages for /u),
     ...(target.platform === 'win32' ? [expect.stringMatching(/^Discovered \d+ Windows PE files while hashing the payload$/u)] : []),
-    expect.stringMatching(new RegExp(`^Sealed the prepared payload: \\d+ files; DSH NEXT 2\\.0\\.1-next, dsh 1\\.0\\.0, Electron 44\\.0\\.0, pnpm ${FIXTURE_RELEASE.pnpmVersion.replaceAll('.', '\\.')}$`, 'u'))])
+    expect.stringMatching(new RegExp(`^Sealed the prepared payload: \\d+ files; OmniMux 2\\.0\\.1-next, dsh 1\\.0\\.0, Electron 44\\.0\\.0, pnpm ${FIXTURE_RELEASE.pnpmVersion.replaceAll('.', '\\.')}$`, 'u'))])
   // Preparing again starts from an empty directory and, without a drill version, keeps the manifest version.
   writeFileSync(join(output, 'stale'), '')
   await preparePayload({ desktopRoot: desktop, output, target, electronVersion: '44.0.0' })

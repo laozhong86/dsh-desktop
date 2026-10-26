@@ -4,6 +4,26 @@
 
 ---
 
+## 2026-10-26 · Next 壳品牌化为 OmniMux（产品壳迁移第一阶段）
+
+- **背景**：Next 壳作为灰度观察对象引入后，一直用上游身份（`DSH NEXT` / `ai.deepseek.dsh.desktop.next` / `~/.dsh`），本仓不打品牌、不打包、不发布。本次把它作为产品壳交付的第一步：完成品牌化并接入发布链路，但**尚未切换出厂默认**——`dsh-plugin-desktop` 仍是当前出厂线。
+- **补丁审计结论（修正版）**：审计发现上游 `anywhere-labs/deepseek-harness-desktop` 自身维护 `patches/` 目录（188 个文件）。本仓 32 个补丁中 **31 个与上游逐字节一致**，唯一属于本仓的是 `dsh-client-ui-settings-account`（我们 262 行 vs 上游 101 行，其中 23 行是 OmniMux 账户桥）。**补丁债极轻**，此前「需重构 4 个身份类补丁」的判断已作废。详见 `docs/contracts/patch-audit-corrected.md`。
+- **品牌化改动**：
+  1. 新增 `dsh-desktop-next/src/product-identity.ts` 作为单一身份来源，与旧壳同构（stable: OmniMux / ai.omnimux.desktop / .omnimux；development: OmniMux-Dev / .omnimux-dev）。
+  2. 两个承重值：`appId` 沿用已发布标识（系统视为同一应用升级），`homeDirectoryName` 沿用 `.omnimux`（老用户会话/设置/插件仍可见）。
+  3. 打包 productName/appId/artifactName、macOS 权限文案、窗口与菜单文案、Helper 与产物路径、`NEXT_APP_ID` 全部收口到身份来源。
+  4. 图标从上游 DSH 资产换为旧壳在用的 OmniMux 资产（icns/ico/png/icon 目录/resources.json）。
+- **更新校验语义变更**：品牌化后 Next 与 Stable 共用 appId，原「靠 appId 区分两个安装包」失效。按老板决定改为**包名 + 内嵌版本**区分——这正是「同一应用升级」的正确语义。
+- **发布链路**：Next 的 `scripts/package.ts` 本身已具备发布能力（mac 走 `releaseMac`，含签名与公证；复用旧壳的 `release-preflight` 与 `sign-runtime`）。本次只补根级入口：`package:dir:next` / `dist:mac:next` / `dist:mac-smoke:next` / `dist:win:next` / `dist:win-portable:next` / `check:next`。
+- **验证**：`dsh-desktop-next` 717 个测试全绿（3 skipped）、typecheck exit 0、`check:next` exit 0（含 Next Host smoke）。
+- **未做（如实登记）**：
+  1. **未做**：真实签名与公证链路未在本轮跑（需要 release 凭据）。
+  2. **未做**：出厂默认仍是 `dsh-plugin-desktop`，切壳是独立决定。
+  3. **未做**：Windows 侧安装包未在真机验证。
+- **AGENTS.md 同步**：两处「never brands / never shipped」表述已更新为当前事实。
+
+---
+
 ## 2026-10-25 · 验收达成：`corepack yarn check` = exit 0
 
 - **真实命令与结果**（受管环境 `env -u NODE_OPTIONS PATH=<managed node 22.22.2>/bin:/usr/bin:/bin:/usr/sbin:/sbin`，worktree `.worktrees/next-shell-merge-issue-3778`）：

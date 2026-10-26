@@ -52,8 +52,8 @@ function runPackagedNode(path: string, args: readonly string[], timeout: number,
 }
 
 async function verifyFinalArtifacts(result: { outDir: string }): Promise<string[]> {
-  const paths = ['mac/DSH NEXT.app/Contents/MacOS/DSH NEXT', 'mac-arm64/DSH NEXT.app/Contents/MacOS/DSH NEXT',
-    'mac-universal/DSH NEXT.app/Contents/MacOS/DSH NEXT', 'win-unpacked/DSH NEXT.exe', 'linux-unpacked/dsh-desktop-next']
+  const paths = ['mac/OmniMux.app/Contents/MacOS/OmniMux', 'mac-arm64/OmniMux.app/Contents/MacOS/OmniMux',
+    'mac-universal/OmniMux.app/Contents/MacOS/OmniMux', 'win-unpacked/OmniMux.exe', 'linux-unpacked/dsh-desktop-next']
   const executables = paths.map(path => join(result.outDir, path)).filter(existsSync)
   if (!executables.length) throw new Error('No packaged Next executable to verify')
   const expectedVersion = expectedNextVersion(desktopRoot)

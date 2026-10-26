@@ -788,7 +788,13 @@
     "omnimux:profile": "node scripts/omnimux.mjs profile",
     "omnimux:stage": "node scripts/omnimux.mjs stage",
     "omnimux:verify": "node scripts/omnimux.mjs verify",
-    "omnimux:path": "node scripts/omnimux.mjs path"
+    "omnimux:path": "node scripts/omnimux.mjs path",
+    "package:dir:next": "yarn aa:prepare-release && yarn workspace dsh-community-market build && yarn workspace dsh-desktop-next package:dir",
+    "dist:mac:next": "yarn aa:prepare-release && yarn workspace dsh-community-market build && yarn workspace dsh-desktop-next dist:mac",
+    "dist:mac-smoke:next": "yarn aa:prepare-release && yarn workspace dsh-community-market build && yarn workspace dsh-desktop-next dist:mac-smoke",
+    "dist:win:next": "yarn aa:prepare-release && yarn workspace dsh-community-market build && yarn workspace dsh-desktop-next dist:win",
+    "dist:win-portable:next": "yarn aa:prepare-release && yarn workspace dsh-community-market build && yarn workspace dsh-desktop-next dist:win-portable",
+    "check:next": "yarn workspace dsh-desktop-next check"
   },
   "version": "2.0.18"
 }

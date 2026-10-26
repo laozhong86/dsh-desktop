@@ -506,7 +506,7 @@ it('retains the Host when hiding to tray, restores the window, keeps failed-Host
     await vi.waitFor(() => expect(fixture.windows).toHaveLength(1))
     const window = fixture.windows[0]
     const tray = fixture.trays[0]
-    expect(tray.menu[0].label).toBe('打开 DSH NEXT')
+    expect(tray.menu[0].label).toBe('打开 OmniMux')
     expect(tray.menu.at(-1).accelerator).toBe('CmdOrCtrl+Q')
     expect(tray.menu.some((item: any) => item.accelerator === 'CmdOrCtrl+,')).toBe(true)
     const preventDefault = vi.fn()
@@ -556,9 +556,9 @@ it('retains the Host when hiding to tray, restores the window, keeps failed-Host
     expect(() => takeSettings({ sender: controls.webContents, senderFrame: controls.webContents.mainFrame })).toThrow('Rejected')
     fixture.phase = 'ready'
     fixture.handlers.get('dsh-next:locale')!({ ...sender, senderFrame: {} }, 'en')
-    expect(tray.menu[0].label).toBe('打开 DSH NEXT')
+    expect(tray.menu[0].label).toBe('打开 OmniMux')
     fixture.handlers.get('dsh-next:locale')!(sender, 'en')
-    expect(tray.menu[0].label).toBe('Open DSH NEXT')
+    expect(tray.menu[0].label).toBe('Open OmniMux')
     const { app, dialog, systemPreferences, desktopCapturer } = await import('electron')
     const previousUrl = controls.webContents.mainFrame.url
     expect((await fixture.onPermission!('query', 'screen')).status).not.toBe('granted')

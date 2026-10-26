@@ -18,9 +18,9 @@ it('retains a chosen data location across launches and reports malformed locatio
   expect(readDataDirectory(original)).toMatchObject({ home: original, error: expect.any(String) })
 })
 
-it('defaults to the shared user home while retaining the old Next-owned location preference', () => {
+it('defaults to the OmniMux home while retaining the old Next-owned location preference', () => {
   const user = home(), locationRoot = home(), selected = home()
-  const shared = join(user, '.dsh')
+  const shared = join(user, '.omnimux')
   expect(defaultDataDirectory(user)).toBe(shared)
   expect(readDataDirectory(shared, locationRoot)).toEqual({ home: shared })
   writeFileSync(join(locationRoot, 'desktop-next-location.json'), JSON.stringify({ home: selected }))

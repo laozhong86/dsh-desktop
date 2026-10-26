@@ -244,7 +244,7 @@ it('checks the running application against the sealed identity at startup', () =
   const file = join(app, DESKTOP_RUNTIME_FILE)
   const identity = { version: '2.0.0-next', dshVersion: readInstalledPackageVersion(app, '@deepseek-ai/dsh'), platform: process.platform, arch: process.arch }
   expect(verifyPackagedRuntimeIdentity(file, identity).release).toEqual(FIXTURE_RELEASE)
-  expect(() => verifyPackagedRuntimeIdentity(file, { ...identity, version: '2.0.1-next' })).toThrow(/does not belong to DSH NEXT 2\.0\.1-next/u)
+  expect(() => verifyPackagedRuntimeIdentity(file, { ...identity, version: '2.0.1-next' })).toThrow(/does not belong to OmniMux 2\.0\.1-next/u)
   expect(() => verifyPackagedRuntimeIdentity(file, { ...identity, dshVersion: '1.0.1' })).toThrow(/declares dsh 1\.0\.0 but 1\.0\.1 is installed/u)
   expect(() => verifyPackagedRuntimeIdentity(file, { ...identity, arch: 'mips' })).toThrow(/cannot run on/u)
   expect(() => verifyPackagedRuntimeIdentity(file, { ...identity, platform: 'aix' })).toThrow(/cannot run on/u)

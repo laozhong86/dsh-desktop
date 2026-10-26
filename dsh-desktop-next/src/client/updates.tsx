@@ -9,7 +9,7 @@ export function NextUpdateSettings({ state, language, run }: { state: DesktopSta
   const action = update ? updateAction(update) : undefined
   return <section className="dshDesktopSettingsGroup" data-next-updates>
     <h3>{state.platform === 'linux' ? t('桌面版本', 'Desktop version') : t('应用更新', 'App updates')}</h3>
-    <p className="dshDesktopSettingsHint">DSH NEXT · {state.version}</p>
+    <p className="dshDesktopSettingsHint">OmniMux · {state.version}</p>
     {update && <>
       <p role={update.phase === 'error' ? 'alert' : 'status'}>{updateLabel(update, language)}</p>
       {update.phase === 'ready' && <p className="dshDesktopSettingsHint">{t('安装时会重启应用并中断正在运行的任务，Profile 和会话会保留。', 'Installation restarts the app and interrupts running tasks. Profiles and sessions are retained.')}</p>}

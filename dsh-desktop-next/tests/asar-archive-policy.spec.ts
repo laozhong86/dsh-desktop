@@ -33,10 +33,10 @@ describe('Electron asar archive view', () => {
 
 describe('archive path mapping', () => {
   it('maps a path inside app.asar to its unpacked sibling and leaves every other path alone', () => {
-    expect(unpackedPath('/Applications/DSH NEXT.app/Contents/Resources/app.asar/node_modules/pnpm/bin/pnpm.mjs'))
-      .toBe('/Applications/DSH NEXT.app/Contents/Resources/app.asar.unpacked/node_modules/pnpm/bin/pnpm.mjs')
-    expect(unpackedPath('C:\\Program Files\\DSH NEXT\\resources\\app.asar\\scripts\\node-bin'))
-      .toBe('C:\\Program Files\\DSH NEXT\\resources\\app.asar.unpacked\\scripts\\node-bin')
+    expect(unpackedPath('/Applications/OmniMux.app/Contents/Resources/app.asar/node_modules/pnpm/bin/pnpm.mjs'))
+      .toBe('/Applications/OmniMux.app/Contents/Resources/app.asar.unpacked/node_modules/pnpm/bin/pnpm.mjs')
+    expect(unpackedPath('C:\\Program Files\\OmniMux\\resources\\app.asar\\scripts\\node-bin'))
+      .toBe('C:\\Program Files\\OmniMux\\resources\\app.asar.unpacked\\scripts\\node-bin')
     expect(unpackedPath('/x/app.asar')).toBe('/x/app.asar.unpacked')
     for (const path of ['/x/app.asar.unpacked/lib/a.js', '/repo/dsh-desktop-next/lib/host.js', '/x/node_modules/asar-helper/lib/index.js']) {
       expect(unpackedPath(path)).toBe(path)
@@ -44,7 +44,7 @@ describe('archive path mapping', () => {
   })
 
   it('recognizes only paths that run through the archive itself', () => {
-    expect(insideArchive('/Applications/DSH NEXT.app/Contents/Resources/app.asar/package.json')).toBe(true)
+    expect(insideArchive('/Applications/OmniMux.app/Contents/Resources/app.asar/package.json')).toBe(true)
     expect(insideArchive('C:\\DSH\\resources\\APP.ASAR\\lib\\main.js')).toBe(true)
     expect(insideArchive('/x/app.asar.unpacked/node_modules/pnpm/bin/pnpm.mjs')).toBe(false)
     expect(insideArchive('/repo/dsh-desktop-next/package.json')).toBe(false)

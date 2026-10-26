@@ -1,59 +1,60 @@
 {
-  "fill" : "system-dark",
-  "groups" : [
+  "fill": "system-dark",
+  "groups": [
     {
-      "layers" : [
+      "layers": [
         {
-          "image-name" : "NEXT Badge.svg",
-          "name" : "NEXT Badge",
-          "position" : {
-            "scale" : 1,
-            "translation-in-points" : [
+          "image-name": "NEXT Badge.svg",
+          "name": "NEXT Badge",
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
               -88,
               0
             ]
           }
         }
       ],
-      "name" : "NEXT Badge",
-      "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.5
+      "name": "NEXT Badge",
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
       },
-      "translucency" : {
-        "enabled" : true,
-        "value" : 0.3
-      }
+      "translucency": {
+        "enabled": true,
+        "value": 0.3
+      },
+      "hidden": true
     },
     {
-      "layers" : [
+      "layers": [
         {
-          "image-name" : "DeepSeek.svg",
-          "name" : "DeepSeek",
-          "position" : {
-            "scale" : 1,
-            "translation-in-points" : [
+          "image-name": "DeepSeek.svg",
+          "name": "DeepSeek",
+          "position": {
+            "scale": 1,
+            "translation-in-points": [
               27,
               23
             ]
           }
         }
       ],
-      "name" : "DeepSeek",
-      "shadow" : {
-        "kind" : "neutral",
-        "opacity" : 0.5
+      "name": "DeepSeek",
+      "shadow": {
+        "kind": "neutral",
+        "opacity": 0.5
       },
-      "translucency" : {
-        "enabled" : true,
-        "value" : 0.3
+      "translucency": {
+        "enabled": true,
+        "value": 0.3
       }
     }
   ],
-  "supported-platforms" : {
-    "circles" : [
+  "supported-platforms": {
+    "circles": [
       "watchOS"
     ],
-    "squares" : "shared"
+    "squares": "shared"
   }
 }

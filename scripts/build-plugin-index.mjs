@@ -60,15 +60,18 @@ const PUBLISHED_PLUGINS = [
       zh: 'OmniMux 中枢：应用、任务看板、专家馆，以及其他 OmniMux 插件依附的壳入口。',
     },
   },
-  {
-    dir: 'omnimux-market',
-    category: 'market',
-    title: { en: 'OmniMux Market', zh: 'OmniMux 市场' },
-    description: {
-      en: 'Browse and install OmniMux plugins from the market index.',
-      zh: '从市场索引浏览并安装 OmniMux 插件。',
-    },
-  },
+  // omnimux-market is held back from the index: its package is 142.5 MB because
+  // `catalog/` carries 136 MB of images, and npm aborts that upload with EPIPE.
+  // It returns once the assets move to the CDN and the package is code-only.
+  // {
+  //   dir: 'omnimux-market',
+  //   category: 'market',
+  //   title: { en: 'OmniMux Market', zh: 'OmniMux 市场' },
+  //   description: {
+  //     en: 'Browse and install OmniMux plugins from the market index.',
+  //     zh: '从市场索引浏览并安装 OmniMux 插件。',
+  //   },
+  // },
 ]
 
 function readManifest(pluginsRoot, dir) {

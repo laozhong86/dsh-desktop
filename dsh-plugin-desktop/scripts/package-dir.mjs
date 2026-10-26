@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 import { electronBuilderEnvironment } from './electron-builder-environment.ts'
 import { withoutWindowsSigningSecrets } from './package-win.ts'
 import { withoutMacReleaseSecrets } from './release-preflight.ts'
-import { readdirSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { writeAppBuildInfo } from './build-info.mjs'
 
 const require = createRequire(import.meta.url)
@@ -75,6 +75,17 @@ export function packageDirectory(options = {}) {
 }
 
 const invokedPath = process.argv[1]
+/** Locate the packaged release-channel marker: `asar: false` keeps app content in
+ * `Resources/app`, while an asar build would unpack it to `app.asar.unpacked`. */
+function packagedMarkerPath(appPath) {
+  const candidates = [
+    join(appPath, 'Contents', 'Resources', 'app', 'preset', 'plugins', 'omnimux', 'src', 'release-channel.json'),
+    join(appPath, 'Contents', 'Resources', 'app.asar.unpacked', 'preset', 'plugins', 'omnimux', 'src', 'release-channel.json'),
+  ]
+  const found = candidates.find(candidate => existsSync(candidate))
+  return found ?? candidates[0]
+}
+
 if (invokedPath !== undefined && fileURLToPath(import.meta.url) === resolve(invokedPath)) {
   packageDirectory()
   // Record build provenance so any agent can identify the source tree of this app.
@@ -83,7 +94,7 @@ if (invokedPath !== undefined && fileURLToPath(import.meta.url) === resolve(invo
     for (const name of readdirSync(appDir)) {
       if (!name.endsWith('.app')) continue
       const appPath = join(appDir, name)
-      const markerPath = join(appPath, 'Contents', 'Resources', 'app.asar.unpacked', 'preset', 'plugins', 'omnimux', 'src', 'release-channel.json')
+      const markerPath = packagedMarkerPath(appPath)
       const { channel } = JSON.parse(readFileSync(markerPath, 'utf8'))
       writeAppBuildInfo(appPath, channel === 'development' ? 'package-dev' : 'package-dir')
     }

@@ -155,6 +155,10 @@ jobs:
           node scripts/build-release-metadata.mjs \
             --version "$(node -p "require('./package.json').version")" \
             --dir release-assets
+      # Plugins ship independently of the application, so the market index is a
+      # released object of its own rather than something baked into the build.
+      - name: Generate plugin index
+        run: node scripts/build-plugin-index.mjs
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2
         with:

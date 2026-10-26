@@ -362,6 +362,17 @@ async function main() {
       console.log(`  ⚠️  未找到版本元数据目录 ${metadataDir}；应用将无法发现更新`)
     }
 
+    // Plugin market index. Plugins ship independently of the desktop application, so
+    // this object is the only thing that tells an installed build what is available.
+    const indexFile = join(ROOT_DIR, 'dist', 'dsh-index.json')
+    if (existsSync(indexFile)) {
+      const stat = statSync(indexFile)
+      uploadPlan.push({ key: 'plugins/dsh-index.json', file: indexFile, size: stat.size })
+      console.log(`  • 插件索引: ${indexFile}`)
+    } else {
+      console.log(`  ⚠️  未找到插件索引 ${indexFile}；请先运行 scripts/build-plugin-index.mjs`)
+    }
+
     console.log(`\n📤 开始同步 ${uploadPlan.length} 个分发节点...`)
     for (const item of uploadPlan) {
       const existingSize = existingMap.get(item.key)

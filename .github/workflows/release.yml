@@ -44,16 +44,9 @@ jobs:
         run: node scripts/verify-version.mjs
       - name: Install dependencies
         run: corepack yarn install --immutable
-      - name: Stage preset
-        env:
-          OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}/omni-source/plugins
-        run: corepack yarn workspace dsh-plugin-desktop stage:preset
-      - name: Verify staged preset
-        # The artifact, not the intent: a preset whose record disagrees with the
-        # packages it ships must fail here, not on a user machine.
-        run: |
-          cd dsh-plugin-desktop
-          node scripts/verify-distribution.ts --preset preset
+      # Next resolves its product plugins as ordinary npm dependencies, so there is no
+      # preset tree to stage. `stage:preset` belongs to the old shell and reads a plugin
+      # lifecycle registry Next never produces.
       - name: Build macOS release (universal DMG)
         env:
           OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}/omni-source/plugins
@@ -91,16 +84,7 @@ jobs:
         run: node scripts/verify-version.mjs
       - name: Install dependencies
         run: corepack yarn install --immutable
-      - name: Stage preset
-        env:
-          OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}\omni-source\plugins
-        run: corepack yarn workspace dsh-plugin-desktop stage:preset
-      - name: Verify staged preset
-        # The artifact, not the intent: a preset whose record disagrees with the
-        # packages it ships must fail here, not on a user machine.
-        run: |
-          cd dsh-plugin-desktop
-          node scripts/verify-distribution.ts --preset preset
+      # Same as the macOS job: Next has no preset tree to stage.
       - name: Build Windows installer (website unsigned)
         env:
           OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}\omni-source\plugins

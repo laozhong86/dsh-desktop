@@ -16,6 +16,8 @@
  *   node scripts/r2-dist-sync.mjs verify --version 2.0.4
  */
 
+import { createHash } from 'node:crypto'
+import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -77,27 +79,85 @@ async function listBucketObjects(token) {
 }
 
 /**
- * 上传单个文件到 R2 存储桶（带重试机制）
+ * 解析当前 Cloudflare API Token 对应的 S3 Access Key ID（即 Token ID）。
+ */
+let cachedS3Creds = null
+async function resolveR2S3Credentials(token) {
+  if (cachedS3Creds) return cachedS3Creds
+  const secretAccessKey = createHash('sha256').update(token).digest('hex')
+  if (process.env.R2_ACCESS_KEY_ID) {
+    cachedS3Creds = { accessKeyId: process.env.R2_ACCESS_KEY_ID, secretAccessKey }
+    return cachedS3Creds
+  }
+  const verifyUrls = [
+    `https://api.cloudflare.com/client/v4/accounts/${resolveAccountId()}/tokens/verify`,
+    'https://api.cloudflare.com/client/v4/user/tokens/verify',
+  ]
+  for (const url of verifyUrls) {
+    try {
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      const data = await res.json()
+      if (data?.result?.id) {
+        cachedS3Creds = { accessKeyId: data.result.id, secretAccessKey }
+        return cachedS3Creds
+      }
+    } catch {
+      // ignore and try next endpoint
+    }
+  }
+  return null
+}
+
+function contentTypeForKey(key) {
+  if (key.endsWith('.exe')) return 'application/x-msdownload'
+  if (key.endsWith('.dmg')) return 'application/x-apple-diskimage'
+  if (key.endsWith('.zip')) return 'application/zip'
+  // The desktop updaters parse these, so they must not arrive as octet-stream.
+  if (key.endsWith('.json')) return 'application/json; charset=utf-8'
+  if (key.endsWith('.txt') || key.endsWith('.yml')) return 'text/plain; charset=utf-8'
+  return 'application/octet-stream'
+}
+
+/**
+ * 上传单个文件到 R2 存储桶（大文件优先走 S3 分片上传以绕过 REST API 100MB 限制，带重试机制）
  */
 async function uploadObjectToR2(token, key, filePath, maxRetries = 3) {
   const stat = statSync(filePath)
   const sizeMB = (stat.size / (1024 * 1024)).toFixed(2)
-  const buffer = readFileSync(filePath)
+  const contentType = contentTypeForKey(key)
+  const s3Creds = stat.size > 50 * 1024 * 1024 ? await resolveR2S3Credentials(token) : null
 
   let lastError = null
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       process.stdout.write(`  ⏳ [${attempt}/${maxRetries}] 正在上传 ${key} (${sizeMB} MB)... `)
+
+      if (s3Creds) {
+        const endpoint = `https://${resolveAccountId()}.r2.cloudflarestorage.com`
+        const proc = spawnSync(
+          'aws',
+          ['s3', 'cp', filePath, `s3://${BUCKET_NAME}/${key}`, '--endpoint-url', endpoint, '--content-type', contentType, '--only-show-errors'],
+          {
+            env: {
+              ...process.env,
+              AWS_ACCESS_KEY_ID: s3Creds.accessKeyId,
+              AWS_SECRET_ACCESS_KEY: s3Creds.secretAccessKey,
+              AWS_DEFAULT_REGION: 'auto',
+            },
+            encoding: 'utf8',
+            timeout: 15 * 60_000,
+          },
+        )
+        if (proc.status !== 0) {
+          throw new Error(`aws s3 cp failed (exit ${proc.status}): ${(proc.stderr || proc.stdout || '').trim()}`)
+        }
+        process.stdout.write(`✅ 成功 (S3 Multipart)\n`)
+        return { etag: 's3-multipart' }
+      }
+
+      const buffer = readFileSync(filePath)
       const encodedKey = encodeURIComponent(key).replace(/%2F/g, '/')
       const url = `https://api.cloudflare.com/client/v4/accounts/${resolveAccountId()}/r2/buckets/${BUCKET_NAME}/objects/${encodedKey}`
-
-      let contentType = 'application/octet-stream'
-      if (key.endsWith('.exe')) contentType = 'application/x-msdownload'
-      else if (key.endsWith('.dmg')) contentType = 'application/x-apple-diskimage'
-      else if (key.endsWith('.zip')) contentType = 'application/zip'
-      // The desktop updaters parse these, so they must not arrive as octet-stream.
-      else if (key.endsWith('.json')) contentType = 'application/json; charset=utf-8'
-      else if (key.endsWith('.txt') || key.endsWith('.yml')) contentType = 'text/plain; charset=utf-8'
 
       const res = await fetch(url, {
         method: 'PUT',

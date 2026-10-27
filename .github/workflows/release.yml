@@ -164,8 +164,6 @@ jobs:
       # Plugins ship independently of the application, so the market index is a
       # released object of its own rather than something baked into the build.
       - name: Generate plugin index
-        env:
-          OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}/omni-source/plugins
         run: node scripts/build-plugin-index.mjs
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2
@@ -185,14 +183,18 @@ jobs:
         run: |
           node scripts/r2-dist-sync.mjs upload --dir release-assets
       # The market plugin ships code only; its catalog images live here. Upload them in
-      # the same release so a fresh install never hits a missing cover.
+      # the same release when the source tree includes them so a fresh install never hits a missing cover.
       - name: Sync market catalog assets to R2
         if: ${{ env.R2_TOKEN != '' && env.R2_ACCOUNT != '' }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          node scripts/upload-market-assets.mjs --dir omni-source/plugins/omnimux-market/catalog
+          if [ -d "omni-source/plugins/omnimux-market/catalog" ]; then
+            node scripts/upload-market-assets.mjs --dir omni-source/plugins/omnimux-market/catalog
+          else
+            echo "omni-source/plugins/omnimux-market/catalog not present in plugins-source branch; skipping cover sync."
+          fi
       # Without this the publish job looks green while the CDN stayed empty.
       - name: Report skipped R2 sync
         if: ${{ env.R2_TOKEN == '' || env.R2_ACCOUNT == '' }}

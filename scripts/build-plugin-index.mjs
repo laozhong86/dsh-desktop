@@ -257,10 +257,12 @@ async function main() {
   for (let dir = ROOT_DIR; dir !== dirname(dir); dir = dirname(dir)) ancestors.push(dir)
   const candidates = [
     process.env.OMNIMUX_PLUGINS_DIR,
+    join(ROOT_DIR, 'dsh-desktop-next', 'node_modules'),
     ...ancestors.map(dir => join(dir, 'dsh-plugin', 'product', 'omnimux-dsh', 'plugins')),
     join(ROOT_DIR, 'dsh-plugin-desktop', 'preset', 'plugins'),
   ].filter(Boolean)
-  const pluginsRoot = candidates.find(dir => existsSync(dir))
+  const pluginsRoot = candidates.find(dir => existsSync(dir) && PUBLISHED_PLUGINS.every(spec => existsSync(join(dir, spec.dir, 'package.json'))))
+    ?? candidates.find(dir => existsSync(dir))
   if (!pluginsRoot) throw new Error(`cannot locate the plugin sources; tried:\n  ${candidates.join('\n  ')}`)
 
   const index = buildIndex(pluginsRoot)

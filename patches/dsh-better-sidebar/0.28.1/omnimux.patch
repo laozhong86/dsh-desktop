@@ -90,175 +90,175 @@ index 472caa5..1b7fc33 100644
 @@ -1360,6 +1378,9 @@ packages:
    '@types/chai@5.2.3':
      resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
- 
+
 +  '@types/css-tree@2.3.11':
 +    resolution: {integrity: sha512-aEokibJOI77uIlqoBOkVbaQGC9zII0A+JH1kcTNKW2CwyYWD8KM6qdo+4c77wD3wZOQfJuNWAr9M4hdk+YhDIg==}
 +
    '@types/d3-array@3.2.2':
      resolution: {integrity: sha512-hOLWVbm7uRza0BYXpIIW5pxfrKe0W+D5lrFiAEYR+pb6w3N2SwSMaJbXdUfSEv+dT4MfHBLtn5js0LAWaO6otw==}
- 
+
 @@ -1608,133 +1629,157 @@ packages:
      resolution: {integrity: sha512-C/0zV5IhgVdYhGJTwrY0v8dknxlhiKwtVJkMUaexu9/QvRmzlV4vfU3hZlUSgqc2BxQHntL1mCVbDq8j0FRFDw==}
      cpu: [arm64]
      os: [android]
 +    deprecated: yuku-codegen is pure JavaScript since 0.14
- 
+
    '@yuku-codegen/binding-darwin-arm64@0.8.7':
      resolution: {integrity: sha512-/u+REDMI4a0/lsJXTM4c53/w31OGZLOReZIyg62uhgLs0kc8NHsj/nOcxTdlQjq5gi0zhdkccD9LaLTXcdzPvw==}
      cpu: [arm64]
      os: [darwin]
 +    deprecated: yuku-codegen is pure JavaScript since 0.14
- 
+
    '@yuku-codegen/binding-darwin-x64@0.8.7':
      resolution: {integrity: sha512-sMMzFOwCo4WXR+/6zIBThOocSC50iIIZZdfiIDbaLvj0Ax/rWt/iavyfEAqajyvzydLyCqR/ZItdLWSRlu1umw==}
      cpu: [x64]
      os: [darwin]
 +    deprecated: yuku-codegen is pure JavaScript since 0.14
- 
+
    '@yuku-codegen/binding-freebsd-x64@0.8.7':
      resolution: {integrity: sha512-MpdpKXix9P+Y1rKgjvcNeNtGjXeL1CmttNhYINrWls8kRpm4xM/oBGTmn6w7to8lAlwj5jm8q03dQPl5mRv4Qw==}
      cpu: [x64]
      os: [freebsd]
 +    deprecated: yuku-codegen is pure JavaScript since 0.14
- 
+
    '@yuku-codegen/binding-linux-arm-gnu@0.8.7':
      resolution: {integrity: sha512-rr1srFLlPAmC1vtxfc9C1YLDe3iH09YjfSeeIidBqKhzx1MATjOAq4mjlRUOnhr/L27MotWIYOFKwVsd5JZFOg==}
      cpu: [arm]
      os: [linux]
      libc: [glibc]
 +    deprecated: yuku-codegen is pure JavaScript since 0.14
- 
+
    '@yuku-codegen/binding-linux-arm-musl@0.8.7':
      resolution: {integrity: sha512-eAufXh8qBRpiSO6ueaMDL+yyoXIGLhpUce72YbcACtZU2qhExwBIJyEtQf5kH2Ki0X2aqkSjSfog4OPtKXan3Q==}
      cpu: [arm]
      os: [linux]
      libc: [musl]
 +    deprecated: yuku-codegen is pure JavaScript since 0.14
- 
+
    '@yuku-codegen/binding-linux-arm64-gnu@0.8.7':
      resolution: {integrity: sha512-gw4w6wPoHObBrdIC4duVWLmJOvpdE25j5D7yrM5mACNlK4klRz/lv8hK+ssQk9EJHBgZjSaqZIJVFgqNYbfv7A==}
      cpu: [arm64]
      os: [linux]
      libc: [glibc]
 +    deprecated: yuku-codegen is pure JavaScript since 0.14
- 
+
    '@yuku-codegen/binding-linux-arm64-musl@0.8.7':
      resolution: {integrity: sha512-L68N6Y4XkqcIaKo3Ra88JEvBEH4AHff44A4INcrxeVWZ8CZtu2tCpfVxe3hR8qQQMcvBSQlDn24KpkCKEhVvfA==}
      cpu: [arm64]
      os: [linux]
      libc: [musl]
 +    deprecated: yuku-codegen is pure JavaScript since 0.14
- 
+
    '@yuku-codegen/binding-linux-x64-gnu@0.8.7':
      resolution: {integrity: sha512-dzyAbltJmf3Cqlb8HcFuYIf5Yn0fl1vTr3XJ9HiVNNvOlhqPSArOqtw9vI1p6/VTXTjrMLXlU+s+/kNHiIy/Cw==}
      cpu: [x64]
      os: [linux]
      libc: [glibc]
 +    deprecated: yuku-codegen is pure JavaScript since 0.14
- 
+
    '@yuku-codegen/binding-linux-x64-musl@0.8.7':
      resolution: {integrity: sha512-Otw4MH3404q0Bbvl+YTdW9aoUV5vXmUw8260bWvt1XlaoIX/ceSgI4ygheRDMfBPoHt6FDayQaO9OLVUZAgkFA==}
      cpu: [x64]
      os: [linux]
      libc: [musl]
 +    deprecated: yuku-codegen is pure JavaScript since 0.14
- 
+
    '@yuku-codegen/binding-win32-arm64@0.8.7':
      resolution: {integrity: sha512-qo/jyrzryiBuKEsFiuWaBCBe3tRMynQ0qFWFgOEjcCMQeZfBm+wKiVEUEFXXLc7bh8YezguAWp0Mtnhq4ARNyA==}
      cpu: [arm64]
      os: [win32]
 +    deprecated: yuku-codegen is pure JavaScript since 0.14
- 
+
    '@yuku-codegen/binding-win32-x64@0.8.7':
      resolution: {integrity: sha512-D5lDsVDx6m00E6bWySlWdH72Ca4TPSaphDqB6QjU6MpuNLIJqoGoatYyq2rOmBE8Zv/kunot/o58KGL03P3eiA==}
      cpu: [x64]
      os: [win32]
 +    deprecated: yuku-codegen is pure JavaScript since 0.14
- 
+
    '@yuku-parser/binding-android-arm64@0.8.7':
      resolution: {integrity: sha512-eGKYiUDX7Y0V7tDTmg+JTVnXnjMqfXXsorZ+EDf5kxwchQ3Or1HS14MzI2fw+jFhHR85fCWt+mtX33Yao73hIQ==}
      cpu: [arm64]
      os: [android]
 +    deprecated: yuku-parser runs on yuku-core since 0.14
- 
+
    '@yuku-parser/binding-darwin-arm64@0.8.7':
      resolution: {integrity: sha512-Re0RHelKLnjEURulY2/KxW+Ngb8zuNA4BRZuMwgGQNzVumT6u4U2N2hc01oeYVNVof0i7GrXE4UCNBgbpRRnjQ==}
      cpu: [arm64]
      os: [darwin]
 +    deprecated: yuku-parser runs on yuku-core since 0.14
- 
+
    '@yuku-parser/binding-darwin-x64@0.8.7':
      resolution: {integrity: sha512-Hn8DROtQkjlA1ACbPgj4a7eP9IuVOI504oiTwpkWPbpaDWD9KdmnVYCqW+1LfenNK/g7O9NhWGpXEdaCNX7lIA==}
      cpu: [x64]
      os: [darwin]
 +    deprecated: yuku-parser runs on yuku-core since 0.14
- 
+
    '@yuku-parser/binding-freebsd-x64@0.8.7':
      resolution: {integrity: sha512-bAP2OV8wRuzplX/jYxv9+vvqQT8JxyNphI8fLfXGL054Xs+4/J5u33cIm3y4rxY8rdoLmmdiJs2Tq7r7lrDRfA==}
      cpu: [x64]
      os: [freebsd]
 +    deprecated: yuku-parser runs on yuku-core since 0.14
- 
+
    '@yuku-parser/binding-linux-arm-gnu@0.8.7':
      resolution: {integrity: sha512-kTYwJQQgmZeAWdDIWabiReIZMpmfLueIj1tCmjStUtFGhR1Z0qwxonKVfUC4N7h/VhGGzLZ//7O1kgt1QKqgCg==}
      cpu: [arm]
      os: [linux]
      libc: [glibc]
 +    deprecated: yuku-parser runs on yuku-core since 0.14
- 
+
    '@yuku-parser/binding-linux-arm-musl@0.8.7':
      resolution: {integrity: sha512-uL4jE8HPT2BLlxAXyD10LqgPuXa9eDa0BKpCdSANmzIJghq/2eZo3/gQNtaxPZMupWoxjYzSad9IXrwu7aYPXQ==}
      cpu: [arm]
      os: [linux]
      libc: [musl]
 +    deprecated: yuku-parser runs on yuku-core since 0.14
- 
+
    '@yuku-parser/binding-linux-arm64-gnu@0.8.7':
      resolution: {integrity: sha512-3gVN4pWSKZmXiNX7cU164dR9MPvesCHnlH6nPfpK+yQsCuYphjKKplcb4SnZBrhiqmXbgb2HR0c2TS0IZUPhgA==}
      cpu: [arm64]
      os: [linux]
      libc: [glibc]
 +    deprecated: yuku-parser runs on yuku-core since 0.14
- 
+
    '@yuku-parser/binding-linux-arm64-musl@0.8.7':
      resolution: {integrity: sha512-S0mwfEjoLpxzXeZw802Wa4RaELsQiPtWqG6INcy8j4GtvNFtl4LCX3eGO1XLn9pyLAISLzTRyU3zUCBUPin8lg==}
      cpu: [arm64]
      os: [linux]
      libc: [musl]
 +    deprecated: yuku-parser runs on yuku-core since 0.14
- 
+
    '@yuku-parser/binding-linux-x64-gnu@0.8.7':
      resolution: {integrity: sha512-lnbWdPmerE5D1uH1G4IEZKnPzCrWCStRGrtgpSIe1RibAo5bZIjDbbbPYXmMHCEh4F+x/JaJpElh26a3r+BPbg==}
      cpu: [x64]
      os: [linux]
      libc: [glibc]
 +    deprecated: yuku-parser runs on yuku-core since 0.14
- 
+
    '@yuku-parser/binding-linux-x64-musl@0.8.7':
      resolution: {integrity: sha512-769uwndMvMzUvATWbAcEvyLHKA+DzhHSCl/obBUrRdYfRo26yxui6S8y3z7uJ+Naup7UKrDxrpK7OnQkxkl9KQ==}
      cpu: [x64]
      os: [linux]
      libc: [musl]
 +    deprecated: yuku-parser runs on yuku-core since 0.14
- 
+
    '@yuku-parser/binding-win32-arm64@0.8.7':
      resolution: {integrity: sha512-mEB/9PlaAkisJ6KWGz0zvywXoU6+80dTlR2LwS7s/jcXXoU6fm2+sitBZXtqu3+Q4DcDgPxM45uWMCzPs0TSRw==}
      cpu: [arm64]
      os: [win32]
 +    deprecated: yuku-parser runs on yuku-core since 0.14
- 
+
    '@yuku-parser/binding-win32-x64@0.8.7':
      resolution: {integrity: sha512-8vNB2DP0ou61nGb8tc/qfi41gfyDXz1MHr2zqL3nR+cJ6CEbiuWV/l/a/vv151gCgiZLLAyGkQGENpozdg716w==}
      cpu: [x64]
      os: [win32]
 +    deprecated: yuku-parser runs on yuku-core since 0.14
- 
+
    '@yuku-toolchain/types@0.8.7':
      resolution: {integrity: sha512-2Z53dNxAJL6UvFoIrDZvYf3zlO8s4VJK4O2hhaB4mXVwwpX/7ajtss3cmfqKvamlNLWyt9FSWs4eoYdlbxpnHA==}
 @@ -3025,10 +3070,6 @@ packages:
      resolution: {integrity: sha512-BwqATHxAulx7X6kNdTkecy7PBjLkgtAHcgrwYLd9iA+cD2At9DzhJwdwaSELk2+aZe01IfiM/Wxtyp68Dvup2A==}
      engines: {node: '>=0.12.18'}
- 
+
 -  source-map-js@1.2.1:
 -    resolution: {integrity: sha512-UXWMKhLOwVKb728IUtQPXxfYU+usdybtUrK/8uGE8CQMvrhOpwvzDBwj0QhSL7MQc7vIsISBG8VQ8+IDQxpfQA==}
 -    engines: {node: '>=0.10.0'}
@@ -269,11 +269,11 @@ index 472caa5..1b7fc33 100644
 @@ -4506,6 +4547,8 @@ snapshots:
        '@types/deep-eql': 4.0.2
        assertion-error: 2.0.1
- 
+
 +  '@types/css-tree@2.3.11': {}
 +
    '@types/d3-array@3.2.2': {}
- 
+
    '@types/d3-axis@3.0.6':
 @@ -5033,7 +5076,7 @@ snapshots:
    css-tree@3.2.1:
@@ -281,17 +281,17 @@ index 472caa5..1b7fc33 100644
        mdn-data: 2.27.1
 -      source-map-js: 1.2.1
 +      source-map-js: 1.2.2
- 
+
    csstype@3.2.3: {}
- 
+
 @@ -6333,8 +6376,6 @@ snapshots:
- 
+
    simple-icons@16.32.0: {}
- 
+
 -  source-map-js@1.2.1: {}
 -
    source-map-js@1.2.2: {}
- 
+
    space-separated-tokens@2.0.2: {}
 diff --git a/src/client/HtmlPreview.tsx b/src/client/HtmlPreview.tsx
 new file mode 100644
@@ -356,7 +356,7 @@ index d398bf9..e6da6f4 100644
 -import { HTML_IFRAME_SANDBOX } from './html-preview.ts'
  import type { EditorToolbarState, FileViewerProps } from './service.ts'
  import css from './sidebar.module.css'
- 
+
 @@ -735,6 +734,9 @@ export function TextEditor(props: FileViewerProps) {
        setDirty(false)
        setConflict(false)
@@ -384,7 +384,7 @@ index d398bf9..e6da6f4 100644
 +  // per-surface unlock. A previewed page always runs in an opaque origin, so a
 +  // persisted legacy "unsafe" preference cannot widen it.
 +  const [previewGeneration, setPreviewGeneration] = useState(0)
- 
+
    // Host-toolbar mode (the merged editor header renders the controls): skip
    // the own toolbar row, report the state after every relevant render (the
 @@ -1097,27 +1094,7 @@ export function TextEditor(props: FileViewerProps) {
@@ -429,7 +429,7 @@ index ccaaa8c..46f89a0 100644
  import { resolveSidebarPath } from './paths.ts'
  import type {
 @@ -427,6 +428,8 @@ function openExternal(payload: OpenExternalPayload): Promise<OpenExternalResult>
- 
+
  /** The sidebar API surface (session scope threaded through every call). */
  export const api = {
 +  htmlPreview: (scope: SessionScope, path: string, signal?: AbortSignal) =>
@@ -452,13 +452,13 @@ index 4891a15..b3ce25f 100644
  import type { FileViewerDescriptor, FileViewerProps } from '../service.ts'
  import { t } from '../locales.ts'
 +import css from '../sidebar.module.css'
- 
+
  /**
   * Lazy wrapper over the chunk-resident viewer component. The `pick`
 @@ -51,9 +54,37 @@ import { t } from '../locales.ts'
   */
  const LazyTextEditor = lazyChunkComponent<FileViewerProps>('editor', (mod) => mod.TextEditor as ComponentType<FileViewerProps> | undefined)
- 
+
 -/** The 4 built-in file viewer descriptors. */
 +/** The 6 built-in file viewer descriptors. */
  export function builtinViewers(): readonly FileViewerDescriptor[] {
@@ -702,7 +702,7 @@ index 8f65370..d33a964 100644
 @@ -90,22 +90,9 @@ function diffOf(op: FileOp, prior: string | undefined): readonly DiffRow[] {
    return []
  }
- 
+
 -/** The render view of one html op target: the route-src iframe. Extracted
 - *  (and exported) so the always-sandboxed contract is pinned directly by the
 - *  sandbox spec — this surface has NO no-sandbox escape hatch. */
@@ -723,7 +723,7 @@ index 8f65370..d33a964 100644
 +export function HtmlRenderPreview(props: { scope: SessionScope; path: string }) {
 +  return <div className={css.htmlPane}><HtmlPreview scope={props.scope} path={props.path} className={css.htmlFrame} /></div>
  }
- 
+
  /** One header pill toggle — the redaction / reading / render toggles share the
 @@ -430,8 +417,9 @@ export function DiffPane({ target, ctx, scope, height, onHeightCommit, onClose,
        : ''),
@@ -735,7 +735,7 @@ index 8f65370..d33a964 100644
 +    () => (htmlOp && contentAbs !== '' ? resolveSidebarPath(scope.cwd, contentAbs) : ''),
      [htmlOp, scope, contentAbs],
    )
- 
+
 @@ -542,7 +530,7 @@ export function DiffPane({ target, ctx, scope, height, onHeightCommit, onClose,
          </div>
        )
@@ -809,7 +809,7 @@ index f9f87f2..0cd49b4 100644
 @@ -17,6 +17,8 @@
   * working inside the sidebar).
   */
- 
+
 +import { isCandidateFilePath } from './candidate-paths.ts'
 +
  /** `new URL(value)`, or null for an unparsable href. */
@@ -818,7 +818,7 @@ index f9f87f2..0cd49b4 100644
 @@ -45,6 +47,56 @@ export function shouldInterceptLink(anchorHref: string, selfOrigin: string): str
    return url.href
  }
- 
+
 +/**
 + * Resolve an anchor to a workspace-relative file path, or null when the
 + * target is not a workspace file.
@@ -1811,12 +1811,12 @@ index feb3095..7c54c23 100644
 +  '.opus': 'audio/opus',
 +  '.aac': 'audio/aac',
  }
- 
+
  /** Content type served by /sidebar/file (binary-safe fallback for unknowns). */
 @@ -132,6 +154,53 @@ export function mediaTypeForPath(path: string): string {
    return MEDIA_TYPES[extname(path).toLowerCase()] ?? 'application/octet-stream'
  }
- 
+
 +/**
 + * Per-resource ceiling the HTML preview builder reads with. 0.28.1 retired the
 + * configurable `readLimit`/`mediaLimit` because every byte route streams, but
@@ -1919,7 +1919,7 @@ index b35477f..a777a1f 100644
 --- a/src/wire.ts
 +++ b/src/wire.ts
 @@ -12,6 +12,7 @@ import { GitCommandError } from './git.ts'
- 
+
  /** Machine-readable error codes of the sidebar API. */
  export type SidebarErrorCode =
 +  | `preview-${string}`
@@ -1932,7 +1932,7 @@ index 4cf50f9..68bd61e 100644
 +++ b/tests/builtins.spec.ts
 @@ -324,10 +324,12 @@ describe('side chat close archives the bound thread', () => {
  })
- 
+
  describe('built-in file viewer registrations', () => {
 -  it('registers the 4 built-in file viewers (the read-only previews yielded to the host)', () => {
 +  it('registers the 6 built-in file viewers (the read-only previews yielded to the host)', () => {
@@ -1948,7 +1948,7 @@ index 4cf50f9..68bd61e 100644
 @@ -393,14 +395,14 @@ describe('built-in file viewer registrations', () => {
      expect(service.matchFileViewer('package.json')?.id).toBe('code')
    })
- 
+
 -  it('the html viewer declares its sandbox and default-unsafe related settings', () => {
 +  it('the html viewer declares NO sandbox escape hatch (the boundary is fixed)', () => {
      const { service } = setup()
@@ -1964,7 +1964,7 @@ index 4cf50f9..68bd61e 100644
 +    expect(toggles.map(t => t.key)).not.toContain('htmlViewerDefaultUnsafe')
 +    expect(toggles).toEqual([])
    })
- 
+
    it('the jsonl viewer carries the code viewer\'s single git-gutter toggle', () => {
 diff --git a/tests/sandbox-views.spec.tsx b/tests/sandbox-views.spec.tsx
 index 8b748c8..e2e5849 100644
@@ -1978,10 +1978,10 @@ index 8b748c8..e2e5849 100644
 +import { DiffPane } from '../src/client/changes/DiffPane.tsx'
  import { createSidebarStore } from '../src/client/state.ts'
  import type { FileViewerProps } from '../src/client/service.ts'
- 
+
 @@ -40,60 +40,23 @@ function viewerProps(store: ReturnType<typeof createSidebarStore>, overrides: Pa
  }
- 
+
  describe('HTML preview iframe sandbox', () => {
 -  it('renders the preview iframe with the exact sandbox tokens and no same-origin / top-navigation', () => {
 -    const store = createSidebarStore()
@@ -2053,12 +2053,12 @@ index 8b748c8..e2e5849 100644
 -    expect(html).toContain('恢复沙箱')
 -    expect(html).not.toContain('临时解锁（不安全）')
    })
- 
+
    it('markdown preview keeps rendering markdown, not an iframe', () => {
 @@ -127,22 +90,18 @@ describe('changes tab HTML render preview sandbox', () => {
      }
    }
- 
+
 -  it('render iframe is ALWAYS sandboxed (no escape hatch) with the route src, never srcdoc', () => {
 -    const html = renderToString(createElement(HtmlRenderPreview, { src: '/sidebar/html/s1/p/a/index.html', title: '/p/a/index.html' }))
 -    const iframe = /<iframe[^>]*>/.exec(html)?.[0]
@@ -2086,5 +2086,5 @@ index 8b748c8..e2e5849 100644
 -    expect(iframe).toContain('referrerPolicy="no-referrer"')
 -    expect(iframe).toContain('allow=""')
    })
- 
+
    it('html op targets show the render toggle (off by default, no iframe); non-html and error targets show none', () => {

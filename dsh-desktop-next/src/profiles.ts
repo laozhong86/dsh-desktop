@@ -26,6 +26,10 @@ export const NEXT_PACKAGE = fileURLToPath(new URL('../package.json', import.meta
  *
  * `omnimux-market` is included: its catalog images live on the CDN and the package is
  * code-only, so the 142 MB publish failure that once forced it out is gone.
+ *
+ * `omnimux-automation` is deliberately absent: upstream now ships scheduling itself
+ * (`@deepseek-ai/dsh-schedule` plus its client UI and agent tools), so the OmniMux
+ * duplicate is retired rather than kept as a second scheduler.
  */
 export const OMNIMUX_PRODUCT_BUNDLES = [
   'dsh-better-sidebar',
@@ -33,7 +37,6 @@ export const OMNIMUX_PRODUCT_BUNDLES = [
   'omnimux-accounts',
   'omnimux-analytics',
   'omnimux-assets',
-  'omnimux-automation',
   'omnimux-clip',
   'omnimux-forms',
   'omnimux-inspiration',

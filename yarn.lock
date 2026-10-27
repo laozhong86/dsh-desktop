@@ -7130,6 +7130,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@formkit/auto-animate@npm:^0.10.0":
+  version: 0.10.0
+  resolution: "@formkit/auto-animate@npm:0.10.0"
+  checksum: 10c0/2d73e0bd1ef735d15e4aa3b67d70f44913709254b28beb4c132ba09714353781510bea2ebcc8e603596b02fce687ac1654320627c7f41b99c91b98cce5ef45b4
+  languageName: node
+  linkType: hard
+
 "@google/genai@npm:2.21.0":
   version: 2.21.0
   resolution: "@google/genai@npm:2.21.0"
@@ -11094,6 +11101,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@xterm/addon-fit@npm:^0.11.0":
+  version: 0.11.0
+  resolution: "@xterm/addon-fit@npm:0.11.0"
+  checksum: 10c0/c0ce94f7e877d07e7197d15d041cc629ce2e853016400aadddc9810838ea8a26e836f87f325eba36df88c03feb72d9f13cd8c3bb41ee31e701f1058edb8553c3
+  languageName: node
+  linkType: hard
+
 "@xterm/addon-serialize@npm:^0.14.0":
   version: 0.14.0
   resolution: "@xterm/addon-serialize@npm:0.14.0"
@@ -11105,6 +11119,13 @@ __metadata:
   version: 6.0.0
   resolution: "@xterm/headless@npm:6.0.0"
   checksum: 10c0/9fa915767d89f52e5c066e2b8160f56701a95382205b03665247b381bb319ed5702626227a933cbb36c4df01c619bc0cc38c96ce9635dc141e88a9742d6ed669
+  languageName: node
+  linkType: hard
+
+"@xterm/xterm@npm:^6.0.0":
+  version: 6.0.0
+  resolution: "@xterm/xterm@npm:6.0.0"
+  checksum: 10c0/b99122553f323a65b708e5eba9903d4c5a1bcb59fe576d29d6e91a33002bccfd1b99403e1e839e1942f4952039db6d3d74ca9d65ed0399b4e9a0a5f35b8c12d9
   languageName: node
   linkType: hard
 
@@ -12269,13 +12290,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"cosmokit@npm:^1.8.1":
-  version: 1.8.1
-  resolution: "cosmokit@npm:1.8.1"
-  checksum: 10c0/56b0294572efc7793d5854b0022243fab9899d0ab6ce7da873839572b4dc8c6d3ba8d6ff5b61231dca2e9d821af73a2be5d502d9ea52af2671374711a93620aa
-  languageName: node
-  linkType: hard
-
 "crelt@npm:^1.0.5, crelt@npm:^1.0.6":
   version: 1.0.7
   resolution: "crelt@npm:1.0.7"
@@ -13079,9 +13093,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"dsh-better-sidebar@npm:^0.19.1":
-  version: 0.19.1
-  resolution: "dsh-better-sidebar@npm:0.19.1"
+"dsh-better-sidebar@npm:^0.28.1":
+  version: 0.28.1
+  resolution: "dsh-better-sidebar@npm:0.28.1"
   dependencies:
     "@codemirror/commands": "npm:^6.10.4"
     "@codemirror/lang-cpp": "npm:^6.0.3"
@@ -13104,31 +13118,33 @@ __metadata:
     "@codemirror/search": "npm:^6.7.1"
     "@codemirror/state": "npm:^6.7.1"
     "@codemirror/view": "npm:^6.43.8"
+    "@deepseek-ai/schemastery": "npm:~3.18.5"
+    "@formkit/auto-animate": "npm:^0.10.0"
     "@lezer/highlight": "npm:^1.2.3"
+    "@xterm/addon-fit": "npm:^0.11.0"
+    "@xterm/xterm": "npm:^6.0.0"
     clsx: "npm:^2.1.1"
     dompurify: "npm:^3.4.14"
     mermaid: "npm:^11.16.1"
-    node-pty: "npm:^1.1.0"
     react-icons: "npm:5.7.0"
     rxjs: "npm:^7.8.2"
-    schemastery: "npm:^3.18.0"
     ws: "npm:^8.18.0"
+    yaml: "npm:^2.9.1"
   peerDependencies:
-    "@deepseek-ai/cordis": ^4.0.2
-    "@deepseek-ai/dsh-agent": ^0.1.5-rc.1
-    "@deepseek-ai/dsh-client-locale": ^0.1.5-rc.1
-    "@deepseek-ai/dsh-client-ui-conversation": ^0.1.5-rc.1
-    "@deepseek-ai/dsh-client-ui-primitives": ^0.1.5-rc.1
-    "@deepseek-ai/dsh-client-ui-settings": ^0.1.5-rc.1
-    "@deepseek-ai/dsh-client-ui-sidebar-right": ^0.1.5-rc.1
-    "@deepseek-ai/dsh-client-ui-slots": ^0.1.5-rc.1
-    "@deepseek-ai/dsh-host-webserver": ^0.1.5-rc.1
-    "@deepseek-ai/dsh-invariants": ^0.1.5-rc.1
-    "@deepseek-ai/dsh-llm": ^0.1.5-rc.1
-    "@deepseek-ai/dsh-session": ^0.1.5-rc.1
-    "@deepseek-ai/dsh-settings": ^0.1.5-rc.1
-    "@deepseek-ai/dsh-subagent": ^0.1.5-rc.1
-    "@deepseek-ai/dsh-tools": ^0.1.5-rc.1
+    "@deepseek-ai/cordis": ^4.0.5
+    "@deepseek-ai/dsh-agent": ^0.2.1-rc.1
+    "@deepseek-ai/dsh-client-locale": ^0.2.1-rc.1
+    "@deepseek-ai/dsh-client-ui-conversation": ^0.2.1-rc.1
+    "@deepseek-ai/dsh-client-ui-primitives": ^0.2.1-rc.1
+    "@deepseek-ai/dsh-client-ui-settings": ^0.2.1-rc.1
+    "@deepseek-ai/dsh-client-ui-sidebar-right": ^0.2.1-rc.1
+    "@deepseek-ai/dsh-client-ui-slots": ^0.2.1-rc.1
+    "@deepseek-ai/dsh-host-webserver": ^0.2.1-rc.1
+    "@deepseek-ai/dsh-llm": ^0.2.1-rc.1
+    "@deepseek-ai/dsh-session": ^0.2.1-rc.1
+    "@deepseek-ai/dsh-settings": ^0.2.1-rc.1
+    "@deepseek-ai/dsh-subagent": ^0.2.1-rc.1
+    "@deepseek-ai/dsh-tools": ^0.2.1-rc.1
     "@huanlin/dsh-plugin-better-locale": ^0.1.0
     react: ^18.2.0
     react-dom: ^18.2.0
@@ -13137,7 +13153,7 @@ __metadata:
       optional: true
     "@huanlin/dsh-plugin-better-locale":
       optional: true
-  checksum: 10c0/1008b4af275241cffc9dec04eba574b699a64dc84c07766b4f4ee18a6425afdb5075dc356a46fa70fd185ba047d966ebab975e7404df1fecd8d90c1d1de69dfb
+  checksum: 10c0/d9e5b880073994c11fd232293dfc5d5ea4afb742c536cc292fbb67b69e7ff43451a5f527bcb30150761732c46e78b46196c559dacfd4ef29ab2064a392393a2e
   languageName: node
   linkType: hard
 
@@ -13537,7 +13553,7 @@ __metadata:
     class-variance-authority: "npm:^0.7.1"
     clsx: "npm:^2.1.1"
     diff: "npm:^9.0.0"
-    dsh-better-sidebar: "npm:^0.19.1"
+    dsh-better-sidebar: "npm:^0.28.1"
     dsh-community-market: "npm:0.1.0-dev.0"
     dsh-ui-kit: "npm:^0.1.0"
     dshmarket: "npm:1.70.1"
@@ -13564,7 +13580,6 @@ __metadata:
     omnimux-accounts: "npm:^0.1.2"
     omnimux-analytics: "npm:^0.2.1"
     omnimux-assets: "npm:^0.2.1"
-    omnimux-automation: "npm:^0.1.3"
     omnimux-clip: "npm:^0.1.1"
     omnimux-forms: "npm:^0.1.1"
     omnimux-inspiration: "npm:^0.1.1"
@@ -16469,13 +16484,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"luxon@npm:^3.7.2":
-  version: 3.7.2
-  resolution: "luxon@npm:3.7.2"
-  checksum: 10c0/ed8f0f637826c08c343a29dd478b00628be93bba6f068417b1d8896b61cb61c6deacbe1df1e057dbd9298334044afa150f9aaabbeb3181418ac8520acfdc2ae2
-  languageName: node
-  linkType: hard
-
 "lz-string@npm:^1.5.0":
   version: 1.5.0
   resolution: "lz-string@npm:1.5.0"
@@ -17769,16 +17777,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"node-pty@npm:^1.1.0":
-  version: 1.1.0
-  resolution: "node-pty@npm:1.1.0"
-  dependencies:
-    node-addon-api: "npm:^7.1.0"
-    node-gyp: "npm:latest"
-  checksum: 10c0/e527305263da36d554b7d2116aee6430b898675fc50e7bd82fbd762f14cb6b948fb8d997736af1f70d76bf9ffd4f5179bc1ed1d8002567dfcf3b29f039291798
-  languageName: node
-  linkType: hard
-
 "node-pty@patch:node-pty@npm%3A1.2.0-beta.15#./patches/node-pty@1.2.0-beta.15.patch::locator=deepseek-harness-desktop%40workspace%3A.":
   version: 1.2.0-beta.15
   resolution: "node-pty@patch:node-pty@npm%3A1.2.0-beta.15#./patches/node-pty@1.2.0-beta.15.patch::version=1.2.0-beta.15&hash=ad2eff&locator=deepseek-harness-desktop%40workspace%3A."
@@ -17937,27 +17935,6 @@ __metadata:
     react-dom:
       optional: true
   checksum: 10c0/25f7f0457f84cfcb06b28a35fd4d85e7a1798ef5008dde48c020fb371c8fe879c073cc7df2c162fbdc891c114de404f55884526e9c94e77600ebbdce9ca1ea61
-  languageName: node
-  linkType: hard
-
-"omnimux-automation@npm:^0.1.3":
-  version: 0.1.3
-  resolution: "omnimux-automation@npm:0.1.3"
-  dependencies:
-    dsh-ui-kit: "npm:^0.1.0"
-    luxon: "npm:^3.7.2"
-    zod: "npm:^4.1.5"
-  peerDependencies:
-    "@deepseek-ai/cordis": ">=4.0.1"
-    "@deepseek-ai/dsh-client-ui-primitives": ">=0.1.0-rc.6 || >=0.2.1-rc.3 <0.3.0-0"
-    react: ^18.2.0
-    react-dom: ^18.2.0
-  peerDependenciesMeta:
-    react:
-      optional: true
-    react-dom:
-      optional: true
-  checksum: 10c0/555c1c7d4883f790d4c5f4528feeaf10bfca24dd7a20e89915cb8353e5a59e3135ea8bb843de4f96d7f711a253d5de860a74dcfd3027f190bc836dfe0f939777
   languageName: node
   linkType: hard
 
@@ -19633,16 +19610,6 @@ __metadata:
   dependencies:
     loose-envify: "npm:^1.1.0"
   checksum: 10c0/26383305e249651d4c58e6705d5f8425f153211aef95f15161c151f7b8de885f24751b377e4a0b3dd42cce09aad3f87a61dab7636859c0d89b7daf1a1e2a5c78
-  languageName: node
-  linkType: hard
-
-"schemastery@npm:^3.18.0":
-  version: 3.18.0
-  resolution: "schemastery@npm:3.18.0"
-  dependencies:
-    "@standard-schema/spec": "npm:^1.1.0"
-    cosmokit: "npm:^1.8.1"
-  checksum: 10c0/2f18f79adbc478e8f90914c3dbb9cf74f6e17a593b32565cbdf6e13cf152bdf0d03fa9f42aed35d27430fec54b0c2bf53b71b8b505ccc80f121cb694095a9513
   languageName: node
   linkType: hard
 
@@ -21474,7 +21441,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"yaml@npm:^2.8.1":
+"yaml@npm:^2.8.1, yaml@npm:^2.9.1":
   version: 2.9.1
   resolution: "yaml@npm:2.9.1"
   bin:
@@ -21606,7 +21573,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"zod@npm:^4, zod@npm:^4.1.5":
+"zod@npm:^4":
   version: 4.6.7
   resolution: "zod@npm:4.6.7"
   checksum: 10c0/4ce2eb14034317b7254e347ca37b5ad591cf8333147030cf05b9b5d31692d45073f7f2747aa50cf8c6b29012194d2b22978cecc89969cf34a0d18e89d0ee7d7b

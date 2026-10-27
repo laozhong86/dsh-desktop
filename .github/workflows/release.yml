@@ -47,11 +47,15 @@ jobs:
       # Next resolves its product plugins as ordinary npm dependencies, so there is no
       # preset tree to stage. `stage:preset` belongs to the old shell and reads a plugin
       # lifecycle registry Next never produces.
-      - name: Build macOS release (universal DMG)
+      # No Apple signing identity is configured, and `dist:mac` refuses to run with
+      # signing disabled. The smoke target produces the same universal DMG unsigned, so
+      # users right-click → Open on first launch. Switch to `dist:mac` once a Developer
+      # ID certificate and notarization credentials are in place.
+      - name: Build macOS release (universal DMG, unsigned)
         env:
           OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}/omni-source/plugins
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-        run: corepack yarn workspace dsh-desktop-next dist:mac
+        run: corepack yarn workspace dsh-desktop-next dist:mac-smoke
       - name: Upload DMG artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:

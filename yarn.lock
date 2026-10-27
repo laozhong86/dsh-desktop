@@ -1407,7 +1407,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@deepseek-ai/cosmokit@npm:~1.8.6":
+"@deepseek-ai/cosmokit@npm:^1.8.3, @deepseek-ai/cosmokit@npm:~1.8.6":
   version: 1.8.6
   resolution: "@deepseek-ai/cosmokit@npm:1.8.6"
   checksum: 10c0/722436ef5bc6d11a30d5d8954ffb8d40d206e2c27e9c58ffd88bd2a10f41f985e4df93e8158b4e425f06d6d8be2a1ee26a572e385aca902cf03b3a8cc8f55c76
@@ -3786,6 +3786,17 @@ __metadata:
   peerDependencies:
     "@deepseek-ai/cordis": ~4.0.5
   checksum: 10c0/b5ad396e0040710e1ad781aea6db9605ec82cb1411f1eb11f121f2d3a86378f5738824202d36f1b682b7613387aa4faeceeae4e3e7418dc3ec950ecdf36aa2e6
+  languageName: node
+  linkType: hard
+
+"@deepseek-ai/dsh-invariants@npm:^0.1.5-rc.1":
+  version: 0.1.5-rc.3
+  resolution: "@deepseek-ai/dsh-invariants@npm:0.1.5-rc.3"
+  dependencies:
+    "@deepseek-ai/schemastery": "npm:3.18.2"
+  peerDependencies:
+    "@deepseek-ai/cordis": 4.0.2
+  checksum: 10c0/85a120251453941d88a09fac8cc60968cd54387fda40ef0e7fee63198a018cac2962e411e4e5344ebfbc51cd4a29d7bffa2e5a9266be2ae3dbd4f6a0eeb418e0
   languageName: node
   linkType: hard
 
@@ -6747,6 +6758,16 @@ __metadata:
     "@deepseek-ai/node-addon-system-linux-x64":
       optional: true
   checksum: 10c0/8d8f831f5b695cd67938b588a32c0c330514620052ff1b0573012549f76a0507b5347cddf8196232d66d78ff01a428b25836844fba75203c6894ff11645e1898
+  languageName: node
+  linkType: hard
+
+"@deepseek-ai/schemastery@npm:3.18.2":
+  version: 3.18.2
+  resolution: "@deepseek-ai/schemastery@npm:3.18.2"
+  dependencies:
+    "@deepseek-ai/cosmokit": "npm:^1.8.3"
+    "@standard-schema/spec": "npm:^1.1.0"
+  checksum: 10c0/699651803c2cec6512ec648c31e0b4fcf07451b0adbf7c6bfb8462b6fa84f97584372b00a31ec8f1248c283f8e91819aa143432c28271347de5568ef9ea46421
   languageName: node
   linkType: hard
 
@@ -13423,6 +13444,7 @@ __metadata:
     "@deepseek-ai/dsh-host-plugin-inventory": "npm:0.2.1-rc.3"
     "@deepseek-ai/dsh-host-webserver": "npm:0.2.1-rc.3"
     "@deepseek-ai/dsh-http-proxy": "npm:0.2.1-rc.3"
+    "@deepseek-ai/dsh-invariants": "npm:^0.1.5-rc.1"
     "@deepseek-ai/dsh-jobs": "npm:0.2.1-rc.3"
     "@deepseek-ai/dsh-jobs-local": "npm:0.2.1-rc.3"
     "@deepseek-ai/dsh-launch-environment": "npm:0.2.1-rc.3"

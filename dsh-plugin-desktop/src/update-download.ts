@@ -16,10 +16,10 @@ import {
 /** Desktop platforms with a fixed installer download endpoint. */
 export type DesktopDownloadPlatform = 'darwin' | 'win32'
 
-/** Fixed download endpoints that record one user-confirmed installer download. */
+/** Fixed download endpoints that serve the latest installer from the distribution bucket. */
 export const DESKTOP_DOWNLOAD_URLS: Readonly<Record<DesktopDownloadPlatform, string>> = {
-  darwin: 'https://www.dshdesktop.cn/api/downloads/mac',
-  win32: 'https://www.dshdesktop.cn/api/downloads/windows',
+  darwin: 'https://dl.omnimux.ai/releases/latest/OmniMux-universal.dmg',
+  win32: 'https://dl.omnimux.ai/releases/latest/OmniMux-Setup.exe',
 }
 
 /** Header pinning a download request and response to the checked release. */

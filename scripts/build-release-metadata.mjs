@@ -52,14 +52,24 @@ function assertChannelVersion(version, channel) {
   if (tag !== expected) throw new Error(`${version} must carry the "-${expected}" tag for the ${channel} channel`)
 }
 
+/** Walk a directory recursively so artifacts nested inside subdirectories are found. */
+function walkFiles(dir) {
+  const out = []
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) out.push(...walkFiles(full))
+    else if (entry.isFile()) out.push({ name: entry.name, path: full })
+  }
+  return out
+}
+
 /** Pick the installer for one platform and hash it. */
 function digestFor(dir, patterns) {
-  const files = readdirSync(dir)
+  const files = walkFiles(dir)
   for (const pattern of patterns) {
-    const name = files.find(file => pattern.test(file))
-    if (name) {
-      const path = join(dir, name)
-      return { name, sha256: createHash('sha256').update(readFileSync(path)).digest('hex'), bytes: statSync(path).size }
+    const hit = files.find(file => pattern.test(file.name))
+    if (hit) {
+      return { name: hit.name, sha256: createHash('sha256').update(readFileSync(hit.path)).digest('hex'), bytes: statSync(hit.path).size }
     }
   }
   return undefined

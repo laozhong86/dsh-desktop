@@ -282,10 +282,27 @@ async function main() {
     const dirIdx = args.indexOf('--dir')
     const searchDir = dirIdx !== -1 ? resolve(ROOT_DIR, args[dirIdx + 1]) : null
 
+    function walkInstallerFiles(dir) {
+      if (!dir || !existsSync(dir)) return []
+      const out = []
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name)
+        if (entry.isDirectory()) out.push(...walkInstallerFiles(full))
+        else if (entry.isFile()) out.push(full)
+      }
+      return out
+    }
+    const discoveredFiles = walkInstallerFiles(searchDir)
+    const discoveredWin = discoveredFiles.find(f => /OmniMux-.*-Setup\.exe$/u.test(basename(f)))
+      ?? discoveredFiles.find(f => /-Setup\.exe$/u.test(basename(f)))
+    const discoveredMac = discoveredFiles.find(f => /OmniMux-.*-universal\.dmg$/u.test(basename(f)))
+      ?? discoveredFiles.find(f => /\.dmg$/u.test(basename(f)))
+
     const candidateWinPaths = [
       winExePath,
       searchDir ? join(searchDir, `DSH-Desktop-${version}-x64-Setup.exe`) : null,
       searchDir ? join(searchDir, `OmniMux-${version}-x64-Setup.exe`) : null,
+      discoveredWin,
       join(ROOT_DIR, 'dist/release-download', `DSH-Desktop-${version}-x64-Setup.exe`),
       join(ROOT_DIR, 'dist/release-download', `OmniMux-${version}-x64-Setup.exe`),
       join(ROOT_DIR, 'dsh-plugin-desktop/dist', `OmniMux-${version}-x64-Setup.exe`),
@@ -295,6 +312,7 @@ async function main() {
       macDmgPath,
       searchDir ? join(searchDir, `DSH.Desktop-${version}-universal.dmg`) : null,
       searchDir ? join(searchDir, `OmniMux-${version}-universal.dmg`) : null,
+      discoveredMac,
       join(ROOT_DIR, 'dist/release-download', `DSH.Desktop-${version}-universal.dmg`),
       join(ROOT_DIR, 'dist/release-download', `OmniMux-${version}-universal.dmg`),
       join(ROOT_DIR, 'dsh-plugin-desktop/dist/mac-release', `OmniMux-${version}-universal.dmg`),
@@ -327,24 +345,30 @@ async function main() {
 
     if (winExePath) {
       const winStat = statSync(winExePath)
-      uploadPlan.push(
-        { key: `releases/v${version}/OmniMux-${version}-x64-Setup.exe`, file: winExePath, size: winStat.size },
-        { key: `releases/v${version}/DSH-Desktop-${version}-x64-Setup.exe`, file: winExePath, size: winStat.size },
-        { key: `releases/latest/OmniMux-Setup.exe`, file: winExePath, size: winStat.size },
-        { key: `releases/latest/OmniMux-x64-Setup.exe`, file: winExePath, size: winStat.size },
-        { key: `releases/latest/DSH-Desktop-Setup.exe`, file: winExePath, size: winStat.size },
-      )
+      const actualWinName = basename(winExePath)
+      const winKeys = new Set([
+        `releases/v${version}/${actualWinName}`,
+        `releases/v${version}/OmniMux-${version}-x64-Setup.exe`,
+        `releases/v${version}/DSH-Desktop-${version}-x64-Setup.exe`,
+        `releases/latest/OmniMux-Setup.exe`,
+        `releases/latest/OmniMux-x64-Setup.exe`,
+        `releases/latest/DSH-Desktop-Setup.exe`,
+      ])
+      for (const key of winKeys) uploadPlan.push({ key, file: winExePath, size: winStat.size })
     }
 
     if (macDmgPath) {
       const macStat = statSync(macDmgPath)
-      uploadPlan.push(
-        { key: `releases/v${version}/OmniMux-${version}-universal.dmg`, file: macDmgPath, size: macStat.size },
-        { key: `releases/v${version}/DSH.Desktop-${version}-universal.dmg`, file: macDmgPath, size: macStat.size },
-        { key: `releases/latest/OmniMux-universal.dmg`, file: macDmgPath, size: macStat.size },
-        { key: `releases/latest/OmniMux-mac.dmg`, file: macDmgPath, size: macStat.size },
-        { key: `releases/latest/DSH-Desktop.dmg`, file: macDmgPath, size: macStat.size },
-      )
+      const actualMacName = basename(macDmgPath)
+      const macKeys = new Set([
+        `releases/v${version}/${actualMacName}`,
+        `releases/v${version}/OmniMux-${version}-universal.dmg`,
+        `releases/v${version}/DSH.Desktop-${version}-universal.dmg`,
+        `releases/latest/OmniMux-universal.dmg`,
+        `releases/latest/OmniMux-mac.dmg`,
+        `releases/latest/DSH-Desktop.dmg`,
+      ])
+      for (const key of macKeys) uploadPlan.push({ key, file: macDmgPath, size: macStat.size })
     }
 
     // Release metadata the desktop updaters poll. It lives at a fixed path beside

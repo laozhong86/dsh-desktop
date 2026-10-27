@@ -13564,7 +13564,7 @@ __metadata:
     omnimux-accounts: "npm:^0.1.2"
     omnimux-analytics: "npm:^0.2.1"
     omnimux-assets: "npm:^0.2.1"
-    omnimux-automation: "npm:^0.1.1"
+    omnimux-automation: "npm:^0.1.3"
     omnimux-clip: "npm:^0.1.1"
     omnimux-forms: "npm:^0.1.1"
     omnimux-inspiration: "npm:^0.1.1"
@@ -13593,6 +13593,9 @@ __metadata:
     vitest: "npm:4.1.8"
     yaml: "npm:^2.9.0"
     zustand: "npm:~4.4.7"
+  dependenciesMeta:
+    "@deepseek-ai/dsh-invariants":
+      optional: true
   languageName: unknown
   linkType: soft
 
@@ -17937,9 +17940,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"omnimux-automation@npm:^0.1.1":
-  version: 0.1.1
-  resolution: "omnimux-automation@npm:0.1.1"
+"omnimux-automation@npm:^0.1.3":
+  version: 0.1.3
+  resolution: "omnimux-automation@npm:0.1.3"
   dependencies:
     dsh-ui-kit: "npm:^0.1.0"
     luxon: "npm:^3.7.2"
@@ -17954,7 +17957,7 @@ __metadata:
       optional: true
     react-dom:
       optional: true
-  checksum: 10c0/721940584bd3a065948eff7abaa57171708e44bc49be972057931085c97e3acb3d8cfae4e96316736d1287ad4d9e1a635a7cc84c5be4cfc9aed3d4b643380d8c
+  checksum: 10c0/555c1c7d4883f790d4c5f4528feeaf10bfca24dd7a20e89915cb8353e5a59e3135ea8bb843de4f96d7f711a253d5de860a74dcfd3027f190bc836dfe0f939777
   languageName: node
   linkType: hard
 

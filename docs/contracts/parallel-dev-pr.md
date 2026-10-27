@@ -13,7 +13,7 @@
 
 ## 硬规则
 
-1. **主 checkout 只读**（日常开发）：主路径 `/Users/x/Desktop/Project/omnimux-desktop-fork` 只做 upstream sync、发版、board/lease 汇总。禁止在主仓并行写特性。
+1. **主 checkout 只读**（日常开发）：主路径（本仓库主 checkout） 只做 upstream sync、发版、board/lease 汇总。禁止在主仓并行写特性。
 2. **一会话 = 一 worktree = 一分支 = 一 PR**。禁止多会话共用同一 cwd。
 3. **写文件前必须有路径租约**。无租约或租约冲突 → 停手问老板。
 4. **产品 PR 只打 fork**：`laozhong86/omnimux-desktop-fork`，base = `omnimux`。禁止对 `anywhere-labs/deepseek-harness-desktop` 开产品特性 PR。

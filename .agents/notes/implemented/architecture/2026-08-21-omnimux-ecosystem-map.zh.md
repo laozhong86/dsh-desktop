@@ -12,11 +12,11 @@ Status: implemented
 
 | 层 | 仓库 | 位置 | 角色 |
 | --- | --- | --- | --- |
-| 官方核心 | `deepseek-ai/deepseek-harness` | `~/Desktop/Project/Github/deepseek-harness`（干净克隆，跟踪上游，当前 `0.1.0-rc.8`） | 官方 DeepSeek Harness 源码，用于跟踪与对比 |
+| 官方核心 | `deepseek-ai/deepseek-harness` | a sibling `deepseek-harness` checkout（干净克隆，跟踪上游，当前 `0.1.0-rc.8`） | 官方 DeepSeek Harness 源码，用于跟踪与对比 |
 | 官方桌面 | `anywhere-labs/deepseek-harness-desktop` | 本仓库的 `origin` 远程 | 本 fork 所基于的上游桌面项目 |
 | 桌面 fork | `laozhong86/omnimux-desktop-fork` | 本仓库（当前工作区，v2.0.1） | OmniMux 品牌化的桌面产品 |
-| 插件开发 | 本地 `dsh-plugin` 工作区 | `~/Desktop/Project/dsh-plugin` | OmniMux DSH 插件的开发地，开发完成后同步进桌面 preset |
-| 网关 | `laozhong86/OmniMux`（`QuantumNous/new-api` 的 fork） | `~/Desktop/Project/OmniMux` | Go 网关（Gin + GORM），在 VPS 上蓝绿部署跑生产（`omnimux.ai`） |
+| 插件开发 | 本地 `dsh-plugin` 工作区 | the sibling `dsh-plugin` checkout | OmniMux DSH 插件的开发地，开发完成后同步进桌面 preset |
+| 网关 | `laozhong86/OmniMux`（`QuantumNous/new-api` 的 fork） | the sibling `OmniMux` checkout | Go 网关（Gin + GORM），在 VPS 上蓝绿部署跑生产（`omnimux.ai`） |
 
 ## 仓库解剖
 
@@ -42,14 +42,14 @@ dsh-plugin/product/omnimux-dsh（插件 monorepo：omnimux 中枢 + dsh-drama �
 
 ## 版本与新鲜度事实
 
-- 子模块 pin 在 `0.1.0-rc.7`；官方上游已推进到 `0.1.0-rc.8`（可见于 `~/Desktop/Project/Github/deepseek-harness` 的干净克隆）。上游 pin 更新是一项待办的独立任务，必须与桌面行为改动分开提交。
+- 子模块 pin 在 `0.1.0-rc.7`；官方上游已推进到 `0.1.0-rc.8`（可见于 a sibling `deepseek-harness` checkout 的干净克隆）。上游 pin 更新是一项待办的独立任务，必须与桌面行为改动分开提交。
 - 网关仓库里的 `OmniMux/electron/` 是旧一代桌面壳（包装 Go 二进制），与本 DSH 桌面端无关，勿混淆。
 
 ## 给 agent 的指引
 
 - 插件日常开发 / 浏览器验收 / 同步进 App / 发版运维，入口是**本仓库**的 `yarn omnimux:*`（见根目录 `AGENTS.md`）。源码改动仍落在 `dsh-plugin/product/omnimux-dsh`。
 - 要把一次日常迭代推进已安装的 App：`yarn omnimux:sync <plugin>`，再 `yarn omnimux:restart`（**不会**重新打包）。要改新安装包内随附内容：`yarn omnimux:stage`，再 `package:dir` / `dist:*`。
-- 要对标或采纳更新的上游行为：先查干净克隆 `~/Desktop/Project/Github/deepseek-harness`，再提出一个独立的子模块 pin 更新。
+- 要对标或采纳更新的上游行为：先查干净克隆 a sibling `deepseek-harness` checkout，再提出一个独立的子模块 pin 更新。
 - 要动面向网关的行为（计费、视频生成、账号流程）：契约在网关仓库与 `dsh-plugin` 文档中（`docs/contracts/hub.md`、`docs/decisions/2026-08-16-harness-consume-not-fork.md`）。
 - 本地图记录的是本地绝对路径；换机器时请按仓库身份定位兄弟仓库，而非路径。
 

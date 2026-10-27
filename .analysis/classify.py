@@ -5,11 +5,12 @@ Read-only over the conflicted worktree. Emits classification.json + classificati
 Bucket rules follow docs/contracts/upstream-sync.md (A/B/C/D).
 """
 import json
+import os
 import subprocess
 import sys
 from collections import Counter, OrderedDict
 
-WT = "/Users/x/Desktop/Project/omnimux-desktop-fork/.worktrees/next-shell-merge-issue-3778"
+WT = os.environ.get("OMNIMUX_WT", "")
 
 
 def git(*args):
@@ -37,7 +38,6 @@ def same_blob(path):
 
 
 def has_brand_literal(path):
-    import os
     full = os.path.join(WT, path)
     if not os.path.exists(full):
         return False

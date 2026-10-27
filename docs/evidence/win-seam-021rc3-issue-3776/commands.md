@@ -1,6 +1,6 @@
 # win-seam-021rc3-issue-3776 — command ledger
 
-Worktree `/Users/x/Desktop/Project/omnimux-desktop-fork/.worktrees/win-seam-021rc3-issue-3776`, branch `agent/win-seam-021rc3-issue-3776`, base `omnimux` = `dca12ebdd2`.
+Worktree `.worktrees/win-seam-021rc3-issue-3776`, branch `agent/win-seam-021rc3-issue-3776`, base `omnimux` = `dca12ebdd2`.
 Host: macOS, Node `v25.8.0`, Yarn `4.18.0` (Corepack). Every command ran in the worktree unless noted.
 Long steps were run as `cmd > log 2>&1; echo "REAL_EXIT=$?" >> log`, so the codes below are real exit codes, not piped ones.
 

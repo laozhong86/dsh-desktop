@@ -1,6 +1,6 @@
 # sharp-universal-issue-3786 — command ledger
 
-Worktree `/Users/x/Desktop/Project/omnimux-desktop-fork/.worktrees/sharp-universal-issue-3786`, branch `agent/sharp-universal-issue-3786`, base `omnimux` = `dca12ebdd2`.
+Worktree `.worktrees/sharp-universal-issue-3786`, branch `agent/sharp-universal-issue-3786`, base `omnimux` = `dca12ebdd2`.
 Host: macOS, Yarn `4.18.0` (Corepack). Node `v25.8.0` for ordinary commands; **Node `v24.18.1`** for the smoke packaging, which refuses anything but 22.19+ or 24.x (`scripts/package-mac.ts:109-113`).
 Codes are real exit codes captured with `cmd > log 2>&1; echo "REAL_EXIT=$?"` — no piped statuses.
 

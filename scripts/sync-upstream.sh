@@ -13,7 +13,8 @@ GIT_ID=(-c user.name="omnimux" -c user.email="dev@omnimux.local")
 
 NODE_BIN="$(command -v node || true)"
 if [ -z "$NODE_BIN" ]; then
-  NODE_BIN="/Users/x/.workbuddy/binaries/node/versions/22.22.2/bin/node"
+  echo "sync-upstream: node not found on PATH" >&2
+  exit 1
 fi
 
 say()  { printf '%s\n' "$*"; }
@@ -92,7 +93,7 @@ corepack yarn install 2>&1 | tail -2
 # ---------- 阶段 6：build + 验证 ----------
 say "── [6/7] build（干净 env）──"
 # 固定用带 corepack 的 managed node（绕 workbuddy safe-delete shim 的 NODE_OPTIONS/PATH 注入）
-MANAGED_NODE_BIN="/Users/x/.workbuddy/binaries/node/versions/22.22.2/bin"
+MANAGED_NODE_BIN="$(dirname "$NODE_BIN")"
 if [ ! -x "$MANAGED_NODE_BIN/node" ]; then
   MANAGED_NODE_BIN="$(dirname "$NODE_BIN")"
 fi

@@ -23,7 +23,7 @@ This repository owns the desktop product around an unmodified DeepSeek Harness c
 
 ## OmniMux plugin ops (this repo is the day-to-day entry)
 
-This fork is the **main ops entry** for OmniMux plugin develop / browser QA / sync-to-app / release. Plugin source lives in the sibling `~/Desktop/Project/dsh-plugin/product/omnimux-dsh`. Contracts: that tree's `docs/contracts/dev-pipeline.md` + `docs/contracts/ops-entry.md` (single ops entry; no per-plugin deploy lanes).
+This fork is the **main ops entry** for OmniMux plugin develop / browser QA / sync-to-app / release. Plugin source lives in the sibling `dsh-plugin` repository at `product/omnimux-dsh`. Contracts: that tree's `docs/contracts/dev-pipeline.md` + `docs/contracts/ops-entry.md` (single ops entry; no per-plugin deploy lanes).
 
 | Command | Purpose |
 | --- | --- |
@@ -52,7 +52,7 @@ MUST NOT hand-`rsync`/`cp` into any profile. Daily iteration uses `omnimux:sync`
 
 ## Repository ecosystem
 
-This desktop product is one layer of a wider OmniMux project ecosystem: it forks an unmodified official DeepSeek Harness checkout, ships preset OmniMux plugins from the sibling `dsh-plugin` development workspace, and talks to the OmniMux Go gateway over `OMNIMUX_BASE_URL`. Sibling repositories live under `~/Desktop/Project/` (`dsh-plugin`, `OmniMux`, `Github/deepseek-harness`, and the parallel slim shell `omnimux-desktop` — an alternative product direction, NOT the shipping line). Read the [ecosystem Agent Note](.agents/notes/implemented/architecture/2026-08-21-omnimux-ecosystem-map.md) before touching plugin sync, upstream pins, or gateway-facing behavior. Cross-repo agent memory: `/Users/x/Desktop/Project/Github/deepseek-harness/.workbuddy/memory/MEMORY.md`.
+This desktop product is one layer of a wider OmniMux project ecosystem: it forks an unmodified official DeepSeek Harness checkout, ships preset OmniMux plugins from the sibling `dsh-plugin` development workspace, and talks to the OmniMux Go gateway over `OMNIMUX_BASE_URL`. Sibling repositories are checked out next to this one (`dsh-plugin`, `OmniMux`, `deepseek-harness`, and the parallel slim shell `omnimux-desktop` — an alternative product direction, NOT the shipping line). Read the [ecosystem Agent Note](.agents/notes/implemented/architecture/2026-08-21-omnimux-ecosystem-map.md) before touching plugin sync, upstream pins, or gateway-facing behavior.
 
 ## Upstream sync contract
 

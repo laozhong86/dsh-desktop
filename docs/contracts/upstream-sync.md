@@ -52,7 +52,7 @@
 **首选执行方式：脚本**（强制分级 + 自动解 B 级 + 生成日志骨架）：
 
 ```sh
-cd /Users/x/Desktop/Project/omnimux-desktop-fork
+cd "$(git rev-parse --show-toplevel)"
 bash scripts/sync-upstream.sh          # 退出码 0=完成待收尾 / 2=C 级停等 / 3=验证不绿
 # 收尾：补全日志 → git add 日志 && commit → push → CI 确认
 ```
@@ -62,14 +62,14 @@ bash scripts/sync-upstream.sh          # 退出码 0=完成待收尾 / 2=C 级�
 **手动执行（脚本不可用时的人工等价流程）**：
 
 ```sh
-cd /Users/x/Desktop/Project/omnimux-desktop-fork
+cd "$(git rev-parse --show-toplevel)"
 git fetch origin
 git log --oneline omnimux..origin/master   # 预检：提交类型分布，识别 C 级风险
 git merge origin/master
 # → 冲突逐个按分级处理；C 级停等；D 级拒绝
 corepack yarn install                       # 依赖跟进（rc 升级必须）
 # 干净环境 build（绕 workbuddy safe-delete shim）：
-env -u NODE_OPTIONS PATH="/Users/x/.workbuddy/binaries/node/versions/22.22.2/bin:/usr/bin:/bin:/usr/sbin:/sbin" \
+env -u NODE_OPTIONS PATH="$(dirname "$(command -v node)"):/usr/bin:/bin:/usr/sbin:/sbin" \
   sh -c 'corepack yarn workspace dsh-plugin-desktop build'
 corepack yarn workspace dsh-plugin-desktop typecheck
 corepack yarn workspace dsh-plugin-desktop test   # 本地 safe-delete 干扰的用例以 CI 为准

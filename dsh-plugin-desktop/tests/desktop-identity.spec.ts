@@ -33,7 +33,7 @@ describe('desktop-identity & port policy (Issue #350)', () => {
         env: { OMNIMUX_CHANNEL: 'prod' },
         execPath: '/Applications/OmniMux.app/Contents/MacOS/OmniMux',
         appName: 'OmniMux',
-        userDataDir: '/Users/x/Library/Application Support/OmniMux-Dev',
+        userDataDir: '/home/tester/Library/Application Support/OmniMux-Dev',
       }),
     ).toBe(true)
   })
@@ -51,7 +51,7 @@ describe('desktop-identity & port policy (Issue #350)', () => {
         env: { OMNIMUX_CHANNEL: 'prod' },
         execPath: '/Applications/OmniMux.app/Contents/MacOS/OmniMux',
         appName: 'OmniMux',
-        userDataDir: '/Users/x/Library/Application Support/OmniMux',
+        userDataDir: '/home/tester/Library/Application Support/OmniMux',
       }),
     ).toBe(false)
   })

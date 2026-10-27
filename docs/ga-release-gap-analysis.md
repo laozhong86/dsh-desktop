@@ -68,7 +68,7 @@
 | 决策点 | 选项 | 推荐 | 理由 |
 |---|---|---|---|
 | D1 发布宿主 | a) GitHub Releases（免费，electron-builder 原生 publish） b) 自建 S3/CDN + 自建更新服务 | a 起步 | release-plan.md 已论证；国内下载慢可后续加 OSS 镜像 |
-| D2 更新服务 | a) 复用现有生产 origin（45.58.165.234 VPS）挂 `/api/desktop/version` + `/api/downloads/*` b) 静态 JSON + OSS 直链 | a | 客户端契约已定死这两个端点，实现它即可，无需改代码 |
+| D2 更新服务 | a) 复用现有生产 origin（网关 VPS，地址见运维仓库）挂 `/api/desktop/version` + `/api/downloads/*` b) 静态 JSON + OSS 直链 | a | 客户端契约已定死这两个端点，实现它即可，无需改代码 |
 | D3 自动更新方案 | a) 接入 electron-updater（zip + blockmap + quitAndInstall，需 EDDSA 更新签名密钥） b) 接受半自动（下载 DMG 手动换）作为 GA v1 | a 为终态；b 可过渡 | GA 目标明确要求"真正替换运行中的 App" |
 | D4 Windows 签名 | a) 官网 unsigned（零额外费，接受 SmartScreen） b) OV 年费 c) Azure Trusted Signing 月费 | **a 当前选定**；b/c 仅付费后 | 零预算约束下商店暂停、官网优先 |
 | D5 官网托管 | a) 域名 + 静态站（GitHub Pages/Vercel/CloudStudio） b) 域名 + 自建 | a | 上线快、成本低 |

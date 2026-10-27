@@ -1,10 +1,10 @@
 # OmniMux 紫色品牌图标全量协同更新 — 系统设计与前端任务清单
 
-> **角色**：架构师 高见远（Gao）  
-> **范围**：全量协同更新（App 图标 + 页面内品牌 Logo/IP 图标）  
-> **仓库 A**：`/Users/x/Desktop/Project/OmniMux`（Web / 平台主仓）  
-> **仓库 B**：`/Users/x/Desktop/Project/omnimux-desktop-fork`（桌面客户端构建源，发运线）  
-> **规范**：`/Users/x/Desktop/Project/OmniMux/DESIGN.md` 2.0.0 Violet & Indigo Brand Refresh  
+> **角色**：架构师 高见远（Gao）
+> **范围**：全量协同更新（App 图标 + 页面内品牌 Logo/IP 图标）
+> **仓库 A**：`OmniMux`（Web / 平台主仓，与本仓库同级 checkout）
+> **仓库 B**：`omnimux-desktop-fork`（桌面客户端构建源，发运线，即本仓库）
+> **规范**：仓库 A 的 `DESIGN.md` 2.0.0 Violet & Indigo Brand Refresh
 > **结论先行**：仓库 A 的 Web/PWA/Landing/品牌套件 **已经换紫**；仓库 B 的 Dock / Windows 应用图标 / 系统托盘 **仍是旧版荧光绿章鱼**，是本次工程的主战场。无后端接口变更，全部由前端落地。
 
 ---
@@ -291,7 +291,7 @@ sequenceDiagram
 
 ### 7. Task List（按依赖排序，硬上限 5）
 
-> 全部任务给 **前端界面开发专家**。Backend 任务数 = 0。  
+> 全部任务给 **前端界面开发专家**。Backend 任务数 = 0。
 > 每个任务 ≥ 3 个相关文件。T02/T03 在 T01 之后可并行。
 
 #### T01 — 项目基础设施：锁定真源 + 生成入口 + 色板契约
@@ -299,11 +299,11 @@ sequenceDiagram
 - **Priority**: P0
 - **Dependencies**: 无
 - **Source Files**:
-  - `/Users/x/Desktop/Project/OmniMux/assets/ip_design/octo_ghost_vector.svg`（只读真源）
-  - `/Users/x/Desktop/Project/omnimux-desktop-fork/dsh-plugin-desktop/build/octo-ghost-app.svg`（新建：直角方图拷贝，供 B 仓离线构建）
-  - `/Users/x/Desktop/Project/omnimux-desktop-fork/dsh-plugin-desktop/scripts/generate-app-icon-source-omnimux.mjs`（新建：1254 SVG → 1024 RGBA `app-icon.png`）
-  - `/Users/x/Desktop/Project/omnimux-desktop-fork/dsh-plugin-desktop/scripts/generate-tray-icons-omnimux.mjs`（改：以 SVG 为源，`BRAND_VIOLET='#7961f2'`，删除 chartreuse 注释）
-  - `/Users/x/Desktop/Project/omnimux-desktop-fork/dsh-plugin-desktop/scripts/generate-mac-app-icon-omnimux.mjs`（仅注释：源图必须是满铺 1024 方图，禁止预圆角）
+  - 仓库 A 的 `assets/ip_design/octo_ghost_vector.svg`（只读真源）
+  - `dsh-plugin-desktop/build/octo-ghost-app.svg`（新建：直角方图拷贝，供 B 仓离线构建）
+  - `dsh-plugin-desktop/scripts/generate-app-icon-source-omnimux.mjs`（新建：1254 SVG → 1024 RGBA `app-icon.png`）
+  - `dsh-plugin-desktop/scripts/generate-tray-icons-omnimux.mjs`（改：以 SVG 为源，`BRAND_VIOLET='#7961f2'`，删除 chartreuse 注释）
+  - `dsh-plugin-desktop/scripts/generate-mac-app-icon-omnimux.mjs`（仅注释：源图必须是满铺 1024 方图，禁止预圆角）
 - **操作要点**:
   1. 拷贝真源 SVG 到 B 仓 `build/octo-ghost-app.svg`，保持直角底 `#b8b7ff`，不要用 `docs/brand/assets/logo-*-*.svg` 的 `rx=280`。
   2. 源脚本用 `sharp(svgBuffer, { density: 384 }).resize(1024,1024).ensureAlpha().png({ compressionLevel: 9 })`。
@@ -316,13 +316,13 @@ sequenceDiagram
 - **Priority**: P0
 - **Dependencies**: T01
 - **Source Files**:
-  - `/Users/x/Desktop/Project/omnimux-desktop-fork/dsh-plugin-desktop/build/app-icon.png`
-  - `/Users/x/Desktop/Project/omnimux-desktop-fork/dsh-plugin-desktop/build/app-icon-mac.png`
-  - `/Users/x/Desktop/Project/omnimux-desktop-fork/dsh-plugin-desktop/package.json`（确认 `build.mac.icon` / `win.icon` / `linux.icon` 路径不变，无需改字段）
+  - `dsh-plugin-desktop/build/app-icon.png`
+  - `dsh-plugin-desktop/build/app-icon-mac.png`
+  - `dsh-plugin-desktop/package.json`（确认 `build.mac.icon` / `win.icon` / `linux.icon` 路径不变，无需改字段）
 - **命令**:
 
 ```bash
-cd /Users/x/Desktop/Project/omnimux-desktop-fork/dsh-plugin-desktop
+cd dsh-plugin-desktop
 node scripts/generate-app-icon-source-omnimux.mjs
 node scripts/generate-mac-app-icon-omnimux.mjs
 ```
@@ -339,17 +339,17 @@ node scripts/generate-mac-app-icon-omnimux.mjs
 - **Priority**: P0
 - **Dependencies**: T01
 - **Source Files**:
-  - `/Users/x/Desktop/Project/omnimux-desktop-fork/dsh-plugin-desktop/build/tray-icon.svg`
-  - `/Users/x/Desktop/Project/omnimux-desktop-fork/dsh-plugin-desktop/build/tray-icon-source-32.png`
-  - `/Users/x/Desktop/Project/omnimux-desktop-fork/dsh-plugin-desktop/build/tray-icon-source-16.png`
-  - `/Users/x/Desktop/Project/omnimux-desktop-fork/dsh-plugin-desktop/build/tray-icon-source-blue-32.png`
-  - `/Users/x/Desktop/Project/omnimux-desktop-fork/dsh-plugin-desktop/build/tray-icon-source-blue-16.png`
-  - `/Users/x/Desktop/Project/omnimux-desktop-fork/dsh-plugin-desktop/build/tray-iconTemplate.png`
-  - `/Users/x/Desktop/Project/omnimux-desktop-fork/dsh-plugin-desktop/build/tray-iconTemplate@2x.png`
-  - `/Users/x/Desktop/Project/omnimux-desktop-fork/dsh-plugin-desktop/build/tray-icon-blue.png`
-  - `/Users/x/Desktop/Project/omnimux-desktop-fork/dsh-plugin-desktop/build/tray-icon-blue@1.25x.png`
-  - `/Users/x/Desktop/Project/omnimux-desktop-fork/dsh-plugin-desktop/build/tray-icon-blue@1.5x.png`
-  - `/Users/x/Desktop/Project/omnimux-desktop-fork/dsh-plugin-desktop/build/tray-icon-blue@2x.png`
+  - `dsh-plugin-desktop/build/tray-icon.svg`
+  - `dsh-plugin-desktop/build/tray-icon-source-32.png`
+  - `dsh-plugin-desktop/build/tray-icon-source-16.png`
+  - `dsh-plugin-desktop/build/tray-icon-source-blue-32.png`
+  - `dsh-plugin-desktop/build/tray-icon-source-blue-16.png`
+  - `dsh-plugin-desktop/build/tray-iconTemplate.png`
+  - `dsh-plugin-desktop/build/tray-iconTemplate@2x.png`
+  - `dsh-plugin-desktop/build/tray-icon-blue.png`
+  - `dsh-plugin-desktop/build/tray-icon-blue@1.25x.png`
+  - `dsh-plugin-desktop/build/tray-icon-blue@1.5x.png`
+  - `dsh-plugin-desktop/build/tray-icon-blue@2x.png`
 - **SVG 规范**:
   - 同一幽灵 `path`，**删除** `#101B2B` 底砖。
   - 身体恰好一处 `fill="#7961f2"`（测试按此计数）。
@@ -358,7 +358,7 @@ node scripts/generate-mac-app-icon-omnimux.mjs
 - **命令**:
 
 ```bash
-cd /Users/x/Desktop/Project/omnimux-desktop-fork/dsh-plugin-desktop
+cd dsh-plugin-desktop
 node scripts/generate-tray-icons-omnimux.mjs
 ```
 
@@ -369,10 +369,10 @@ node scripts/generate-tray-icons-omnimux.mjs
 - **Priority**: P1
 - **Dependencies**: 无（可与 T02/T03 并行；不依赖新桌面 PNG）
 - **Source Files**:
-  - `/Users/x/Desktop/Project/OmniMux/FORK_CUSTOMIZATIONS.md`（删除 chartreuse `#C6F14F` / `#101B2B` 旧 IP 描述，改为 DESIGN 2.0 香芋紫 + 曜石黑 + 白胶囊眼）
-  - `/Users/x/Desktop/Project/OmniMux/web/src/features/omnimux-landing/components/logo-mark.tsx`（注释去掉 potrace/旧绿叙事，改为「共享 web/public/logo.svg，DESIGN 2.0 lavender IP」）
-  - `/Users/x/Desktop/Project/omnimux-desktop-fork/dsh-plugin-desktop/README.md`
-  - `/Users/x/Desktop/Project/omnimux-desktop-fork/dsh-plugin-desktop/README.zh.md`（「brand-blue tray / `#4D6BFE`」→「OmniMux 极光紫托盘 `#7961f2` + macOS Template」；并写明 build 调用的是 `*-omnimux.mjs`）
+  - `OmniMux/FORK_CUSTOMIZATIONS.md`（删除 chartreuse `#C6F14F` / `#101B2B` 旧 IP 描述，改为 DESIGN 2.0 香芋紫 + 曜石黑 + 白胶囊眼）
+  - `OmniMux/web/src/features/omnimux-landing/components/logo-mark.tsx`（注释去掉 potrace/旧绿叙事，改为「共享 web/public/logo.svg，DESIGN 2.0 lavender IP」）
+  - `dsh-plugin-desktop/README.md`
+  - `dsh-plugin-desktop/README.zh.md`（「brand-blue tray / `#4D6BFE`」→「OmniMux 极光紫托盘 `#7961f2` + macOS Template」；并写明 build 调用的是 `*-omnimux.mjs`）
 - **抽检清单（只读，已紫则不动文件）**:
   - `web/public/{logo.svg,logo.png,favicon.ico,favicon-16x16.png,favicon-32x32.png,apple-touch-icon.png,icon-192.png,icon-512.png,maskable-icon-512.png}`
   - `web/src/features/omnimux-landing/assets/{octo_ghost_vector.svg,doodle-left.svg,doodle-right.svg,underline-hero.svg,underline-section.svg,underline-faq.svg}`
@@ -384,9 +384,9 @@ node scripts/generate-tray-icons-omnimux.mjs
 - **Priority**: P0
 - **Dependencies**: T02, T03, T04
 - **Source Files**:
-  - `/Users/x/Desktop/Project/omnimux-desktop-fork/dsh-plugin-desktop/tests/package.spec.ts`
-  - `/Users/x/Desktop/Project/omnimux-desktop-fork/dsh-plugin-desktop/package.json`（`scripts.build` 已含两步 generate，确认 T01 新源脚本若需进 build，则插到 mac 生成 **之前**：`generate-app-icon-source` → `generate-mac-app-icon-omnimux` → `generate-tray-icons-omnimux`）
-  - `/Users/x/Desktop/Project/omnimux-desktop-fork/docs/system_design.md`（本文件，验收时对照）
+  - `dsh-plugin-desktop/tests/package.spec.ts`
+  - `dsh-plugin-desktop/package.json`（`scripts.build` 已含两步 generate，确认 T01 新源脚本若需进 build，则插到 mac 生成 **之前**：`generate-app-icon-source` → `generate-mac-app-icon-omnimux` → `generate-tray-icons-omnimux`）
+  - `docs/system_design.md`（本文件，验收时对照）
 - **`package.spec.ts` 必改点**:
   - `expect(source.match(/#C6F14F/gu)).toHaveLength(1)` → `expect(source.match(/#7961f2/gu)).toHaveLength(1)`，并 `not.toMatch(/#C6F14F|#C8F135|#A3E635/i)`。
   - `keeps the OmniMux brand source icon unmodified` 的 sha256：对新 `app-icon.png` 重算后替换 `ad1baf25839507f5dad99bddf716ffc3210b49ba2465339957e21c4f8c0da456`。
@@ -394,7 +394,7 @@ node scripts/generate-tray-icons-omnimux.mjs
 - **命令**:
 
 ```bash
-cd /Users/x/Desktop/Project/omnimux-desktop-fork
+cd omnimux-desktop-fork
 corepack yarn workspace dsh-plugin-desktop exec vitest run tests/package.spec.ts
 # 图标相关断言全绿后再考虑
 # corepack yarn workspace dsh-plugin-desktop build

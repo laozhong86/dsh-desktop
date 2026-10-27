@@ -4,7 +4,7 @@ Every command was run as `cmd > log 2>&1; echo "REAL_EXIT=$?"` (or with the exit
 the log). No piped exit code is reported. Worktree commands always carried an explicit `workdir`
 and `git -C <path>`.
 
-Worktree: `/Users/x/Desktop/Project/omnimux-desktop-fork/.worktrees/harness-rc3-repin`
+Worktree: `.worktrees/harness-rc3-repin`
 Branch: `agent/harness-rc3-repin` (base `fork/omnimux` = `f245033bc2`)
 Pin commit: `9dda0eeba3084e1e92fe15f8fcda956d656c9136`
 
@@ -17,7 +17,7 @@ Pin commit: `9dda0eeba3084e1e92fe15f8fcda956d656c9136`
 | 5 | `git -C deepseek-harness checkout -q a4c74a91e0…` (worktree) | 0 | `dsh-v0.1.5-rc.3` |
 | 6 | `node verify-patches.mjs <wt> 0.1.5-rc.1 0.1.5-rc.1` (control) | 0 | 13/13 patches, 40/40 hunks — validates the oracle against the shipped rc.1 tarballs |
 | 7 | `corepack yarn upstream:prepare-runtime` (ambient PATH) | **1** | failed at `build:lib` — the DSH Desktop runtime shim on PATH supplied pnpm 11.8.0 while the harness pins 11.7.0 |
-| 8 | `env -u NODE_OPTIONS PATH=/Users/x/.nvm/versions/node/v25.8.0/bin:/usr/bin:/bin:/usr/sbin:/sbin corepack yarn upstream:prepare-runtime` | 0 | `release pack: family dsh, 265 tarball(s) in dist/npm` |
+| 8 | `env -u NODE_OPTIONS PATH=$(dirname "$(command -v node)"):/usr/bin:/bin:/usr/sbin:/sbin corepack yarn upstream:prepare-runtime` | 0 | `release pack: family dsh, 265 tarball(s) in dist/npm` |
 | 9 | `node verify-patches.mjs <wt> 0.1.5-rc.1 0.1.5-rc.3` (target) | 0 | 13/13 patches, 40/40 hunks transplant; 0 repairs, 0 failures |
 | 10 | `git mv patches/*@0.1.5-rc.1.patch …@0.1.5-rc.3.patch` (13 files) | 0 | tracked renames |
 | 11 | `node scripts/sync-vendored-runtime.mjs --write` | 0 | `stable 265 packages from a4c74a91e0 are verified` |

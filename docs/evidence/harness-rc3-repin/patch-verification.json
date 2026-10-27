@@ -1,10 +1,10 @@
 {
   "control": {
     "generatedAt": "2026-10-05T19:11:50.564Z",
-    "repoRoot": "/Users/x/Desktop/Project/omnimux-desktop-fork/.worktrees/harness-rc3-repin",
+    "repoRoot": ".worktrees/harness-rc3-repin",
     "sourceVersion": "0.1.5-rc.1",
     "targetVersion": "0.1.5-rc.1",
-    "packedDir": "/Users/x/Desktop/Project/omnimux-desktop-fork/.worktrees/harness-rc3-repin/vendor/dsh-runtime/0.1.5-rc.1",
+    "packedDir": ".worktrees/harness-rc3-repin/vendor/dsh-runtime/0.1.5-rc.1",
     "oracle": "patch -p1 --dry-run --forward --fuzz=0",
     "crossCheck": "git apply --check -p1 (stricter; rejects zero-context hunks)",
     "patchCount": 13,
@@ -565,10 +565,10 @@
   },
   "target": {
     "generatedAt": "2026-10-05T19:11:59.540Z",
-    "repoRoot": "/Users/x/Desktop/Project/omnimux-desktop-fork/.worktrees/harness-rc3-repin",
+    "repoRoot": ".worktrees/harness-rc3-repin",
     "sourceVersion": "0.1.5-rc.1",
     "targetVersion": "0.1.5-rc.3",
-    "packedDir": "/Users/x/Desktop/Project/omnimux-desktop-fork/.worktrees/harness-rc3-repin/deepseek-harness/dist/npm",
+    "packedDir": ".worktrees/harness-rc3-repin/deepseek-harness/dist/npm",
     "oracle": "patch -p1 --dry-run --forward --fuzz=0",
     "crossCheck": "git apply --check -p1 (stricter; rejects zero-context hunks)",
     "patchCount": 13,

@@ -12,11 +12,11 @@ This note is the canonical map of how this repository — the OmniMux desktop (`
 
 | Layer | Repository | Location | Role |
 | --- | --- | --- | --- |
-| Official core | `deepseek-ai/deepseek-harness` | `~/Desktop/Project/Github/deepseek-harness` (clean clone, tracks upstream, currently `0.1.0-rc.8`) | Canonical DeepSeek Harness source used for tracking and comparison |
+| Official core | `deepseek-ai/deepseek-harness` | a sibling `deepseek-harness` checkout (clean clone, tracks upstream, currently `0.1.0-rc.8`) | Canonical DeepSeek Harness source used for tracking and comparison |
 | Official desktop | `anywhere-labs/deepseek-harness-desktop` | this repository's `origin` remote | Upstream desktop project this fork is based on |
 | Desktop fork | `laozhong86/omnimux-desktop-fork` | this repository (current workspace, v2.0.1) | The OmniMux-branded desktop product |
-| Plugin development | local `dsh-plugin` workspace | `~/Desktop/Project/dsh-plugin` | Where OmniMux DSH plugins are developed before shipping into the desktop preset |
-| Gateway | `laozhong86/OmniMux` (fork of `QuantumNous/new-api`) | `~/Desktop/Project/OmniMux` | Go gateway (Gin + GORM) running production on a VPS (blue-green) at `omnimux.ai` |
+| Plugin development | local `dsh-plugin` workspace | the sibling `dsh-plugin` checkout | Where OmniMux DSH plugins are developed before shipping into the desktop preset |
+| Gateway | `laozhong86/OmniMux` (fork of `QuantumNous/new-api`) | the sibling `OmniMux` checkout | Go gateway (Gin + GORM) running production on a VPS (blue-green) at `omnimux.ai` |
 
 ## Repository anatomy
 
@@ -42,14 +42,14 @@ dsh-plugin/product/omnimux-dsh (plugin monorepo: omnimux hub + dsh-drama vertica
 
 ## Version and freshness facts
 
-- Submodule pin is `0.1.0-rc.7`; official upstream has moved to `0.1.0-rc.8` (visible in the clean clone at `~/Desktop/Project/Github/deepseek-harness`). An upstream pin update is an open, standalone task and must stay separate from desktop behavior commits.
+- Submodule pin is `0.1.0-rc.7`; official upstream has moved to `0.1.0-rc.8` (visible in the clean clone at a sibling `deepseek-harness` checkout). An upstream pin update is an open, standalone task and must stay separate from desktop behavior commits.
 - `OmniMux/electron/` inside the gateway repo is the legacy desktop wrapper (wraps the Go binary); it is unrelated to this DSH-based desktop. Do not confuse the two.
 
 ## Guidance for agents
 
 - Day-to-day plugin develop / browser QA / sync-to-app / release ops run from **this repository** via `yarn omnimux:*` (see root `AGENTS.md`). Source edits still land in `dsh-plugin/product/omnimux-dsh`.
 - To push a daily iteration into the installed App: `yarn omnimux:sync <plugin>` then `yarn omnimux:restart` (does **not** re-package). To change what ships inside a new install package: `yarn omnimux:stage` then `package:dir` / `dist:*`.
-- To compare against or adopt newer upstream behavior: consult the clean clone `~/Desktop/Project/Github/deepseek-harness`, then propose a dedicated submodule pin update.
+- To compare against or adopt newer upstream behavior: consult the clean clone a sibling `deepseek-harness` checkout, then propose a dedicated submodule pin update.
 - To touch gateway-facing behavior (billing, video generation, account flows): the contract lives in the gateway repo and the `dsh-plugin` docs (`docs/contracts/hub.md`, `docs/decisions/2026-08-16-harness-consume-not-fork.md`).
 - This map documents local absolute paths; on a different machine, locate siblings by repository identity rather than by path.
 

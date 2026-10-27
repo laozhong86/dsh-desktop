@@ -54,22 +54,17 @@ jobs:
         run: |
           cd dsh-plugin-desktop
           node scripts/verify-distribution.ts --preset preset
-      - name: Build macOS release (arm64 DMG)
+      - name: Build macOS release (universal DMG)
         env:
           OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}/omni-source/plugins
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-        run: |
-          corepack yarn workspace dsh-plugin-desktop build
-          cd dsh-plugin-desktop
-          node node_modules/electron-builder/cli.js --mac dmg --arm64 --publish never \
-            --config.mac.notarize=false --config.npmRebuild=false \
-            --config.directories.output=dist/mac-arm64-release
+        run: corepack yarn workspace dsh-desktop-next dist:mac
       - name: Upload DMG artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: OmniMux-mac
           path: |
-            dsh-plugin-desktop/dist/mac-arm64-release/**/*.dmg
+            dsh-desktop-next/dist/**/*.dmg
           if-no-files-found: error
           retention-days: 14
 
@@ -110,19 +105,19 @@ jobs:
         env:
           OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}\omni-source\plugins
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
-        run: corepack yarn workspace dsh-plugin-desktop dist:win
+        run: corepack yarn workspace dsh-desktop-next dist:win
       - name: Verify Windows installer
         env:
           OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}\omni-source\plugins
-        run: corepack yarn workspace dsh-plugin-desktop check:win-package
+        run: corepack yarn workspace dsh-desktop-next check:win-package
       - name: Upload Windows installer
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4
         with:
           name: OmniMux-win
           path: |
-            dsh-plugin-desktop/dist/OmniMux-*.exe
-            dsh-plugin-desktop/dist/OmniMux-*.zip
-            dsh-plugin-desktop/dist/win-unpacked
+            dsh-desktop-next/dist/OmniMux-*.exe
+            dsh-desktop-next/dist/OmniMux-*.zip
+            dsh-desktop-next/dist/win-unpacked
           if-no-files-found: error
           retention-days: 14
 
@@ -144,6 +139,13 @@ jobs:
       R2_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+      # The market catalog images are uploaded from the plugin source tree, so this job
+      # needs the same plugins checkout the build jobs use.
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
+        with:
+          ref: plugins-source
+          path: omni-source
+          persist-credentials: false
       - name: Download build artifacts
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
         with:
@@ -182,6 +184,15 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           node scripts/r2-dist-sync.mjs upload --dir release-assets
+      # The market plugin ships code only; its catalog images live here. Upload them in
+      # the same release so a fresh install never hits a missing cover.
+      - name: Sync market catalog assets to R2
+        if: ${{ env.R2_TOKEN != '' && env.R2_ACCOUNT != '' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node scripts/upload-market-assets.mjs --dir omni-source/plugins/omnimux-market/catalog
       # Without this the publish job looks green while the CDN stayed empty.
       - name: Report skipped R2 sync
         if: ${{ env.R2_TOKEN == '' || env.R2_ACCOUNT == '' }}

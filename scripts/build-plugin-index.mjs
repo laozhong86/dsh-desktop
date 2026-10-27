@@ -57,21 +57,117 @@ const PUBLISHED_PLUGINS = [
     title: { en: 'OmniMux', zh: 'OmniMux' },
     description: {
       en: 'The OmniMux hub: apps, taskboard, expert gallery and the shell entries every other OmniMux plugin attaches to.',
-      zh: 'OmniMux 中枢：应用、任务看板、专家馆，以及其他 OmniMux 插件依附的壳入口。',
+      zh: 'undefined',
     },
   },
-  // omnimux-market is held back from the index: its package is 142.5 MB because
-  // `catalog/` carries 136 MB of images, and npm aborts that upload with EPIPE.
-  // It returns once the assets move to the CDN and the package is code-only.
-  // {
-  //   dir: 'omnimux-market',
-  //   category: 'market',
-  //   title: { en: 'OmniMux Market', zh: 'OmniMux 市场' },
-  //   description: {
-  //     en: 'Browse and install OmniMux plugins from the market index.',
-  //     zh: '从市场索引浏览并安装 OmniMux 插件。',
-  //   },
-  // },
+  {
+    dir: 'omnimux-market',
+    category: 'market',
+    title: { en: 'OmniMux Market', zh: 'OmniMux Market' },
+    description: {
+      en: 'Browse and install OmniMux plugins from the market index.',
+      zh: 'undefined',
+    },
+  },
+  {
+    dir: 'omnimux-accounts',
+    category: 'core',
+    title: { en: 'OmniMux Accounts', zh: 'OmniMux Accounts' },
+    description: {
+      en: 'Account and session management for OmniMux.',
+      zh: 'undefined',
+    },
+  },
+  {
+    dir: 'omnimux-analytics',
+    category: 'feature',
+    title: { en: 'OmniMux Analytics', zh: 'OmniMux Analytics' },
+    description: {
+      en: 'Usage analytics for OmniMux workspaces.',
+      zh: 'undefined',
+    },
+  },
+  {
+    dir: 'omnimux-assets',
+    category: 'feature',
+    title: { en: 'OmniMux Assets', zh: 'OmniMux Assets' },
+    description: {
+      en: 'Asset library and cloud catalog for OmniMux.',
+      zh: 'undefined',
+    },
+  },
+  {
+    dir: 'omnimux-automation',
+    category: 'feature',
+    title: { en: 'OmniMux Automation', zh: 'OmniMux Automation' },
+    description: {
+      en: 'Automation workflows for OmniMux tasks.',
+      zh: 'undefined',
+    },
+  },
+  {
+    dir: 'omnimux-clip',
+    category: 'feature',
+    title: { en: 'OmniMux Clip', zh: 'OmniMux Clip' },
+    description: {
+      en: 'Clip and short-video production tools.',
+      zh: 'undefined',
+    },
+  },
+  {
+    dir: 'omnimux-forms',
+    category: 'feature',
+    title: { en: 'OmniMux Forms', zh: 'OmniMux Forms' },
+    description: {
+      en: 'Form building and collection.',
+      zh: 'undefined',
+    },
+  },
+  {
+    dir: 'omnimux-inspiration',
+    category: 'feature',
+    title: { en: 'OmniMux Inspiration', zh: 'OmniMux Inspiration' },
+    description: {
+      en: 'Inspiration gallery and reference collection.',
+      zh: 'undefined',
+    },
+  },
+  {
+    dir: 'omnimux-products',
+    category: 'feature',
+    title: { en: 'OmniMux Products', zh: 'OmniMux Products' },
+    description: {
+      en: 'Product catalog and listing tools.',
+      zh: 'undefined',
+    },
+  },
+  {
+    dir: 'omnimux-publish',
+    category: 'feature',
+    title: { en: 'OmniMux Publish', zh: 'OmniMux Publish' },
+    description: {
+      en: 'Multi-channel publishing for OmniMux content.',
+      zh: 'undefined',
+    },
+  },
+  {
+    dir: 'omnimux-video',
+    category: 'feature',
+    title: { en: 'OmniMux Video', zh: 'OmniMux Video' },
+    description: {
+      en: 'Video generation and editing.',
+      zh: 'undefined',
+    },
+  },
+  {
+    dir: 'omnimux-workflow',
+    category: 'feature',
+    title: { en: 'OmniMux Workflow', zh: 'OmniMux Workflow' },
+    description: {
+      en: 'Workflow orchestration for OmniMux.',
+      zh: 'undefined',
+    },
+  },
 ]
 
 function readManifest(pluginsRoot, dir) {
@@ -150,6 +246,7 @@ function buildIndex(pluginsRoot) {
       categories: {
         core: { title: { en: 'Core', zh: '核心' } },
         market: { title: { en: 'Market', zh: '市场' } },
+        feature: { title: { en: 'Features', zh: '功能' } },
       },
     },
     plugins: PUBLISHED_PLUGINS.map(spec => entryFor(pluginsRoot, spec)),

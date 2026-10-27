@@ -18,3 +18,11 @@
   disabled: true
 - id: product-analytics
   disabled: true
+# The omnimux hub serves HMR over its own WebSocket and refuses to mount while the
+# official EventSource row is present. omnimux's own bundle patch says the same, but
+# bundle patches apply in list order and `@deepseek-ai/dsh-web-app` inserts this row
+# after omnimux, so that declaration lands before the row exists. Disabling it here —
+# in the last patch applied — is what actually takes effect.
+- id: client-hmr
+  name: '@deepseek-ai/dsh-client-hmr'
+  disabled: true

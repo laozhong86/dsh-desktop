@@ -57,7 +57,7 @@ const PUBLISHED_PLUGINS = [
     title: { en: 'OmniMux', zh: 'OmniMux' },
     description: {
       en: 'The OmniMux hub: apps, taskboard, expert gallery and the shell entries every other OmniMux plugin attaches to.',
-      zh: 'undefined',
+      zh: 'OmniMux 中枢：应用、任务看板、专家馆，以及其他 OmniMux 插件依附的壳入口。',
     },
   },
   {
@@ -66,7 +66,7 @@ const PUBLISHED_PLUGINS = [
     title: { en: 'OmniMux Market', zh: 'OmniMux Market' },
     description: {
       en: 'Browse and install OmniMux plugins from the market index.',
-      zh: 'undefined',
+      zh: '从市场索引浏览并安装 OmniMux 插件。',
     },
   },
   {
@@ -75,7 +75,7 @@ const PUBLISHED_PLUGINS = [
     title: { en: 'OmniMux Accounts', zh: 'OmniMux Accounts' },
     description: {
       en: 'Account and session management for OmniMux.',
-      zh: 'undefined',
+      zh: 'OmniMux 账号与会话管理。',
     },
   },
   {
@@ -84,7 +84,7 @@ const PUBLISHED_PLUGINS = [
     title: { en: 'OmniMux Analytics', zh: 'OmniMux Analytics' },
     description: {
       en: 'Usage analytics for OmniMux workspaces.',
-      zh: 'undefined',
+      zh: 'OmniMux 工作区使用分析。',
     },
   },
   {
@@ -93,16 +93,7 @@ const PUBLISHED_PLUGINS = [
     title: { en: 'OmniMux Assets', zh: 'OmniMux Assets' },
     description: {
       en: 'Asset library and cloud catalog for OmniMux.',
-      zh: 'undefined',
-    },
-  },
-  {
-    dir: 'omnimux-automation',
-    category: 'feature',
-    title: { en: 'OmniMux Automation', zh: 'OmniMux Automation' },
-    description: {
-      en: 'Automation workflows for OmniMux tasks.',
-      zh: 'undefined',
+      zh: 'OmniMux 资产库与云端目录。',
     },
   },
   {
@@ -111,7 +102,7 @@ const PUBLISHED_PLUGINS = [
     title: { en: 'OmniMux Clip', zh: 'OmniMux Clip' },
     description: {
       en: 'Clip and short-video production tools.',
-      zh: 'undefined',
+      zh: '片段与短视频制作工具。',
     },
   },
   {
@@ -120,7 +111,7 @@ const PUBLISHED_PLUGINS = [
     title: { en: 'OmniMux Forms', zh: 'OmniMux Forms' },
     description: {
       en: 'Form building and collection.',
-      zh: 'undefined',
+      zh: '表单构建与收集。',
     },
   },
   {
@@ -129,7 +120,7 @@ const PUBLISHED_PLUGINS = [
     title: { en: 'OmniMux Inspiration', zh: 'OmniMux Inspiration' },
     description: {
       en: 'Inspiration gallery and reference collection.',
-      zh: 'undefined',
+      zh: '灵感馆与参考素材收集。',
     },
   },
   {
@@ -138,7 +129,7 @@ const PUBLISHED_PLUGINS = [
     title: { en: 'OmniMux Products', zh: 'OmniMux Products' },
     description: {
       en: 'Product catalog and listing tools.',
-      zh: 'undefined',
+      zh: '商品目录与上架工具。',
     },
   },
   {
@@ -147,7 +138,7 @@ const PUBLISHED_PLUGINS = [
     title: { en: 'OmniMux Publish', zh: 'OmniMux Publish' },
     description: {
       en: 'Multi-channel publishing for OmniMux content.',
-      zh: 'undefined',
+      zh: 'OmniMux 内容多渠道发布。',
     },
   },
   {
@@ -156,7 +147,7 @@ const PUBLISHED_PLUGINS = [
     title: { en: 'OmniMux Video', zh: 'OmniMux Video' },
     description: {
       en: 'Video generation and editing.',
-      zh: 'undefined',
+      zh: '视频生成与编辑。',
     },
   },
   {
@@ -165,7 +156,7 @@ const PUBLISHED_PLUGINS = [
     title: { en: 'OmniMux Workflow', zh: 'OmniMux Workflow' },
     description: {
       en: 'Workflow orchestration for OmniMux.',
-      zh: 'undefined',
+      zh: 'OmniMux 工作流编排。',
     },
   },
 ]

@@ -53,13 +53,19 @@ jobs:
       # preset tree to stage. `stage:preset` belongs to the old shell and reads a plugin
       # lifecycle registry Next never produces.
       # No Apple signing identity is configured, and `dist:mac` refuses to run with
-      # signing disabled. The smoke target produces the same universal DMG unsigned, so
+      # signing disabled. The smoke target produces the same DMG unsigned, so
       # users right-click → Open on first launch. Switch to `dist:mac` once a Developer
       # ID certificate and notarization credentials are in place.
-      - name: Build macOS release (universal DMG, unsigned)
+      - name: Build macOS release (arm64 DMG, unsigned)
         env:
           OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}/omni-source/plugins
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          # Apple Silicon only. A universal build carries a second copy of every
+          # native dependency (LibreOffice, uv, sherpa, sharp, koffi), which more
+          # than doubles the installer for an Intel audience this release does not
+          # have yet. Going universal later means restoring this variable and the
+          # artifact naming with it.
+          DSH_MAC_SMOKE_ARCH: arm64
         run: corepack yarn workspace dsh-desktop-next dist:mac-smoke
       - name: Upload DMG artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4

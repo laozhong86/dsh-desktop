@@ -4,7 +4,7 @@ import { createRequire } from 'node:module'
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseArgs } from 'node:util'
-import { nextRuntimeFileExclusion, nextRuntimePackageExclusion, type NextPackagingTarget, type RuntimePackageConstraints } from './runtime-file-policy.ts'
+import { nextRuntimeFileExclusion, nextRuntimePackageExclusion, nextRuntimeUnusedFeatureExclusion, type NextPackagingTarget, type RuntimePackageConstraints } from './runtime-file-policy.ts'
 import { nextPackagingTarget, nextPayloadRelease, PAYLOAD_DIR, verifyNextPayload } from './packaged-payload.ts'
 import { DESKTOP_RUNTIME_FILE, physicalPayload, sealPayloadAsync, type DesktopRuntimeDescriptor } from '../src/runtime-tree.ts'
 import { packagingStep, packagingStepSync } from './packaging-step.ts'
@@ -116,7 +116,10 @@ export function collectProductionClosure(desktopRoot: string, target = nextPacka
         continue
       }
       let source = realpathSync(installed)
-      const exclusion = nextRuntimePackageExclusion(readManifest(source), target)
+      // A feature this line does not ship is dropped before the OS/CPU check:
+      // the manifest would pass that check and still be dead weight.
+      const exclusion = nextRuntimeUnusedFeatureExclusion(name)
+        ?? nextRuntimePackageExclusion(readManifest(source), target)
       if (exclusion !== undefined) {
         if (required.includes(name)) throw new Error(`Next payload: dependency ${name} required by ${dependent} cannot be packaged: ${exclusion}`)
         continue

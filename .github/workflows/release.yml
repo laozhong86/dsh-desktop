@@ -9,6 +9,11 @@ on:
         type: choice
         options: [mac, win, both]
         default: 'both'
+      skip_cdn:
+        description: 'Publish the GitHub Release only, leaving dl.omnimux.ai on the previous build (no CDN update, no auto-update for installed clients)'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -119,12 +124,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    # `secrets` is not available in a step-level `if` expression. Surface the raw
-    # values through job-level env and test for emptiness instead — a boolean
-    # expression here would compare against a string and never match.
-    env:
-      R2_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      R2_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803  # v6
       # The market catalog images are uploaded from the plugin source tree, so this job
@@ -176,16 +175,27 @@ jobs:
             release-assets/**/*.zip
           fail_on_unmatched_files: false
       - name: Sync to Cloudflare R2 (dl.omnimux.ai)
-        if: ${{ env.R2_TOKEN != '' && env.R2_ACCOUNT != '' }}
+        if: ${{ !inputs.skip_cdn }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
+          # Missing credentials are a FAILURE, not a warning (issue #127): the
+          # landing page and the in-app updater both read dl.omnimux.ai, so a
+          # green release with an empty CDN leaves every user on the previous
+          # build with nobody notified. An intentional CDN-less publish sets the
+          # skip_cdn input instead of relying on the secrets being absent.
+          if [ -z "${CLOUDFLARE_API_TOKEN}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID}" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are required to publish."
+            echo "dl.omnimux.ai would stay on the previous build while this release reports success."
+            echo "Set both repository secrets, or re-run with the skip_cdn input to publish the GitHub Release only."
+            exit 1
+          fi
           node scripts/r2-dist-sync.mjs upload --dir release-assets
       # The market plugin ships code only; its catalog images live here. Upload them in
       # the same release when the source tree includes them so a fresh install never hits a missing cover.
       - name: Sync market catalog assets to R2
-        if: ${{ env.R2_TOKEN != '' && env.R2_ACCOUNT != '' }}
+        if: ${{ !inputs.skip_cdn }}
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -195,9 +205,23 @@ jobs:
           else
             echo "omni-source/plugins/omnimux-market/catalog not present in plugins-source branch; skipping cover sync."
           fi
-      # Without this the publish job looks green while the CDN stayed empty.
-      - name: Report skipped R2 sync
-        if: ${{ env.R2_TOKEN == '' || env.R2_ACCOUNT == '' }}
+      # Confirm what users will actually download, and that the version archive a
+      # rollback depends on exists (issues #126 and #127). This runs after the
+      # upload, so it validates the live CDN rather than the intent.
+      - name: Verify the published CDN
+        if: ${{ !inputs.skip_cdn }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          echo "::warning::R2 sync skipped: CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID are not both configured."
-          echo "GitHub Release published, but dl.omnimux.ai was not updated — installed clients cannot see this release."
+          # The archive is keyed by the version the ARTIFACT carries, which is the
+          # Next build's version, not this repo's root manifest.
+          artifact_version="$(node -p "require('./dsh-desktop-next/package.json').version")"
+          node scripts/r2-dist-sync.mjs verify --version "$artifact_version"
+      # An explicit CDN-less publish still has to say so out loud, otherwise the
+      # job looks identical to a full release.
+      - name: Report an intentionally CDN-less publish
+        if: ${{ inputs.skip_cdn }}
+        run: |
+          echo "::warning::skip_cdn was set: the GitHub Release is published but dl.omnimux.ai was NOT updated."
+          echo "Landing-page downloads and in-app auto-update still point at the previous build."

@@ -56,9 +56,11 @@ jobs:
           else
             git diff --check "$BASE_SHA" "$HEAD_SHA"
             # The classifier prints one verdict per line: product, then mac.
-            readarray -t verdicts < <(git diff --name-only -z "$BASE_SHA" "$HEAD_SHA" | node scripts/classify-ci-changes.mjs)
-            product="${verdicts[0]}"
-            mac="${verdicts[1]}"
+            # Read them without `readarray`: that is a bash 4 builtin and the
+            # step must stay portable to the bash 3.2 macOS runners too.
+            verdicts="$(git diff --name-only -z "$BASE_SHA" "$HEAD_SHA" | node scripts/classify-ci-changes.mjs)"
+            product="$(printf '%s\n' "$verdicts" | sed -n '1p')"
+            mac="$(printf '%s\n' "$verdicts" | sed -n '2p')"
           fi
           echo "product=$product" >> "$GITHUB_OUTPUT"
           echo "mac=$mac" >> "$GITHUB_OUTPUT"

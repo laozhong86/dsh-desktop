@@ -1095,7 +1095,7 @@ describe('published package surface', () => {
     expect(mac([])).toBe('true')
 
     expect(ciWorkflow).toContain('node scripts/classify-ci-changes.mjs')
-    expect(ciWorkflow).toContain('mac="${verdicts[1]}"')
+    expect(ciWorkflow).toContain("mac=\"$(printf '%s\\n' \"$verdicts\" | sed -n '2p')\"")
     expect(ciWorkflow).toContain("if: needs.changes.outputs.product == 'true'")
     expect(ciWorkflow).toContain('Documentation-only change; product build and tests are not required.')
   })

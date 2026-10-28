@@ -148,17 +148,29 @@ jobs:
       - name: Resolve version
         id: version
         run: |
-          tag="v$(node -p "require('./package.json').version")"
+          # The tag must name what was actually built. Both build jobs package
+          # dsh-desktop-next, so the Next manifest is the release version; the
+          # root manifest still carries the retired shell (2.0.18) and using it
+          # produced a tag that already existed and a version no artifact
+          # matched (same root cause as the archive path in #126).
+          next_version="$(node -p "require('./dsh-desktop-next/package.json').version")"
+          tag="v${next_version}"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "next_version=${next_version}" >> "$GITHUB_OUTPUT"
+          echo "Resolved release tag ${tag} from dsh-desktop-next/package.json"
       # The desktop updaters poll a fixed per-channel object beside the installers.
-      # Generate it before publishing so both channels carry it in the same upload.
+      # Generate it before publishing so the channel object and the installers land
+      # in the same upload.
+      #
+      # One call, for the version actually built: the script derives the channel
+      # from the prerelease tag (2.0.20-next -> version-next.json, 2.0.18 ->
+      # version-stable.json). Generating the stable object from the root manifest
+      # advertised 2.0.18 while the served bytes were the 2.0.20-next build — a
+      # stable client would have been told to download a version it did not get.
       - name: Generate release metadata
         run: |
           node scripts/build-release-metadata.mjs \
-            --version "$(node -p "require('./package.json').version")" \
-            --dir release-assets
-          node scripts/build-release-metadata.mjs \
-            --version "$(node -p "require('./dsh-desktop-next/package.json').version")" \
+            --version "${{ steps.version.outputs.next_version }}" \
             --dir release-assets
       # Plugins ship independently of the application, so the market index is a
       # released object of its own rather than something baked into the build.

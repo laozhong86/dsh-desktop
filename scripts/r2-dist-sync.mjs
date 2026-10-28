@@ -273,6 +273,12 @@ async function main() {
   }
 
   // 解析 version
+  //
+  // The archive directory must be named after the version the ARTIFACT carries,
+  // not the shell's package.json: this repo's root manifest is the old shell
+  // (2.0.18) while the shipping Next build is 2.0.20-next, so reading the
+  // manifest filed every archive under a version no user would look for
+  // (issue #126). `--version` still wins when a caller states it explicitly.
   let version = null
   const versionIdx = args.indexOf('--version')
   if (versionIdx !== -1 && args[versionIdx + 1]) {
@@ -286,23 +292,43 @@ async function main() {
     }
   }
 
+  /** The `x.y.z[-tag]` embedded in one installer filename, or null. */
+  function versionOfInstallerName(name) {
+    const match = /^OmniMux-(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)-(?:x64-Setup\.exe|universal\.dmg)$/u.exec(name)
+    return match?.[1] ?? null
+  }
+
   if (command === 'verify') {
     console.log(`🔍 正在巡检 https://dl.omnimux.ai 版本 v${version} 及 latest 直链...`)
-    const checkKeys = [
-      `releases/v${version}/OmniMux-${version}-x64-Setup.exe`,
-      `releases/v${version}/DSH-Desktop-${version}-x64-Setup.exe`,
-      `releases/v${version}/OmniMux-${version}-universal.dmg`,
-      `releases/v${version}/DSH.Desktop-${version}-universal.dmg`,
-      `releases/latest/OmniMux-Setup.exe`,
-      `releases/latest/OmniMux-x64-Setup.exe`,
-      `releases/latest/DSH-Desktop-Setup.exe`,
-      `releases/latest/OmniMux-universal.dmg`,
-      `releases/latest/OmniMux-mac.dmg`,
-      `releases/latest/DSH-Desktop.dmg`,
+
+    // `latest/` must be complete: every alias the landing page or an updater can
+    // hit has to resolve, or a download button is dead.
+    const latestKeys = [
+      'releases/latest/OmniMux-Setup.exe',
+      'releases/latest/OmniMux-x64-Setup.exe',
+      'releases/latest/DSH-Desktop-Setup.exe',
+      'releases/latest/OmniMux-universal.dmg',
+      'releases/latest/OmniMux-mac.dmg',
+      'releases/latest/DSH-Desktop.dmg',
     ]
 
+    // The archive only needs ONE reachable artifact per platform: it exists so a
+    // user reporting a bad release can be handed the previous installer
+    // (issue #126). Demanding all four historical aliases would fail a release
+    // that only ever built one shell.
+    const archiveCandidates = {
+      windows: [
+        `releases/v${version}/OmniMux-${version}-x64-Setup.exe`,
+        `releases/v${version}/DSH-Desktop-${version}-x64-Setup.exe`,
+      ],
+      macos: [
+        `releases/v${version}/OmniMux-${version}-universal.dmg`,
+        `releases/v${version}/DSH.Desktop-${version}-universal.dmg`,
+      ],
+    }
+
     let allOk = true
-    for (const key of checkKeys) {
+    for (const key of latestKeys) {
       const res = await verifyEndpoint(key)
       if (res.ok) {
         const sizeMB = (res.size / (1024 * 1024)).toFixed(2)
@@ -312,6 +338,23 @@ async function main() {
         console.log(`  ❌ [FAIL]   ${res.url.padEnd(65)} -> ${res.error}`)
       }
     }
+
+    for (const [platform, keys] of Object.entries(archiveCandidates)) {
+      let reachable = null
+      for (const key of keys) {
+        const res = await verifyEndpoint(key)
+        if (res.ok) { reachable = res; break }
+      }
+      if (reachable !== null) {
+        const sizeMB = (reachable.size / (1024 * 1024)).toFixed(2)
+        console.log(`  ✅ [ARCHIVE ${platform}] ${reachable.url.padEnd(58)} (${sizeMB.padStart(6)} MB)`)
+      } else {
+        allOk = false
+        console.log(`  ❌ [ARCHIVE ${platform}] no reachable artifact under releases/v${version}/`)
+        console.log(`       Rollback to v${version} is impossible; tried: ${keys.join(', ')}`)
+      }
+    }
+
     if (!allOk) {
       process.exitCode = 1
     }
@@ -395,6 +438,18 @@ async function main() {
 
     if (!winExePath && !macDmgPath) {
       throw new Error(`未找到任何待上传的 .exe 或 .dmg 产物文件，请检查 dist/ 或使用 --dir 参数指定。`)
+    }
+
+    // Re-derive the archive version from the artifact itself. The candidate
+    // search above needs a version to build paths with, so it runs on the
+    // manifest value; the key naming must not. When the two disagree (the shell
+    // manifest says 2.0.18, the Next build is 2.0.20-next) an archive filed
+    // under the manifest version is unreachable by anyone who knows what they
+    // installed — issue #126.
+    const artifactVersion = versionOfInstallerName(basename(macDmgPath ?? winExePath))
+    if (artifactVersion !== null && artifactVersion !== version) {
+      console.log(`📌 归档版本以产物为准：v${artifactVersion}（壳仓 manifest 为 v${version}）`)
+      version = artifactVersion
     }
 
     console.log(`📌 匹配到本地待分发文件：`)

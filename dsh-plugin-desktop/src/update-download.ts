@@ -16,9 +16,17 @@ import {
 /** Desktop platforms with a fixed installer download endpoint. */
 export type DesktopDownloadPlatform = 'darwin' | 'win32'
 
-/** Fixed download endpoints that serve the latest installer from the distribution bucket. */
+/**
+ * Fixed download endpoints that serve the latest installer from the distribution bucket.
+ *
+ * `darwin` points at the arm64 build because that is the only macOS artifact this
+ * release line publishes: a universal DMG carried a second copy of every native
+ * dependency (LibreOffice, uv, sherpa, sharp, koffi) for an Intel audience that
+ * does not exist yet. `OmniMux-universal.dmg` stays available as a manual alias so
+ * an older client asking for it still resolves.
+ */
 export const DESKTOP_DOWNLOAD_URLS: Readonly<Record<DesktopDownloadPlatform, string>> = {
-  darwin: 'https://dl.omnimux.ai/releases/latest/OmniMux-universal.dmg',
+  darwin: 'https://dl.omnimux.ai/releases/latest/OmniMux-arm64.dmg',
   win32: 'https://dl.omnimux.ai/releases/latest/OmniMux-Setup.exe',
 }
 

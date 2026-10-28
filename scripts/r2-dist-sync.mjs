@@ -294,7 +294,7 @@ async function main() {
 
   /** The `x.y.z[-tag]` embedded in one installer filename, or null. */
   function versionOfInstallerName(name) {
-    const match = /^OmniMux-(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)-(?:x64-Setup\.exe|universal\.dmg)$/u.exec(name)
+    const match = /^OmniMux-(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)-(?:x64-Setup\.exe|arm64\.dmg|universal\.dmg)$/u.exec(name)
     return match?.[1] ?? null
   }
 
@@ -307,6 +307,7 @@ async function main() {
       'releases/latest/OmniMux-Setup.exe',
       'releases/latest/OmniMux-x64-Setup.exe',
       'releases/latest/DSH-Desktop-Setup.exe',
+      'releases/latest/OmniMux-arm64.dmg',
       'releases/latest/OmniMux-universal.dmg',
       'releases/latest/OmniMux-mac.dmg',
       'releases/latest/DSH-Desktop.dmg',
@@ -322,6 +323,7 @@ async function main() {
         `releases/v${version}/DSH-Desktop-${version}-x64-Setup.exe`,
       ],
       macos: [
+        `releases/v${version}/OmniMux-${version}-arm64.dmg`,
         `releases/v${version}/OmniMux-${version}-universal.dmg`,
         `releases/v${version}/DSH.Desktop-${version}-universal.dmg`,
       ],
@@ -398,7 +400,8 @@ async function main() {
     const discoveredFiles = walkInstallerFiles(searchDir)
     const discoveredWin = discoveredFiles.find(f => /OmniMux-.*-Setup\.exe$/u.test(basename(f)))
       ?? discoveredFiles.find(f => /-Setup\.exe$/u.test(basename(f)))
-    const discoveredMac = discoveredFiles.find(f => /OmniMux-.*-universal\.dmg$/u.test(basename(f)))
+    const discoveredMac = discoveredFiles.find(f => /OmniMux-.*-arm64\.dmg$/u.test(basename(f)))
+      ?? discoveredFiles.find(f => /OmniMux-.*-universal\.dmg$/u.test(basename(f)))
       ?? discoveredFiles.find(f => /\.dmg$/u.test(basename(f)))
 
     const candidateWinPaths = [
@@ -477,8 +480,10 @@ async function main() {
       const actualMacName = basename(macDmgPath)
       const macKeys = new Set([
         `releases/v${version}/${actualMacName}`,
+        `releases/v${version}/OmniMux-${version}-arm64.dmg`,
         `releases/v${version}/OmniMux-${version}-universal.dmg`,
         `releases/v${version}/DSH.Desktop-${version}-universal.dmg`,
+        `releases/latest/OmniMux-arm64.dmg`,
         `releases/latest/OmniMux-universal.dmg`,
         `releases/latest/OmniMux-mac.dmg`,
         `releases/latest/DSH-Desktop.dmg`,

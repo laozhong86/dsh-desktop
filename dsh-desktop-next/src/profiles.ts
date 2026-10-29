@@ -13,6 +13,7 @@ import { pluginMarketPatch } from './profile-plugin-market.ts'
 import { RETIRED_SCHEDULE_BUNDLE, retiredSchedulePatch } from './profile-schedule.ts'
 import { removeLinkProjectionsSafely } from '../../dsh-plugin-desktop/src/link-projections.ts'
 import { insideArchive, unpackedPath } from './asar-archive-policy.ts'
+import PLUGIN_TIERS from '../../config/plugin-tiers.json' with { type: 'json' }
 
 export const NEXT_PACKAGE = fileURLToPath(new URL('../package.json', import.meta.url))
 
@@ -29,8 +30,11 @@ export const NEXT_PACKAGE = fileURLToPath(new URL('../package.json', import.meta
  * hard preinstall rather than an optional product plugin. A tier file that
  * dropped it would break the whole shell, which is why the schema keeps the two
  * concepts apart.
+ *
+ * The file is imported, not read at runtime: it lives at the repository root, outside the
+ * packaged payload, so a runtime read finds nothing in an installed app. The bundler inlines it.
  */
-const TIERS = JSON.parse(readFileSync(fileURLToPath(new URL('../../config/plugin-tiers.json', import.meta.url)), 'utf8')) as {
+const TIERS = PLUGIN_TIERS as {
   tiers: { infrastructure: string[]; preview: string[]; beta: string[]; retired: string[] }
 }
 

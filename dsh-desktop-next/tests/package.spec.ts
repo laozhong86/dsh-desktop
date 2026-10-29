@@ -65,7 +65,10 @@ it('archives the application like upstream Desktop while keeping fuses and nativ
   // Like upstream Desktop's dev launcher, every development launch prepares the payload before the shell starts.
   expect(next.scripts.dev).toBe('yarn build && yarn prepare:runtime && node scripts/start.mjs')
   expect(next.scripts.start).toBe('yarn prepare:runtime && node scripts/start.mjs')
-  for (const name of ['@deepseek-ai/dsh-skill-office', '@deepseek-ai/dsh-tool-workspace-dependencies']) expect(next.dependencies[name], name).toBe(next.dependencies['@deepseek-ai/dsh'])
+  expect(next.dependencies['@deepseek-ai/dsh-tool-workspace-dependencies']).toBe(next.dependencies['@deepseek-ai/dsh'])
+  // The Host no longer mounts Office skills; only the runtime preparation reads the skill's assets at build time.
+  expect(next.dependencies['@deepseek-ai/dsh-skill-office']).toBeUndefined()
+  expect(next.devDependencies['@deepseek-ai/dsh-skill-office']).toBe(next.dependencies['@deepseek-ai/dsh'])
   expect(next.build.mac.icon).toBe('build/app-icon.icon')
   expect(existsSync(new URL('../build/app-icon.icon/icon.json', import.meta.url))).toBe(true)
   expect(next.build.nsis).toMatchObject({ oneClick: false, perMachine: false, allowElevation: true, allowToChangeInstallationDirectory: true })

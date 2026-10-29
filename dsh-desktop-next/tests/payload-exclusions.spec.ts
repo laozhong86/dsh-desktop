@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { nextRuntimeUnusedFeatureExclusion } from '../scripts/runtime-file-policy.ts'
+import { NEXT_MAC_NATIVE_ENTRIES } from '../scripts/mac-runtime.ts'
 
 const desktopRoot = join(import.meta.dirname, '..')
 const cordisPatch = readFileSync(join(desktopRoot, 'cordis.patch.yml'), 'utf8')
@@ -74,5 +75,12 @@ describe('payload exclusions', () => {
     expect(disabled).toContain('desktop-product-telemetry')
     expect(disabled).toContain('product-analytics')
     expect(disabled).toContain('client-hmr')
+  })
+
+  it('does not ask the macOS artifact verifier for native files of an excluded package', () => {
+    // The verifier runs lipo on every listed entry; one the payload left out fails the DMG check.
+    const paths = NEXT_MAC_NATIVE_ENTRIES.map(entry => entry.path)
+    expect(paths.some(path => path.includes('@dataiku/uv'))).toBe(false)
+    expect(paths).toContain('node_modules/@deepseek-ai/node-addon-system-darwin-arm64/bin/system.node')
   })
 })

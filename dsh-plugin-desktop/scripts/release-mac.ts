@@ -9,7 +9,7 @@ import {
   assertMacReleaseReady,
   withoutMacReleaseSecrets,
 } from './release-preflight.ts'
-import { prepareInstalledMacUniversalRuntime } from './mac-universal.ts'
+import { macSmokeArchitecture, prepareInstalledMacUniversalRuntime } from './mac-universal.ts'
 import { prepareFsExtForElectron } from './prepare-fs-ext.ts'
 import { electronBuilderEnvironment } from './electron-builder-environment.ts'
 import { desktopRuntimeTargets, prepareDesktopInterpreters, primaryRuntimeDirectory, verifyPreparedDesktopRuntime } from './prepare-runtime.ts'
@@ -38,7 +38,9 @@ export interface MacReleaseOptions {
   ) => void
   /** Report non-secret release progress. */
   readonly log: (message: string) => void
-  /** Validate and prepare both architecture-specific runtime trees. */
+  /** Target macOS architecture: universal merges arm64+x64, single arch produces a leaner DMG. */
+  readonly releaseArch: 'universal' | 'arm64' | 'x64'
+  /** Validate and prepare the architecture-specific runtime trees matching releaseArch. */
   readonly prepareRuntime: () => void
 }
 
@@ -65,19 +67,26 @@ function run(command: string, args: readonly string[], cwd: string, env: NodeJS.
 function defaultReleaseOptions(): MacReleaseOptions {
   const desktopRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
   const outputDir = resolve(desktopRoot, 'dist', 'mac-release')
+  const releaseArch = macSmokeArchitecture(process.env)
   return {
     env: process.env,
     platform: process.platform,
     desktopRoot,
     outputDir,
+    releaseArch,
     resetOutput: () => rmSync(outputDir, { recursive: true, force: true }),
     listCodeSigningIdentities,
     run,
     log: message => console.log(message),
     prepareRuntime: () => {
-      prepareFsExtForElectron({ platform: 'darwin', arch: 'arm64', desktopRoot })
-      prepareFsExtForElectron({ platform: 'darwin', arch: 'x64', desktopRoot })
-      prepareInstalledMacUniversalRuntime(desktopRoot)
+      if (releaseArch === 'universal') {
+        prepareFsExtForElectron({ platform: 'darwin', arch: 'arm64', desktopRoot })
+        prepareFsExtForElectron({ platform: 'darwin', arch: 'x64', desktopRoot })
+        prepareInstalledMacUniversalRuntime(desktopRoot)
+      } else {
+        const arch = releaseArch === 'arm64' ? 'arm64' : 'x64'
+        prepareFsExtForElectron({ platform: 'darwin', arch, desktopRoot })
+      }
       verifyPreparedDesktopRuntime(desktopRoot, 'darwin')
     },
   }
@@ -111,8 +120,11 @@ export function releaseMac(options: MacReleaseOptions = defaultReleaseOptions())
   options.run('yarn', ['run', 'check'], resolve(options.desktopRoot, '..'), buildEnvironment)
   options.resetOutput()
   options.prepareRuntime()
+  const archFlag = options.releaseArch === 'universal' ? '--universal'
+    : options.releaseArch === 'arm64' ? '--arm64' : '--x64'
+  options.log(`macOS release target: ${options.releaseArch}`)
   options.run('yarn', [
-    'exec', 'electron-builder', '--mac', 'dmg', '--universal',
+    'exec', 'electron-builder', '--mac', 'dmg', archFlag,
     '--config.forceCodeSigning=true', '--config.mac.notarize=true',
     '--config.npmRebuild=false',
     `--config.directories.output=${options.outputDir}`,

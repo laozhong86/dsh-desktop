@@ -182,6 +182,14 @@ jobs:
       # released object of its own rather than something baked into the build.
       - name: Generate plugin index
         run: node scripts/build-plugin-index.mjs
+      # The installer carries whatever plugin versions the lockfile pinned, and
+      # nothing else says which. Write that beside the binaries so a release
+      # answers "what code is in this build" without re-deriving it.
+      - name: Generate plugin provenance
+        env:
+          GITHUB_SHA: ${{ github.sha }}
+          RELEASE_VERSION: ${{ steps.version.outputs.next_version }}
+        run: node scripts/build-plugin-provenance.mjs --out release-assets
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2
         with:
@@ -191,6 +199,7 @@ jobs:
             release-assets/**/*.dmg
             release-assets/**/*.exe
             release-assets/**/*.zip
+            release-assets/plugin-provenance.json
           fail_on_unmatched_files: false
       - name: Sync to Cloudflare R2 (dl.omnimux.ai)
         if: ${{ !inputs.skip_cdn }}

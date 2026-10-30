@@ -294,7 +294,7 @@ async function main() {
 
   /** The `x.y.z[-tag]` embedded in one installer filename, or null. */
   function versionOfInstallerName(name) {
-    const match = /^OmniMux-(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)-(?:x64-Setup\.exe|arm64\.dmg|universal\.dmg)$/u.exec(name)
+    const match = /^OmniMux-(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)-(?:x64-Setup\.exe|arm64\.dmg|x64\.dmg|universal\.dmg)$/u.exec(name)
     return match?.[1] ?? null
   }
 
@@ -308,6 +308,7 @@ async function main() {
       'releases/latest/OmniMux-x64-Setup.exe',
       'releases/latest/DSH-Desktop-Setup.exe',
       'releases/latest/OmniMux-arm64.dmg',
+      'releases/latest/OmniMux-x64.dmg',
       'releases/latest/OmniMux-universal.dmg',
       'releases/latest/OmniMux-mac.dmg',
       'releases/latest/DSH-Desktop.dmg',
@@ -324,6 +325,7 @@ async function main() {
       ],
       macos: [
         `releases/v${version}/OmniMux-${version}-arm64.dmg`,
+        `releases/v${version}/OmniMux-${version}-x64.dmg`,
         `releases/v${version}/OmniMux-${version}-universal.dmg`,
         `releases/v${version}/DSH.Desktop-${version}-universal.dmg`,
       ],
@@ -400,9 +402,9 @@ async function main() {
     const discoveredFiles = walkInstallerFiles(searchDir)
     const discoveredWin = discoveredFiles.find(f => /OmniMux-.*-Setup\.exe$/u.test(basename(f)))
       ?? discoveredFiles.find(f => /-Setup\.exe$/u.test(basename(f)))
-    const discoveredMac = discoveredFiles.find(f => /OmniMux-.*-arm64\.dmg$/u.test(basename(f)))
-      ?? discoveredFiles.find(f => /OmniMux-.*-universal\.dmg$/u.test(basename(f)))
-      ?? discoveredFiles.find(f => /\.dmg$/u.test(basename(f)))
+    const discoveredMacArm64 = discoveredFiles.find(f => /OmniMux-.*-arm64\.dmg$/u.test(basename(f)))
+    const discoveredMacX64 = discoveredFiles.find(f => /OmniMux-.*-x64\.dmg$/u.test(basename(f)))
+    const discoveredMacUniversal = discoveredFiles.find(f => /OmniMux-.*-universal\.dmg$/u.test(basename(f)))
 
     const candidateWinPaths = [
       winExePath,
@@ -414,15 +416,26 @@ async function main() {
       join(ROOT_DIR, 'dsh-plugin-desktop/dist', `OmniMux-${version}-x64-Setup.exe`),
     ].filter(Boolean)
 
-    const candidateMacPaths = [
+    const candidateMacArm64Paths = [
+      searchDir ? join(searchDir, `OmniMux-${version}-arm64.dmg`) : null,
+      discoveredMacArm64,
+      join(ROOT_DIR, 'dist/release-download', `OmniMux-${version}-arm64.dmg`),
+      join(ROOT_DIR, 'dsh-desktop-next/dist/mac-release', `OmniMux-${version}-arm64.dmg`),
+    ].filter(Boolean)
+
+    const candidateMacX64Paths = [
+      searchDir ? join(searchDir, `OmniMux-${version}-x64.dmg`) : null,
+      discoveredMacX64,
+      join(ROOT_DIR, 'dist/release-download', `OmniMux-${version}-x64.dmg`),
+      join(ROOT_DIR, 'dsh-desktop-next/dist/mac-release', `OmniMux-${version}-x64.dmg`),
+    ].filter(Boolean)
+
+    const candidateMacUniversalPaths = [
       macDmgPath,
-      searchDir ? join(searchDir, `DSH.Desktop-${version}-universal.dmg`) : null,
       searchDir ? join(searchDir, `OmniMux-${version}-universal.dmg`) : null,
-      discoveredMac,
-      join(ROOT_DIR, 'dist/release-download', `DSH.Desktop-${version}-universal.dmg`),
+      discoveredMacUniversal,
       join(ROOT_DIR, 'dist/release-download', `OmniMux-${version}-universal.dmg`),
       join(ROOT_DIR, 'dsh-plugin-desktop/dist/mac-release', `OmniMux-${version}-universal.dmg`),
-      join(ROOT_DIR, 'dsh-plugin-desktop/dist/mac-release', `OmniMux-2.0.3-universal.dmg`),
     ].filter(Boolean)
 
     for (const p of candidateWinPaths) {
@@ -432,14 +445,18 @@ async function main() {
       }
     }
 
-    for (const p of candidateMacPaths) {
-      if (existsSync(p)) {
-        macDmgPath = p
-        break
-      }
+    const macArtifacts = []
+    for (const p of candidateMacArm64Paths) {
+      if (existsSync(p)) { macArtifacts.push({ path: p, arch: 'arm64' }); break }
+    }
+    for (const p of candidateMacX64Paths) {
+      if (existsSync(p)) { macArtifacts.push({ path: p, arch: 'x64' }); break }
+    }
+    for (const p of candidateMacUniversalPaths) {
+      if (existsSync(p)) { macArtifacts.push({ path: p, arch: 'universal' }); break }
     }
 
-    if (!winExePath && !macDmgPath) {
+    if (!winExePath && macArtifacts.length === 0) {
       throw new Error(`未找到任何待上传的 .exe 或 .dmg 产物文件，请检查 dist/ 或使用 --dir 参数指定。`)
     }
 
@@ -449,7 +466,7 @@ async function main() {
     // manifest says 2.0.18, the Next build is 2.0.20-next) an archive filed
     // under the manifest version is unreachable by anyone who knows what they
     // installed — issue #126.
-    const artifactVersion = versionOfInstallerName(basename(macDmgPath ?? winExePath))
+    const artifactVersion = versionOfInstallerName(basename(macArtifacts[0]?.path ?? winExePath))
     if (artifactVersion !== null && artifactVersion !== version) {
       console.log(`📌 归档版本以产物为准：v${artifactVersion}（壳仓 manifest 为 v${version}）`)
       version = artifactVersion
@@ -457,7 +474,9 @@ async function main() {
 
     console.log(`📌 匹配到本地待分发文件：`)
     if (winExePath) console.log(`  • Windows EXE: ${winExePath}`)
-    if (macDmgPath) console.log(`  • macOS DMG:   ${macDmgPath}`)
+    for (const { path, arch } of macArtifacts) {
+      console.log(`  • macOS ${arch} DMG: ${path}`)
+    }
 
     const uploadPlan = []
 
@@ -475,20 +494,22 @@ async function main() {
       for (const key of winKeys) uploadPlan.push({ key, file: winExePath, size: winStat.size })
     }
 
-    if (macDmgPath) {
-      const macStat = statSync(macDmgPath)
-      const actualMacName = basename(macDmgPath)
-      const macKeys = new Set([
-        `releases/v${version}/${actualMacName}`,
-        `releases/v${version}/OmniMux-${version}-arm64.dmg`,
-        `releases/v${version}/OmniMux-${version}-universal.dmg`,
-        `releases/v${version}/DSH.Desktop-${version}-universal.dmg`,
-        `releases/latest/OmniMux-arm64.dmg`,
-        `releases/latest/OmniMux-universal.dmg`,
-        `releases/latest/OmniMux-mac.dmg`,
-        `releases/latest/DSH-Desktop.dmg`,
-      ])
-      for (const key of macKeys) uploadPlan.push({ key, file: macDmgPath, size: macStat.size })
+    for (const { path: macPath, arch } of macArtifacts) {
+      const macStat = statSync(macPath)
+      const actualMacName = basename(macPath)
+      const macKeys = new Set([`releases/v${version}/${actualMacName}`])
+      if (arch === 'arm64') {
+        macKeys.add(`releases/v${version}/OmniMux-${version}-arm64.dmg`)
+        macKeys.add(`releases/latest/OmniMux-arm64.dmg`)
+        macKeys.add(`releases/latest/OmniMux-mac.dmg`)
+      } else if (arch === 'x64') {
+        macKeys.add(`releases/v${version}/OmniMux-${version}-x64.dmg`)
+        macKeys.add(`releases/latest/OmniMux-x64.dmg`)
+      } else {
+        macKeys.add(`releases/v${version}/OmniMux-${version}-universal.dmg`)
+        macKeys.add(`releases/latest/OmniMux-universal.dmg`)
+      }
+      for (const key of macKeys) uploadPlan.push({ key, file: macPath, size: macStat.size })
     }
 
     // Release metadata the desktop updaters poll. It lives at a fixed path beside

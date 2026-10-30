@@ -836,7 +836,7 @@ describe('published package surface', () => {
   it('fixes the installed application identity', () => {
     // verify-version.mjs keeps the root and desktop versions equal.
     expect(workspaceManifest.version).toBe(manifest.version)
-    expect(manifest.version).toBe('2.0.18')
+    expect(manifest.version).toBe('2.0.21')
     expect(manifest.build?.productName).toBe('OmniMux')
     expect(manifest.build?.appId).toBe('ai.omnimux.desktop')
     expect(manifest.build?.asar).toBe(false)

@@ -50,6 +50,7 @@ jobs:
           node scripts/verify-bilingual-docs.mjs
           node --test scripts/market-dependency-direction.test.mjs
           node scripts/verify-market-dependency-direction.mjs
+          node --test scripts/build-plugin-provenance.test.mjs
           if [[ "$EVENT_NAME" == "workflow_dispatch" || -z "$BASE_SHA" || "$BASE_SHA" =~ ^0+$ ]]; then
             product=true
             mac=true

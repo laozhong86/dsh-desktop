@@ -26,8 +26,8 @@ export type DesktopDownloadPlatform = 'darwin' | 'win32'
  * an older client asking for it still resolves.
  */
 export const DESKTOP_DOWNLOAD_URLS: Readonly<Record<DesktopDownloadPlatform, string>> = {
-  darwin: 'https://dl.omnimux.ai/releases/latest/OmniMux-arm64.dmg',
-  win32: 'https://dl.omnimux.ai/releases/latest/OmniMux-Setup.exe',
+  darwin: `https://dl.omnimux.ai/releases/latest/OmniMux-${process.arch === 'x64' ? 'x64' : 'arm64'}.dmg`,
+  win32: 'https://dl.omnimux.ai/releases/latest/OmniMux-x64-Setup.exe',
 }
 
 /** Header pinning a download request and response to the checked release. */

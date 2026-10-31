@@ -872,7 +872,7 @@ describe('published package surface', () => {
       '!node_modules/node-pty/build/**',
       '!node_modules/fs-ext/build/**',
     ])
-    expect(manifest.build?.mac?.icon).toBe('build/app-icon.icon')
+    expect(manifest.build?.mac?.icon).toBe('build/app-icon.icns')
     expect(manifest.build?.dmg?.icon).toBe('build/app-icon.icns')
     expect(manifest.build?.mac?.mergeASARs).toBe(false)
     expect(manifest.build?.mac?.signIgnore).toEqual(['\\.(?:pak|dat|wasm)$', '/Contents/Resources/runtime/(?:arm64|x64)/primary-runtime(?:/|$)'])
@@ -1132,7 +1132,11 @@ describe('published package surface', () => {
     for (const name of ['app-icon.png', 'app-icon-mac.png', 'app-icon.icns', 'app-icon.ico']) {
       expect(readFileSync(new URL(`build/${name}`, packageRoot)).byteLength).toBeGreaterThan(0)
     }
-    expect(readFileSync(new URL('build/app-icon.icns', packageRoot)).subarray(0, 4).toString()).toBe('icns')
+    const icns = readFileSync(new URL('build/app-icon.icns', packageRoot))
+    expect(icns.subarray(0, 4).toString()).toBe('icns')
+    // `ic10` is the 512@2x slice: macOS scales the Dock icon up to 1024, so an `.icns`
+    // that stops at 256 renders as an upscaled bitmap instead of the brand icon.
+    expect(icns.includes(Buffer.from('ic10'))).toBe(true)
   })
 
   it('generates exact-DPI Windows application and installer icon frames', () => {

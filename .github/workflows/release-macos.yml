@@ -39,6 +39,11 @@ jobs:
       - name: Install dependencies
         working-directory: src
         run: corepack yarn install --immutable
+      - name: Refresh Agents Anywhere release artifact
+        working-directory: src
+        run: |
+          # 发布门禁要求桥接件出自官方 AA main 的最新提交，CI 里必须现场刷新。
+          corepack yarn aa:prepare-release
       - name: Import Developer ID certificate
         working-directory: src
         env:

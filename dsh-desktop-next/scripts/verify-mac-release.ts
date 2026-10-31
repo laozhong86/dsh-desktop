@@ -27,7 +27,8 @@ export function verifyNextMac(signed: boolean): void {
     run: (command, args) => {
       if (!signed && ['codesign', 'spctl', 'xcrun'].includes(command)) return
       if (smokeSlices !== undefined && command === 'lipo' && args[1] === '-verify_arch' && args[0]?.includes('/Contents/MacOS/') && !smokeSlices.includes(args[2] as MacUniversalArch)) return
-      const result = spawnSync(command, args, { stdio: 'inherit' })
+      const result = spawnSync(command, args, { stdio: 'inherit', timeout: 10 * 60 * 1000 })
+      if (result.signal === 'SIGTERM') throw new Error(`Artifact verification timed out after 10m: ${command} ${args.join(' ')}`)
       if (result.error || result.status !== 0) throw result.error ?? new Error(`Artifact verification failed: ${command}`)
       if (signed && command === 'codesign' && args.includes('--verify')) verifyNextMacEntitlements(args.at(-1)!, undefined, archSlices)
     } })

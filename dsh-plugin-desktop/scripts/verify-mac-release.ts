@@ -42,9 +42,17 @@ function listDmgs(distDir: string): readonly string[] {
     .filter(path => statSync(path).isFile())
 }
 
+// One verification subprocess gets up to ten minutes; the release build already proved the
+// chain signs and notarizes, so a verify step must never be able to stall the job all the
+// way to the CI timeout without naming the culprit (as happened on the 1.6GB image).
+const VERIFY_COMMAND_TIMEOUT_MS = 10 * 60 * 1000
+
 function run(command: string, args: readonly string[]): void {
-  const result = spawnSync(command, args, { stdio: 'inherit' })
+  const result = spawnSync(command, args, { stdio: 'inherit', timeout: VERIFY_COMMAND_TIMEOUT_MS })
   if (result.error !== undefined) throw result.error
+  if (result.signal === 'SIGTERM') {
+    throw new Error(`${command} ${args.join(' ')} timed out after ${VERIFY_COMMAND_TIMEOUT_MS / 60000}m`)
+  }
   if (result.status !== 0) {
     throw new Error(`${command} ${args.join(' ')} exited with ${String(result.status)}`)
   }
@@ -93,22 +101,30 @@ export function verifyMacRelease(
     mounted = true
     const executablePath = join(appPath, 'Contents', 'MacOS', options.productName)
     for (const slice of options.archSlices ?? ['x86_64', 'arm64']) {
+      console.log(`[verify-mac] lipo executable ${slice}`)
       options.run('lipo', [executablePath, '-verify_arch', slice])
     }
     const unpackedRoot = options.unpackedRoot === undefined ? join(appPath, 'Contents', 'Resources', 'app') : options.unpackedRoot(appPath)
     for (const entry of options.nativeEntries ?? MACOS_UNIVERSAL_NATIVE_ENTRIES) {
+      console.log(`[verify-mac] lipo native ${entry.arch} ${entry.path}`)
       options.run('lipo', [join(unpackedRoot, entry.path), '-verify_arch', entry.arch])
       if (entry.path.endsWith('/bin/uv')) {
         options.run('/bin/test', ['-x', join(unpackedRoot, entry.path)])
         if (entry.arch === (process.arch === 'x64' ? 'x86_64' : process.arch)) {
+          console.log(`[verify-mac] exec uv --version`)
           options.run(join(unpackedRoot, entry.path), ['--version'])
         }
       }
     }
+    console.log(`[verify-mac] codesign --verify --deep app`)
     options.run('codesign', ['--verify', '--deep', '--strict', '--verbose=2', appPath])
+    console.log(`[verify-mac] entitlements`)
     options.verifyEntitlements?.(appPath, options.productName)
+    console.log(`[verify-mac] runtime payload`)
     options.verifyRuntime?.(appPath)
+    console.log(`[verify-mac] spctl assess`)
     options.run('spctl', ['--assess', '--type', 'execute', '--verbose=4', appPath])
+    console.log(`[verify-mac] stapler validate`)
     options.run('xcrun', ['stapler', 'validate', appPath])
   } catch (cause) {
     failure = cause

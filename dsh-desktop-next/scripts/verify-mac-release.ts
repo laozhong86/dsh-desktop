@@ -29,7 +29,7 @@ export function verifyNextMac(signed: boolean): void {
       if (smokeSlices !== undefined && command === 'lipo' && args[1] === '-verify_arch' && args[0]?.includes('/Contents/MacOS/') && !smokeSlices.includes(args[2] as MacUniversalArch)) return
       const result = spawnSync(command, args, { stdio: 'inherit' })
       if (result.error || result.status !== 0) throw result.error ?? new Error(`Artifact verification failed: ${command}`)
-      if (signed && command === 'codesign' && args.includes('--verify')) verifyNextMacEntitlements(args.at(-1)!)
+      if (signed && command === 'codesign' && args.includes('--verify')) verifyNextMacEntitlements(args.at(-1)!, undefined, archSlices)
     } })
 }
 if (process.argv[1]?.endsWith('/verify-mac-release.ts')) verifyNextMac(true)

@@ -70,7 +70,7 @@ jobs:
       - name: Build macOS release (arm64 DMG, signed + notarized)
         env:
           OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}/omni-source/plugins
-          CSC_NAME: 'Developer ID Application: Yuhang Zhong (XXK6GHRZ44)'
+          CSC_NAME: 'Yuhang Zhong (XXK6GHRZ44)'
           DSH_MAC_RELEASE_ARCH: arm64
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
@@ -141,7 +141,7 @@ jobs:
       - name: Build macOS release (x64 DMG, signed + notarized)
         env:
           OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}/omni-source/plugins
-          CSC_NAME: 'Developer ID Application: Yuhang Zhong (XXK6GHRZ44)'
+          CSC_NAME: 'Yuhang Zhong (XXK6GHRZ44)'
           DSH_MAC_RELEASE_ARCH: x64
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}

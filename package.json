@@ -716,7 +716,7 @@
     "@deepseek-ai/dsh-webhook@npm:^0.2.1-rc.3": "file:vendor/dsh-runtime/0.2.1-rc.3/deepseek-ai-dsh-webhook-0.2.1-rc.3.tgz",
     "@deepseek-ai/dsh-webhook-github@npm:0.2.1-rc.3": "file:vendor/dsh-runtime/0.2.1-rc.3/deepseek-ai-dsh-webhook-github-0.2.1-rc.3.tgz",
     "@deepseek-ai/dsh-webhook-github@npm:^0.2.1-rc.3": "file:vendor/dsh-runtime/0.2.1-rc.3/deepseek-ai-dsh-webhook-github-0.2.1-rc.3.tgz",
-    "dshmarket@npm:1.70.1": "patch:dshmarket@npm%3A1.70.1#./.yarn/patches/dshmarket-desktop.patch"
+    "dshmarket@npm:1.73.5": "patch:dshmarket@npm%3A1.73.5#./.yarn/patches/dshmarket-desktop.patch"
   },
   "dependenciesMeta": {
     "@deepseek-ai/dsh-subprocess-local": {
@@ -791,8 +791,8 @@
     "omnimux:path": "node scripts/omnimux.mjs path",
     "package:dir:next": "yarn aa:prepare-release && yarn workspace dsh-community-market build && yarn workspace dsh-desktop-next package:dir",
     "dist:mac:next": "yarn aa:prepare-release && yarn workspace dsh-community-market build && yarn workspace dsh-desktop-next dist:mac",
-    "dist:mac-arm64:next": "DSH_MAC_RELEASE_ARCH=arm64 yarn aa:prepare-release && yarn workspace dsh-community-market build && yarn workspace dsh-desktop-next dist:mac",
-    "dist:mac-x64:next": "DSH_MAC_RELEASE_ARCH=x64 yarn aa:prepare-release && yarn workspace dsh-community-market build && yarn workspace dsh-desktop-next dist:mac",
+    "dist:mac-arm64:next": "yarn aa:prepare-release && yarn workspace dsh-community-market build && DSH_MAC_RELEASE_ARCH=arm64 yarn workspace dsh-desktop-next dist:mac",
+    "dist:mac-x64:next": "yarn aa:prepare-release && yarn workspace dsh-community-market build && DSH_MAC_RELEASE_ARCH=x64 yarn workspace dsh-desktop-next dist:mac",
     "dist:mac-smoke:next": "yarn aa:prepare-release && yarn workspace dsh-community-market build && yarn workspace dsh-desktop-next dist:mac-smoke",
     "dist:win:next": "yarn aa:prepare-release && yarn workspace dsh-community-market build && yarn workspace dsh-desktop-next dist:win",
     "dist:win-portable:next": "yarn aa:prepare-release && yarn workspace dsh-community-market build && yarn workspace dsh-desktop-next dist:win-portable",

@@ -70,7 +70,6 @@ jobs:
       - name: Build macOS release (arm64 DMG, signed + notarized)
         env:
           OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}/omni-source/plugins
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           CSC_NAME: 'Developer ID Application: Yuhang Zhong (XXK6GHRZ44)'
           DSH_MAC_RELEASE_ARCH: arm64
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -142,7 +141,6 @@ jobs:
       - name: Build macOS release (x64 DMG, signed + notarized)
         env:
           OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}/omni-source/plugins
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
           CSC_NAME: 'Developer ID Application: Yuhang Zhong (XXK6GHRZ44)'
           DSH_MAC_RELEASE_ARCH: x64
           APPLE_ID: ${{ secrets.APPLE_ID }}
@@ -202,7 +200,6 @@ jobs:
       - name: Build Windows installer (website unsigned)
         env:
           OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}\omni-source\plugins
-          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: corepack yarn workspace dsh-desktop-next dist:win
       - name: Verify Windows installer
         env:

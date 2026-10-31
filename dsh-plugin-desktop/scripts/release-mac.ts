@@ -143,10 +143,14 @@ export function releaseMac(options: MacReleaseOptions = defaultReleaseOptions())
   const archFlag = options.releaseArch === 'universal' ? '--universal'
     : options.releaseArch === 'arm64' ? '--arm64' : '--x64'
   options.log(`macOS release target: ${options.releaseArch}`)
+  // electron-builder auto-enables publishing when it detects CI and then aborts the
+  // whole packaging step with "GitHub Personal Access Token is not set". Releasing is
+  // the workflow's job (artifact upload plus the publish job), so the build declares
+  // that it never publishes on its own.
   options.run('yarn', [
     'exec', 'electron-builder', '--mac', 'dmg', archFlag,
     '--config.forceCodeSigning=true', '--config.mac.notarize=true',
-    '--config.npmRebuild=false',
+    '--config.npmRebuild=false', '--publish', 'never',
     `--config.directories.output=${options.outputDir}`,
   ], options.desktopRoot, electronBuilderEnvironment(releaseEnvironment))
   options.run(

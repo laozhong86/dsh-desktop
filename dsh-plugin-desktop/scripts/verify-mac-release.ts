@@ -11,6 +11,8 @@ import { verifyDesktopMacRuntime } from './verify-mac-runtime.ts'
 
 /** Injectable filesystem and command boundaries for release verification. */
 export interface MacReleaseVerificationOptions {
+  /** CPU slices the packaged executable must carry; both for a universal release. */
+  readonly archSlices?: readonly string[]
   /** Native inventory for shells which do not load legacy-only modules. */
   readonly nativeEntries?: readonly { readonly arch: string; readonly path: string }[]
   /** Physical runtime root inside the application; the unpacked `Resources/app` layout by default. */
@@ -90,8 +92,9 @@ export function verifyMacRelease(
     options.run('hdiutil', ['attach', dmgPath, '-mountpoint', mountPoint, '-nobrowse', '-readonly'])
     mounted = true
     const executablePath = join(appPath, 'Contents', 'MacOS', options.productName)
-    options.run('lipo', [executablePath, '-verify_arch', 'x86_64'])
-    options.run('lipo', [executablePath, '-verify_arch', 'arm64'])
+    for (const slice of options.archSlices ?? ['x86_64', 'arm64']) {
+      options.run('lipo', [executablePath, '-verify_arch', slice])
+    }
     const unpackedRoot = options.unpackedRoot === undefined ? join(appPath, 'Contents', 'Resources', 'app') : options.unpackedRoot(appPath)
     for (const entry of options.nativeEntries ?? MACOS_UNIVERSAL_NATIVE_ENTRIES) {
       options.run('lipo', [join(unpackedRoot, entry.path), '-verify_arch', entry.arch])

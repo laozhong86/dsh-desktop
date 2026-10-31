@@ -4,6 +4,7 @@ import { mkdtempSync, readdirSync, rmdirSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { macSmokeArchitecture, macSmokeExecutableSlices, type MacUniversalArch } from '../../dsh-plugin-desktop/scripts/mac-universal.ts'
+import { macReleaseArchitecture } from '../../dsh-plugin-desktop/scripts/release-mac.ts'
 import { verifyMacRelease } from '../../dsh-plugin-desktop/scripts/verify-mac-release.ts'
 import { NEXT_MAC_NATIVE_ENTRIES } from './mac-runtime.ts'
 import { verifyNextMacEntitlements } from './verify-mac-entitlements.ts'
@@ -11,7 +12,12 @@ import { verifyNextMacRuntime } from './verify-mac-runtime.ts'
 
 export function verifyNextMac(signed: boolean): void {
   const smokeSlices = signed ? undefined : macSmokeExecutableSlices(macSmokeArchitecture(process.env))
-  verifyMacRelease({ distDir: resolve(process.argv[2] ?? `dist/${signed ? 'mac-release' : 'mac-smoke'}`), productName: 'OmniMux', nativeEntries: NEXT_MAC_NATIVE_ENTRIES,
+  // A signed release packages one architecture unless it is explicitly universal; the
+  // mounted executable must carry exactly those slices, not the universal pair.
+  const releaseArch = macReleaseArchitecture(process.env)
+  const archSlices = releaseArch === 'universal' ? ['x86_64', 'arm64']
+    : [releaseArch === 'arm64' ? 'arm64' : 'x86_64']
+  verifyMacRelease({ distDir: resolve(process.argv[2] ?? `dist/${signed ? 'mac-release' : 'mac-smoke'}`), productName: 'OmniMux', nativeEntries: NEXT_MAC_NATIVE_ENTRIES, archSlices,
     // Next archives its application; native files live beside the archive.
     unpackedRoot: appPath => join(appPath, 'Contents', 'Resources', 'app.asar.unpacked'),
     listDmgs: path => readdirSync(path).filter(name => name.endsWith('.dmg')).map(name => join(path, name)).filter(path => statSync(path).isFile()),

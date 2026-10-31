@@ -1,0 +1,95 @@
+name: macOS signed release (private source)
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Which architecture to build
+        type: choice
+        options: [arm64, x64, both]
+        default: arm64
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Check out private source
+        uses: actions/checkout@v4
+        with:
+          repository: laozhong86/omnimux-desktop-fork
+          ref: omnimux
+          token: ${{ secrets.REPO_TOKEN }}
+          fetch-depth: 0
+          submodules: recursive
+          persist-credentials: false
+          path: src
+      - name: Check out private plugin source
+        uses: actions/checkout@v4
+        with:
+          repository: laozhong86/omnimux-desktop-fork
+          ref: plugins-source
+          token: ${{ secrets.REPO_TOKEN }}
+          persist-credentials: false
+          path: plugins-src
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.2
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Install dependencies
+        working-directory: src
+        run: corepack yarn install --immutable
+      - name: Import Developer ID certificate
+        working-directory: src
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          echo "$APPLE_CERTIFICATE" | base64 --decode > developerID_application.p12
+          security create-keychain -p "github-actions" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "github-actions" build.keychain
+          security import developerID_application.p12 -k build.keychain \
+            -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "github-actions" build.keychain
+          security find-identity -v build.keychain
+      - name: Build arm64
+        if: ${{ inputs.platform == 'arm64' || inputs.platform == 'both' }}
+        working-directory: src
+        env:
+          OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}/plugins-src/plugins
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          CSC_NAME: 'Developer ID Application: Yuhang Zhong (XXK6GHRZ44)'
+          DSH_MAC_RELEASE_ARCH: arm64
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: corepack yarn workspace dsh-desktop-next dist:mac
+      - name: Upload arm64 DMG
+        if: ${{ inputs.platform == 'arm64' || inputs.platform == 'both' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: OmniMux-mac-arm64
+          path: src/dsh-desktop-next/dist/mac-release/*arm64*.dmg
+          if-no-files-found: error
+          retention-days: 14
+      - name: Build x64
+        if: ${{ inputs.platform == 'x64' || inputs.platform == 'both' }}
+        working-directory: src
+        env:
+          OMNIMUX_PLUGINS_DIR: ${{ github.workspace }}/plugins-src/plugins
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          CSC_NAME: 'Developer ID Application: Yuhang Zhong (XXK6GHRZ44)'
+          DSH_MAC_RELEASE_ARCH: x64
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: corepack yarn workspace dsh-desktop-next dist:mac
+      - name: Upload x64 DMG
+        if: ${{ inputs.platform == 'x64' || inputs.platform == 'both' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: OmniMux-mac-x64
+          path: src/dsh-desktop-next/dist/mac-release/*x64*.dmg
+          if-no-files-found: error
+          retention-days: 14

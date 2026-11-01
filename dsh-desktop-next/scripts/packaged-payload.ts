@@ -5,6 +5,8 @@ import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { basename as posixBasename, dirname as posixDirname } from 'node:path/posix'
 import { getRawHeader } from '@electron/asar'
+import { macSmokeArchitecture } from '../../dsh-plugin-desktop/scripts/mac-universal.ts'
+import { macReleaseArchitecture } from '../../dsh-plugin-desktop/scripts/release-mac.ts'
 import { nextRuntimeFileExclusion, nextRuntimePackageExclusion, nextRuntimeUnusedFeatureExclusion, type NextPackagingTarget, type RuntimePackageConstraints } from './runtime-file-policy.ts'
 import { DESKTOP_RUNTIME_FILE, parseDesktopRuntime, verifyPayload, type DesktopRuntimeDescriptor, type DesktopRuntimeFile, type NextRelease, type PayloadEntry, type PayloadSource, type VerifyPayloadOptions } from '../src/runtime-tree.ts'
 
@@ -13,14 +15,27 @@ export const PAYLOAD_DIR = '.desktop-build/payload'
 
 /**
  * Architectures whose native dependencies one Next package carries.
- * macOS releases are universal and the Yarn tree installs both Darwin CPU variants, so even a
- * single-architecture directory build ships both; Windows releases are x64 only.
+ * macOS universal builds carry both Darwin CPU variants, while single-architecture release or smoke
+ * builds (`DSH_MAC_RELEASE_ARCH` / `DSH_MAC_SMOKE_ARCH` = `arm64` or `x64`) prune the opposite CPU's
+ * native modules; Windows releases are x64 only.
  * @param platform - Electron platform being packaged.
  * @param hostArch - Build host architecture, used for platforms without a release target.
+ * @param env - Process environment inspected for single-architecture selection.
  * @returns Platform and architectures recorded in the payload descriptor.
  */
-export function nextPackagingTarget(platform: NodeJS.Platform, hostArch: string = process.arch): NextPackagingTarget {
-  if (platform === 'darwin') return { platform, archs: ['arm64', 'x64'] }
+export function nextPackagingTarget(
+  platform: NodeJS.Platform,
+  hostArch: string = process.arch,
+  env: NodeJS.ProcessEnv = process.env,
+): NextPackagingTarget {
+  if (platform === 'darwin') {
+    const smokeArch = macSmokeArchitecture(env)
+    const releaseArch = macReleaseArchitecture(env)
+    const arch = smokeArch !== 'universal' ? smokeArch : releaseArch
+    if (arch === 'arm64') return { platform, archs: ['arm64'] }
+    if (arch === 'x64') return { platform, archs: ['x64'] }
+    return { platform, archs: ['arm64', 'x64'] }
+  }
   if (platform === 'win32') return { platform, archs: ['x64'] }
   return { platform, archs: [hostArch] }
 }

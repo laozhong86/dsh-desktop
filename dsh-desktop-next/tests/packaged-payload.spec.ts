@@ -49,7 +49,11 @@ async function assembled(extra: (app: string) => void = () => {}, seal = true): 
 }
 
 it('describes the architectures each release target carries', () => {
-  expect(nextPackagingTarget('darwin')).toEqual({ platform: 'darwin', archs: ['arm64', 'x64'] })
+  expect(nextPackagingTarget('darwin', 'arm64', {})).toEqual({ platform: 'darwin', archs: ['arm64', 'x64'] })
+  expect(nextPackagingTarget('darwin', 'arm64', { DSH_MAC_RELEASE_ARCH: 'arm64' })).toEqual({ platform: 'darwin', archs: ['arm64'] })
+  expect(nextPackagingTarget('darwin', 'arm64', { DSH_MAC_RELEASE_ARCH: 'x64' })).toEqual({ platform: 'darwin', archs: ['x64'] })
+  expect(nextPackagingTarget('darwin', 'arm64', { DSH_MAC_SMOKE_ARCH: 'arm64' })).toEqual({ platform: 'darwin', archs: ['arm64'] })
+  expect(nextPackagingTarget('darwin', 'arm64', { DSH_MAC_SMOKE_ARCH: 'x64' })).toEqual({ platform: 'darwin', archs: ['x64'] })
   expect(nextPackagingTarget('win32')).toEqual({ platform: 'win32', archs: ['x64'] })
   expect(nextPackagingTarget('linux', 'arm64')).toEqual({ platform: 'linux', archs: ['arm64'] })
 })

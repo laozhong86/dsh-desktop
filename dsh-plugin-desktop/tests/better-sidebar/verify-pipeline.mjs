@@ -68,13 +68,13 @@ const { stagePresetProfile } = await import(pathToFileURL(stagePath).href)
 const first = buildPatchedBetterSidebar(join(workRoot, 'first'))
 const firstHashes = hashes(first.packedRoot)
 
-// Mirrors PRODUCT_PLUGINS in stage-preset-profile.ts: the stage asserts every
-// one of these has a source directory, so the fixture must cover the full list.
+// Mirrors config/plugin-tiers.json (preview + beta, the tiers stagePresetProfile
+// stages): the stage asserts every one of these has a source directory, so the
+// fixture must cover the full list.
 const productNames = [
   'omnimux', 'omnimux-accounts', 'omnimux-assets', 'omnimux-products',
   'omnimux-workflow', 'omnimux-market', 'omnimux-inspiration', 'omnimux-clip',
   'omnimux-video', 'omnimux-analytics', 'omnimux-publish', 'omnimux-forms',
-  'omnimux-automation',
 ]
 const pluginsRoot = join(workRoot, 'product-plugins')
 for (const name of productNames) {

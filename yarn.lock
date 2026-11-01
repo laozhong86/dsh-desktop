@@ -13556,7 +13556,7 @@ __metadata:
     dsh-better-sidebar: "npm:^0.28.1"
     dsh-community-market: "npm:0.1.0-dev.0"
     dsh-ui-kit: "npm:^0.1.0"
-    dshmarket: "npm:1.73.6"
+    dshmarket: "npm:1.73.7"
     electron: "npm:44.7.0"
     electron-builder: "npm:26.15.7"
     extract-zip: "npm:2.0.1"
@@ -13814,7 +13814,7 @@ __metadata:
     class-variance-authority: "npm:^0.7.1"
     clsx: "npm:^2.1.1"
     dsh-community-market: "npm:0.1.0-dev.0"
-    dshmarket: "npm:1.73.6"
+    dshmarket: "npm:1.73.7"
     electron: "npm:44.7.0"
     electron-builder: "npm:26.15.7"
     extract-zip: "npm:2.0.1"
@@ -13862,9 +13862,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"dshmarket@npm:1.73.6":
-  version: 1.73.6
-  resolution: "dshmarket@npm:1.73.6"
+"dshmarket@npm:1.73.7":
+  version: 1.73.7
+  resolution: "dshmarket@npm:1.73.7"
   dependencies:
     js-yaml: "npm:^4.3.2"
     undici: "npm:^7.29.1"
@@ -13877,13 +13877,13 @@ __metadata:
       optional: true
     "@deepseek-ai/schemastery":
       optional: true
-  checksum: 10c0/ce3a3d8b4fead747a9424985f5b603ef5cc03dd16abe15e318d66fb1839fd3728153261493d01faef4ca15f1b394e3f043e2fc0e9c07f041ab5ad84776f25982
+  checksum: 10c0/ae0f063c0fe61895230404bad58fad9086413181b266870d3bb2c01412e77b385c24c42144e80b503e70e3e3e4bfe357f69abee956368ab77f098c366761e2b8
   languageName: node
   linkType: hard
 
-"dshmarket@patch:dshmarket@npm%3A1.73.6#./.yarn/patches/dshmarket-desktop.patch::locator=deepseek-harness-desktop%40workspace%3A.":
-  version: 1.73.6
-  resolution: "dshmarket@patch:dshmarket@npm%3A1.73.6#./.yarn/patches/dshmarket-desktop.patch::version=1.73.6&hash=3adf79&locator=deepseek-harness-desktop%40workspace%3A."
+"dshmarket@patch:dshmarket@npm%3A1.73.7#./.yarn/patches/dshmarket-desktop.patch::locator=deepseek-harness-desktop%40workspace%3A.":
+  version: 1.73.7
+  resolution: "dshmarket@patch:dshmarket@npm%3A1.73.7#./.yarn/patches/dshmarket-desktop.patch::version=1.73.7&hash=3adf79&locator=deepseek-harness-desktop%40workspace%3A."
   dependencies:
     js-yaml: "npm:^4.3.2"
     undici: "npm:^7.29.1"
@@ -13896,7 +13896,7 @@ __metadata:
       optional: true
     "@deepseek-ai/schemastery":
       optional: true
-  checksum: 10c0/9a28ae467466ef53c6e55967ef2769941b28fce6b382d6238c1c7926ef761090912aba18051394377d9d41ed7793d1a2f9615ed7d36c6977bdd441c4d9706a28
+  checksum: 10c0/9cdd9c57e1e39141c708f551a88a8706095a86fef6eeb0b5a30dbb9a7bf16c64359562da186c4bc608c78ba0b061bd3e798ff796f913bb3602be6f2607f679d1
   languageName: node
   linkType: hard
 

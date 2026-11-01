@@ -84,7 +84,9 @@ jobs:
     if: ${{ inputs.target == 'mac-x64' || inputs.target == 'mac-both' || inputs.target == 'all' }}
     # Build x86_64 on a native Intel runner: on arm64 macos-latest every compile and
     # codesign call runs under Rosetta and the x64 package blew past the job timeout.
-    runs-on: macos-15-intel
+    # Must also be macOS 26: electron-builder needs actool >= 26.0, and the macOS 15
+    # Intel image only ships Xcode 16.4.
+    runs-on: macos-26-intel
     timeout-minutes: 80
     steps:
       - name: Check out private source

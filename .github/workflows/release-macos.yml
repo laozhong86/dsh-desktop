@@ -87,7 +87,9 @@ jobs:
     # Must also be macOS 26: electron-builder needs actool >= 26.0, and the macOS 15
     # Intel image only ships Xcode 16.4.
     runs-on: macos-26-intel
-    timeout-minutes: 80
+    # Standard Intel runners are ~4 vCPUs; the full monorepo gate plus packaging
+    # legitimately runs longer than the arm64 runner needs.
+    timeout-minutes: 120
     steps:
       - name: Check out private source
         uses: actions/checkout@v4

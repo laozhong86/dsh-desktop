@@ -27,21 +27,24 @@ node --version   # 确认 24.18.1
 
 打包前还需按仓库契约完成两项准备，否则会启动崩溃或依赖解析失败：
 
-1. **stage preset**：`OMNIMUX_PLUGINS_DIR=<插件目录> yarn omnimux:stage`（未 stage 会触发 `missing dsh-better-sidebar` 恢复窗口）
+1. **stage preset**：仓库内已提交的 `dsh-plugin-desktop/preset/` 默认包含完整的 177 个已物化插件，**日常发版直接复用，禁止在本机盲目重跑 `yarn omnimux:stage`**（若本机 `../dsh-plugin` 源码树落后于线上分支，盲跑会导致 `preset/skeleton/package.json` 丢插件）。仅在明确需要从最新插件源码重刷时才执行 `OMNIMUX_PLUGINS_DIR=<插件目录> yarn omnimux:stage`，且执行后必须核对 `skeleton/package.json` 列表完整无缺失。
 2. **依赖完整**：`corepack yarn install --immutable`（依赖树空心会让 electron-builder 在缺生产依赖时中断）
+3. **本机直连网络门禁**：当在本机执行公证或大包上传时，必须确认当前生效的 Surge 主配置（`~/Library/Application Support/Surge/Profiles/Default.conf`）顶部已包含 `PROCESS-NAME,notarytool,DIRECT`、`DOMAIN-SUFFIX,notary-submissions-prod.s3-accelerate.amazonaws.com,DIRECT`、`DOMAIN,api.cloudflare.com,DIRECT`、`DOMAIN-SUFFIX,r2.cloudflarestorage.com,DIRECT`、`DOMAIN,dl.omnimux.ai,DIRECT` 与 `DOMAIN,upload.omnimux.ai,DIRECT`，否则代理节点（约 1 Mbps）会导致 547 MB 公证上传耗时 84+ 分钟并断流卡死。
 
 ---
 
-## 1. 跨平台产物架构规范
+## 1. 跨平台产物架构规范与「云端 + 本机混合构建分工」
 
-### 1.1 macOS 产物规范（Apple Silicon vs Intel）
-- **通用二进制（Universal DMG - 推荐标准）**：
-  - 文件命名：`OmniMux-<version>-universal.dmg`（兼容器名：`DSH.Desktop-<version>-universal.dmg`）
-  - 内部架构：包含 `arm64`（Apple Silicon M1~M4 系列）和 `x86_64`（Intel）双架构 native 模块（sharp, koffi, ripgrep, node-pty）。
-  - 优势：用户下载单一安装包即可在所有 Mac 机型上原生运行，无需区分机型，零决策成本。
-- **单架构 DMG（可选）**：
-  - `OmniMux-<version>-arm64.dmg`（仅 M 芯片，体积略小）
-  - `OmniMux-<version>-x64.dmg`（仅 Intel 芯片）
+### 1.1 macOS 产物规范（Apple Silicon vs Intel）与构建分工
+- **双架构独立 DMG（当前主推）与通用 DMG**：
+  - `OmniMux-<version>-arm64.dmg`（Apple Silicon M 系列芯片）
+  - `OmniMux-<version>-x64.dmg`（Intel 芯片）
+  - `OmniMux-<version>-universal.dmg`（通用二进制，按需）
+- **云端 + 本机混合构建强制分工（2.0.21 实测铁律）**：
+  - **Windows x64 + macOS arm64 → 走 GitHub Actions 云端构建与 R2 同步**：云端构建 `win`（约 12 分钟）与 `mac-arm64`（约 19 分钟）稳定快速，完成后直接触发私有仓 `r2-publish` 走机房带宽 1 分钟同步上云。
+  - **macOS x64 → 强制走本机构建、签名、直连公证与 `upload.omnimux.ai` 分片上传**：GitHub Actions 的 macOS runner（无论 `macos-latest` arm64 还是 `macos-26-intel`）在对 50,765 个文件的 x64 包执行 `codesign` 时存在环境级退化（卡死 70–108 分钟直至超时取消），而在本机签名同一份 x64 包仅需 **1.5 分钟**，直连上传苹果公证（`--keychain-profile "AC_PASSWORD"`）仅需 **90 秒**，经自有域名 `https://upload.omnimux.ai` 分片上传 356.8 MB DMG 仅需 **2 分钟**。
+  - **单架构精准瘦身 + ULMO 压缩 + 边缘全缓存 HIT**：`DSH_MAC_RELEASE_ARCH=arm64|x64` 会自动剔除另一颗芯片的 `primary-runtime` 与原生模块，配合 `dmg.format = "ULMO"`（LZMA），使 `arm64` DMG 降至 **393.07 MiB**、`x64` DMG 降至 **356.81 MiB**（连同 Windows `307.11 MiB` 全部低于 Cloudflare **512 MiB** 单文件边缘缓存上限），配合 `dl.omnimux.ai/*` 的 `cacheEverything` 边缘路由实现三端全员 `cf-cache-status: HIT`。
+  - **完整操作指引**：已收敛为全局技能包 `omnimux-desktop-release`（真源：`/Users/x/Desktop/Project/opc-skills/skills/omnimux-desktop-release/SKILL.md`），执行发版前优先加载该技能。
 
 ### 1.2 Windows 产物规范
 - **NSIS 安装包（x64 Installer - 官网主推）**：

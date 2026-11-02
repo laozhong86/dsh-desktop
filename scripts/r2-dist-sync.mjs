@@ -502,6 +502,11 @@ async function main() {
         macKeys.add(`releases/v${version}/OmniMux-${version}-arm64.dmg`)
         macKeys.add(`releases/latest/OmniMux-arm64.dmg`)
         macKeys.add(`releases/latest/OmniMux-mac.dmg`)
+        // Keep universal/legacy aliases pointing at arm64 when no separate universal DMG is built
+        if (!macArtifacts.some(item => item.arch === 'universal')) {
+          macKeys.add(`releases/latest/OmniMux-universal.dmg`)
+          macKeys.add(`releases/latest/DSH-Desktop.dmg`)
+        }
       } else if (arch === 'x64') {
         macKeys.add(`releases/v${version}/OmniMux-${version}-x64.dmg`)
         macKeys.add(`releases/latest/OmniMux-x64.dmg`)
